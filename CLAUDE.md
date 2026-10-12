@@ -26,7 +26,8 @@ Dependency direction: `app` → `storage`/`input`/`games` → `core`. `core` dep
 
 - Build + tests: `./gradlew build`
 - Tests only: `./gradlew test`
-- Run app: `./gradlew :app:run`
+- Run app (until onboarding exists in M4, values are required arguments, none are hardcoded):
+  `./gradlew :app:run --args="--dpi 800 --cm360 40 --fov 103"` (all options: `LaunchOptions.USAGE`, printed on invalid arguments)
 - Package installer: `./gradlew :app:jpackage` (added in M8)
 
 ## JDK setup

@@ -12,8 +12,10 @@ AimTune never touches game processes, never reads input outside its own focused 
 
 ```
 ./gradlew build
-./gradlew :app:run
+./gradlew :app:run --args="--dpi 800 --cm360 40 --fov 103"
 ```
+
+Until onboarding exists (milestone 4), the trainer takes your DPI, sensitivity in cm/360° and the game's FOV as arguments; see `LaunchOptions.USAGE` in `app` for all options. Click starts a round, Esc aborts it, F3 toggles the debug overlay.
 
 Gradle itself runs on whatever JDK `JAVA_HOME` points to (Gradle 9.6.0 supports JDK 17 up to 25). The project compiles for Java 21 through a Gradle toolchain, and the foojay resolver plugin downloads JDK 21 automatically if it isn't installed, so you don't need to install JDK 21 yourself.
 

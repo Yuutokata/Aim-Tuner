@@ -6,7 +6,7 @@
 |---|---|---|
 | `core` | Units, event model, submovement segmentation, metrics, scoring, GP, acquisition, optimizer, accel analysis/fit, simulated player. Pure Kotlin, no LibGDX. | nothing |
 | `games` | `GameProfile` interface, JSON loader, bundled profiles (`games/*.json`), converters. | `core` |
-| `input` | `RawMouseSource` interface and implementations: `WindowsRawInputSource` (JNA, WM_INPUT, QPC) and `GlfwRawMouseSource` (fallback). | `core` |
+| `input` | `RawMouseSource` interface and `WindowsRawInputSource` (JNA, WM_INPUT, QPC). The GLFW fallback `GlfwMouseSource` lives in `app` because it needs the window handle. | `core` |
 | `storage` | SQLite persistence (sessions, rounds, raw events, target events), settings JSON. | `core` |
 | `app` | LibGDX application, Scene2D UI, 3D room, `Scenario` rendering, i18n, jpackage. | all |
 
@@ -18,7 +18,8 @@ raw input (counts + QPC timestamps) → `MouseEvent` stream → round recorder (
 
 ## Threading
 
-- Input thread: dedicated message-only window thread for Raw Input; pushes events into a lock-free queue, timestamped on arrival with QPC.
+- Input thread: dedicated message-only window thread for Raw Input; pushes events into a lock-free queue, timestamped on arrival with QPC. The window reports focus to the source, which registers the mouse only while focused (see ADR 0002).
+- Shared clock: the source exposes the `NanoClock` that stamps its events (QPC on Windows); the trainer uses the same clock for shots and round times.
 - Render/game thread (LibGDX): drains the queue each frame, applies sensitivity to camera, evaluates scenario.
 - Compute: optimizer and fitting run on a background coroutine dispatcher; results posted back to the render thread.
 - Storage writes on an IO dispatcher.
