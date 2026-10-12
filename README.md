@@ -15,7 +15,7 @@ AimTune never touches game processes, never reads input outside its own focused 
 ./gradlew :app:run
 ```
 
-Requires JDK 21 (Gradle toolchain resolves it automatically).
+Gradle itself runs on whatever JDK `JAVA_HOME` points to (Gradle 9.6.0 supports JDK 17 up to 25). The project compiles for Java 21 through a Gradle toolchain, and the foojay resolver plugin downloads JDK 21 automatically if it isn't installed, so you don't need to install JDK 21 yourself.
 
 ## Documentation
 

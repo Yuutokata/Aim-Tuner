@@ -60,7 +60,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Last session
 
-- Plan approved. Wrote documentation set, branch renamed to `main`, Gradle multi-module + CI added. `gradlew build` passes with JDK 21 (JAVA_HOME was not set in the shell; used `~/.jdks/ms-21.0.12.1`).
+- Plan approved. Wrote documentation set, branch renamed to `main`, Gradle multi-module + CI added. `gradlew build` passes with JDK 21 (JAVA_HOME was not set in the shell; used `~/.jdks/ms-21.0.12.1`). Later: JAVA_HOME is now JDK 25; verified the build on Gradle 9.6.0 + JDK 25 with toolchain 21 provisioned by foojay (auto-detect disabled), documented in CLAUDE.md and README.
 
 ## Next steps
 
@@ -72,6 +72,6 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Open questions
 
-- `docs/design/AimTune.pdf` could not be rendered (no `pdftoppm`/poppler). Screen layouts in DESIGN.md are not yet derived from it; install poppler or export PNGs.
+- `docs/design/AimTune.pdf` can now be rendered (poppler installed). Screen layouts in DESIGN.md are not yet derived from it; review it before M2 UI work.
 - `.idea/` files are staged; suggest unstaging (global rule: no editor config unless asked).
 - Exposed vs plain JDBC for storage (decide in ADR 0003 at M3).

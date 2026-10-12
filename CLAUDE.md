@@ -29,6 +29,12 @@ Dependency direction: `app` → `storage`/`input`/`games` → `core`. `core` dep
 - Run app: `./gradlew :app:run`
 - Package installer: `./gradlew :app:jpackage` (added in M8)
 
+## JDK setup
+
+- Gradle 9.6.0 (wrapper) runs on the JDK in `JAVA_HOME`, currently JDK 25 (Gradle 9.1+ supports running on 25). Do not downgrade the wrapper below 9.1.
+- The project targets Java 21 via `kotlin { jvmToolchain(21) }` (in `build-logic`). The foojay-resolver plugin in `settings.gradle.kts` downloads JDK 21 automatically when none is installed; no manual JDK 21 install needed.
+- To check provisioning: `./gradlew build -Porg.gradle.java.installations.auto-detect=false`.
+
 ## Conventions
 
 - Kotlin, JDK 21, Gradle Kotlin DSL, version catalog `gradle/libs.versions.toml`, convention plugins in `build-logic`.
