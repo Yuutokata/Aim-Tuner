@@ -1,0 +1,225 @@
+package de.yuuto.aimtune.storage
+
+import de.yuuto.aimtune.core.math.Vec3
+import de.yuuto.aimtune.core.metrics.RoundMetrics
+import de.yuuto.aimtune.core.recording.RoundRecording
+import de.yuuto.aimtune.core.scenario.Target
+import de.yuuto.aimtune.core.scenario.TargetEvent
+import java.sql.Connection
+import java.sql.ResultSet
+import java.sql.Statement
+import java.sql.Types
+
+enum class SessionKind(val id: String) {
+    SENSITIVITY("sensitivity"),
+    ACCEL_AB("accel_ab"),
+    ;
+
+    companion object {
+        fun fromId(id: String): SessionKind = entries.firstOrNull { it.id == id } ?: error("unknown session kind '$id'")
+    }
+}
+
+data class SessionRow(val id: Long, val startedAtMs: Long, val gameId: String?, val dpi: Double, val kind: SessionKind)
+
+/** A stored round without its raw events; [metrics] holds the values derived when it was saved. */
+data class RoundRow(
+    val id: Long,
+    val sessionId: Long,
+    val scenario: String,
+    val seed: Long,
+    val cm360: Double,
+    val blind: Boolean,
+    val startedAtMs: Long,
+    val metrics: Map<String, Double>,
+)
+
+/** Version of the metric definitions written with each round; raise it when ALGORITHMS.md changes them. */
+const val METRICS_VERSION = 1
+
+class RoundRepository(private val database: Database) {
+
+    fun createSession(startedAtMs: Long, gameId: String?, dpi: Double, kind: SessionKind): Long = database.transaction { c ->
+        c.prepareStatement("INSERT INTO session (started_at_ms, game_id, dpi, kind) VALUES (?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS).use {
+            it.setLong(1, startedAtMs)
+            it.setString(2, gameId)
+            it.setDouble(3, dpi)
+            it.setString(4, kind.id)
+            it.executeUpdate()
+            it.generatedKeys.use { keys -> keys.next(); keys.getLong(1) }
+        }
+    }
+
+    fun sessions(): List<SessionRow> = database.transaction { c ->
+        c.createStatement().use { s ->
+            s.executeQuery("SELECT id, started_at_ms, game_id, dpi, kind FROM session ORDER BY started_at_ms, id").use { rs ->
+                buildList {
+                    while (rs.next()) add(SessionRow(rs.getLong(1), rs.getLong(2), rs.getString(3), rs.getDouble(4), SessionKind.fromId(rs.getString(5))))
+                }
+            }
+        }
+    }
+
+    /** Stores the raw recording and its derived [metrics] in one transaction and returns the round id. */
+    fun saveRound(sessionId: Long, recording: RoundRecording, startedAtMs: Long, blind: Boolean, metrics: RoundMetrics): Long =
+        database.transaction { c ->
+            val roundId = insertRound(c, sessionId, recording, startedAtMs, blind)
+            insertTargetEvents(c, roundId, recording)
+            insertMetrics(c, roundId, metrics.toNamedValues())
+            roundId
+        }
+
+    fun loadRecording(roundId: Long): RoundRecording? = database.transaction { c ->
+        c.prepareStatement(
+            "SELECT scenario, seed, dpi, cm360, start_nanos, duration_nanos, mouse_event_count, mouse_events FROM round WHERE id = ?",
+        ).use { s ->
+            s.setLong(1, roundId)
+            s.executeQuery().use { rs ->
+                if (!rs.next()) return@use null
+                val start = rs.getLong(5)
+                RoundRecording(
+                    scenarioId = rs.getString(1),
+                    seed = rs.getLong(2),
+                    dpi = rs.getDouble(3),
+                    cm360 = rs.getDouble(4),
+                    startNanos = start,
+                    endNanos = start + rs.getLong(6),
+                    mouseEvents = MouseEventCodec.decode(rs.getBytes(8), rs.getInt(7), start),
+                    targetEvents = loadTargetEvents(c, roundId, start),
+                )
+            }
+        }
+    }
+
+    /** Rounds of [sessionId], or of all sessions when null, oldest first. */
+    fun rounds(sessionId: Long? = null): List<RoundRow> = database.transaction { c ->
+        val where = if (sessionId == null) "" else "WHERE session_id = ?"
+        c.prepareStatement(
+            "SELECT id, session_id, scenario, seed, cm360, blind, started_at_ms FROM round $where ORDER BY started_at_ms, id",
+        ).use { s ->
+            if (sessionId != null) s.setLong(1, sessionId)
+            s.executeQuery().use { rs ->
+                buildList {
+                    while (rs.next()) add(roundRow(rs, loadMetrics(c, rs.getLong(1))))
+                }
+            }
+        }
+    }
+
+    private fun roundRow(rs: ResultSet, metrics: Map<String, Double>) =
+        RoundRow(rs.getLong(1), rs.getLong(2), rs.getString(3), rs.getLong(4), rs.getDouble(5), rs.getInt(6) != 0, rs.getLong(7), metrics)
+
+    private fun insertRound(c: Connection, sessionId: Long, r: RoundRecording, startedAtMs: Long, blind: Boolean): Long =
+        c.prepareStatement(
+            "INSERT INTO round (session_id, scenario, seed, cm360, dpi, blind, started_at_ms, start_nanos, duration_nanos, " +
+                "mouse_event_count, mouse_events, metrics_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            Statement.RETURN_GENERATED_KEYS,
+        ).use {
+            it.setLong(1, sessionId)
+            it.setString(2, r.scenarioId)
+            it.setLong(3, r.seed)
+            it.setDouble(4, r.cm360)
+            it.setDouble(5, r.dpi)
+            it.setInt(6, if (blind) 1 else 0)
+            it.setLong(7, startedAtMs)
+            it.setLong(8, r.startNanos)
+            it.setLong(9, r.endNanos - r.startNanos)
+            it.setInt(10, r.mouseEvents.size)
+            it.setBytes(11, MouseEventCodec.encode(r.mouseEvents, r.startNanos))
+            it.setInt(12, METRICS_VERSION)
+            it.executeUpdate()
+            it.generatedKeys.use { keys -> keys.next(); keys.getLong(1) }
+        }
+
+    private fun insertTargetEvents(c: Connection, roundId: Long, r: RoundRecording) {
+        c.prepareStatement(
+            "INSERT INTO target_event (round_id, seq, type, time_offset_nanos, target_id, x, y, z, radius) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ).use { s ->
+            r.targetEvents.forEachIndexed { seq, event ->
+                s.setLong(1, roundId)
+                s.setInt(2, seq)
+                s.setLong(4, event.timeNanos - r.startNanos)
+                s.setNull(5, Types.INTEGER)
+                listOf(6, 7, 8, 9).forEach { s.setNull(it, Types.REAL) }
+                when (event) {
+                    is TargetEvent.Spawned -> {
+                        s.setString(3, SPAWNED)
+                        s.setInt(5, event.target.id)
+                        s.setDouble(6, event.target.center.x)
+                        s.setDouble(7, event.target.center.y)
+                        s.setDouble(8, event.target.center.z)
+                        s.setDouble(9, event.target.radius)
+                    }
+                    is TargetEvent.Hit -> {
+                        s.setString(3, HIT)
+                        s.setInt(5, event.targetId)
+                    }
+                    is TargetEvent.Miss -> s.setString(3, MISS)
+                }
+                s.addBatch()
+            }
+            s.executeBatch()
+        }
+    }
+
+    private fun insertMetrics(c: Connection, roundId: Long, values: Map<String, Double>) {
+        c.prepareStatement("INSERT INTO metric (round_id, name, value) VALUES (?, ?, ?)").use { s ->
+            for ((name, value) in values) {
+                s.setLong(1, roundId)
+                s.setString(2, name)
+                s.setDouble(3, value)
+                s.addBatch()
+            }
+            s.executeBatch()
+        }
+    }
+
+    private fun loadTargetEvents(c: Connection, roundId: Long, startNanos: Long): List<TargetEvent> =
+        c.prepareStatement(
+            "SELECT type, time_offset_nanos, target_id, x, y, z, radius FROM target_event WHERE round_id = ? ORDER BY seq",
+        ).use { s ->
+            s.setLong(1, roundId)
+            s.executeQuery().use { rs ->
+                buildList {
+                    while (rs.next()) {
+                        val time = startNanos + rs.getLong(2)
+                        add(
+                            when (val type = rs.getString(1)) {
+                                SPAWNED -> TargetEvent.Spawned(time, Target(rs.getInt(3), Vec3(rs.getDouble(4), rs.getDouble(5), rs.getDouble(6)), rs.getDouble(7)))
+                                HIT -> TargetEvent.Hit(time, rs.getInt(3))
+                                MISS -> TargetEvent.Miss(time)
+                                else -> error("unknown target event type '$type'")
+                            },
+                        )
+                    }
+                }
+            }
+        }
+
+    private fun loadMetrics(c: Connection, roundId: Long): Map<String, Double> =
+        c.prepareStatement("SELECT name, value FROM metric WHERE round_id = ?").use { s ->
+            s.setLong(1, roundId)
+            s.executeQuery().use { rs ->
+                buildMap { while (rs.next()) put(rs.getString(1), rs.getDouble(2)) }
+            }
+        }
+
+    private companion object {
+        const val SPAWNED = "spawned"
+        const val HIT = "hit"
+        const val MISS = "miss"
+    }
+}
+
+/** Stable names under which metrics are stored; unavailable (null) metrics are omitted. */
+fun RoundMetrics.toNamedValues(): Map<String, Double> = buildMap {
+    put("hits", hits.toDouble())
+    put("shots", shots.toDouble())
+    put("accuracy", accuracy)
+    meanTimeToHitMs?.let { put("mean_time_to_hit_ms", it) }
+    meanFirstError?.let { put("mean_first_error", it) }
+    meanAbsFirstError?.let { put("mean_abs_first_error", it) }
+    errorSpread?.let { put("error_spread", it) }
+    meanCorrectiveSubmovements?.let { put("mean_corrective_submovements", it) }
+    meanPathEfficiency?.let { put("mean_path_efficiency", it) }
+}
