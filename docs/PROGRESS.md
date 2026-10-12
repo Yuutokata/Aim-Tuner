@@ -86,7 +86,7 @@ Single source of truth for project status. Update at the end of every task and b
 - Trainer FOV assumes the game's FOV value refers to a 16:9 window and keeps the vertical FOV fixed when the window aspect changes. Real per-game aspect behavior is verified in M4.
 
 - Pre-test notice (frame 1g) shows Windows pointer precision and Raw Accel status plus an "Open Raw Accel" button. Not in the spec. Reading the Windows setting is read-only and safe; detecting an active Raw Accel profile and launching Raw Accel need a source-verified approach (M4/M7). Neither touches game processes. Keep "notice only, never enforced".
-- Metric weights in Settings include "Consistency" (40/30/20/10 with accuracy, time to hit, tracking). The spec defines weights per scenario and has no consistency metric. Define it (e.g. spread of signed endpoint error) in ALGORITHMS.md at M3/M6.
+- Decided: "Consistency" is the spread (sample SD) of the signed first-movement error, lower is better (see ALGORITHMS.md). Chosen because it uses the same over/undershoot quantity as the optimizer and accel analysis and does not double-count time to hit. Revisit if sideways error turns out to matter.
 - Mockups show a fixed "round 4 / 10" and "about 20 min"; the spec wants flexible length and stop-anytime. Plan: the 10 is a suggested session length, "Stop for today" always available, "Continue session" needs persisted session state (M3/M5).
 - Export Raw Accel settings needs a save location: LibGDX has no file dialog (options: native dialog via LWJGL tinyfd, or fixed folder). Decide at M7.
 - Mockup game tiles (CS2, Apex, OW2, Fortnite) need yaw/FOV verification before they ship; Valorant first.
