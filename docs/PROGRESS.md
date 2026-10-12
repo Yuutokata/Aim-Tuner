@@ -5,7 +5,7 @@ Single source of truth for project status. Update at the end of every task and b
 ## Current
 
 - **Milestone:** M1 Project setup
-- **Task:** Gradle multi-module, CI (docs are done)
+- **Task:** done, waiting for user review
 
 ## Checklist
 
@@ -15,9 +15,9 @@ Single source of truth for project status. Update at the end of every task and b
 - [x] docs/SPEC, ARCHITECTURE, ALGORITHMS, DESIGN, PROGRESS
 - [x] ADRs 0001-0004
 - [x] README, CONTRIBUTING skeleton, LICENSE (MIT)
-- [ ] Gradle multi-module (`core`, `games`, `input`, `storage`, `app`), version catalog, `build-logic`
-- [ ] Remove root `src/`, `.gitignore` cleanup
-- [ ] GitHub Actions (build/test on windows-latest, release artifact)
+- [x] Gradle multi-module (`core`, `games`, `input`, `storage`, `app`), version catalog, `build-logic`
+- [x] Remove root `src/`
+- [x] GitHub Actions (build/test on windows-latest, dist zip artifact on tags; jpackage installer comes in M8)
 
 ### M2 Raw input + room + flick
 - [ ] Verify versions (LibGDX, LWJGL3, JNA) and `RAWMOUSE` layout
@@ -60,11 +60,11 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Last session
 
-- Plan approved. Wrote documentation set. Branch renamed to `main`.
+- Plan approved. Wrote documentation set, branch renamed to `main`, Gradle multi-module + CI added. `gradlew build` passes with JDK 21 (JAVA_HOME was not set in the shell; used `~/.jdks/ms-21.0.12.1`).
 
 ## Next steps
 
-1. Gradle multi-module setup + CI, then commit and stop for review.
+1. User reviews M1. Then M2: verify LibGDX/LWJGL3/JNA versions and RAWMOUSE layout, build raw input + room + flick.
 
 ## Known bugs
 

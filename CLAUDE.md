@@ -27,7 +27,7 @@ Dependency direction: `app` → `storage`/`input`/`games` → `core`. `core` dep
 - Build + tests: `./gradlew build`
 - Tests only: `./gradlew test`
 - Run app: `./gradlew :app:run`
-- Package installer: `./gradlew :app:jpackage`
+- Package installer: `./gradlew :app:jpackage` (added in M8)
 
 ## Conventions
 
