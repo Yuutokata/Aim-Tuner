@@ -10,6 +10,7 @@ Single source of truth for project status. Update at the end of every task and b
 ## Checklist
 
 ### M1 Project setup
+- [x] Design PDF reviewed, DESIGN.md aligned (frames 1a-1n)
 - [x] Branch renamed to `main`
 - [x] CLAUDE.md
 - [x] docs/SPEC, ARCHITECTURE, ALGORITHMS, DESIGN, PROGRESS
@@ -34,7 +35,7 @@ Single source of truth for project status. Update at the end of every task and b
 ### M4 Game profiles, converters, onboarding, settings
 - [ ] `GameProfile` + JSON loader, Valorant (verify yaw/FOV)
 - [ ] Converters (+ Valorant 800 DPI / 0.249 ≈ 65.6 cm/360° test)
-- [ ] Onboarding + search-range table + settings screen
+- [ ] Onboarding (4 steps per DESIGN.md) + search-range table + pre-test notice + settings screen
 
 ### M5 Bayesian optimizer
 - [ ] GP + acquisition, noise, repeats, session offsets
@@ -53,7 +54,7 @@ Single source of truth for project status. Update at the end of every task and b
 - [ ] Raw Accel export
 
 ### M8 Results, i18n, packaging
-- [ ] Results view + charts + history
+- [ ] Results view (sens + accel tabs) + charts + history + copy-to-clipboard
 - [ ] i18n en/de
 - [ ] jpackage installer
 - [ ] README screenshots, CONTRIBUTING "add a game"
@@ -72,6 +73,9 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Open questions
 
-- `docs/design/AimTune.pdf` can now be rendered (poppler installed). Screen layouts in DESIGN.md are not yet derived from it; review it before M2 UI work.
-- `.idea/` files are staged; suggest unstaging (global rule: no editor config unless asked).
+- Pre-test notice (frame 1g) shows Windows pointer precision and Raw Accel status plus an "Open Raw Accel" button. Not in the spec. Reading the Windows setting is read-only and safe; detecting an active Raw Accel profile and launching Raw Accel need a source-verified approach (M4/M7). Neither touches game processes. Keep "notice only, never enforced".
+- Metric weights in Settings include "Consistency" (40/30/20/10 with accuracy, time to hit, tracking). The spec defines weights per scenario and has no consistency metric. Define it (e.g. spread of signed endpoint error) in ALGORITHMS.md at M3/M6.
+- Mockups show a fixed "round 4 / 10" and "about 20 min"; the spec wants flexible length and stop-anytime. Plan: the 10 is a suggested session length, "Stop for today" always available, "Continue session" needs persisted session state (M3/M5).
+- Export Raw Accel settings needs a save location: LibGDX has no file dialog (options: native dialog via LWJGL tinyfd, or fixed folder). Decide at M7.
+- Mockup game tiles (CS2, Apex, OW2, Fortnite) need yaw/FOV verification before they ship; Valorant first.
 - Exposed vs plain JDBC for storage (decide in ADR 0003 at M3).

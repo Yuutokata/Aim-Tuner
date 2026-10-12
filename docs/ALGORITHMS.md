@@ -8,7 +8,7 @@ Formulas and parameter reasoning. Sections marked *(draft)* are finalised in the
 
 ## Search range *(draft)*
 
-Table keyed by aim style (wrist, mixed, arm) giving a multiplicative window around typical cm/360° values, capped above by pad width (a 360° turn must fit on the pad with margin). The current cm/360° is always included by widening the window if needed. Table lives in config, not code.
+Table keyed by aim style giving a window around typical cm/360° values (initial defaults from the onboarding mockup: wrist 20-35, mixed 30-50, arm 45-80; to be tuned), capped above by pad width (a 360° turn must fit on the pad with margin). The current cm/360° is always included by widening the window if needed. Table lives in config, not code.
 
 ## Submovement segmentation *(draft, M3)*
 
