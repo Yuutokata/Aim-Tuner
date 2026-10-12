@@ -62,6 +62,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Last session
 
+- Fixed blurry HUD text: replaced the scaled default bitmap font with FreeType-rendered Inter / JetBrains Mono at exact pixel size (HUD layout now in framebuffer pixels). Not yet checked by eye.
 - M2: added core units/FOV/view angles/seeded flick scenario/round summary, input module (RawMouseSource, WindowsRawInputSource, QpcClock), app (LibGDX trainer, HUD, debug overlay, GLFW fallback). 39 unit tests pass; the app starts and the raw source starts, but real mouse input and the visuals have not been exercised yet.
 - Earlier: plan approved. Wrote documentation set, branch renamed to `main`, Gradle multi-module + CI added. `gradlew build` passes with JDK 21 (JAVA_HOME was not set in the shell; used `~/.jdks/ms-21.0.12.1`). Later: JAVA_HOME is now JDK 25; verified the build on Gradle 9.6.0 + JDK 25 with toolchain 21 provisioned by foojay (auto-detect disabled), documented in CLAUDE.md and README.
 

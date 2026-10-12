@@ -11,7 +11,9 @@ dependencies {
 
     implementation(libs.gdx)
     implementation(libs.gdx.backend.lwjgl3)
+    implementation(libs.gdx.freetype)
     runtimeOnly(variantOf(libs.gdx.platform) { classifier("natives-desktop") })
+    runtimeOnly(variantOf(libs.gdx.freetype.platform) { classifier("natives-desktop") })
 }
 
 application {

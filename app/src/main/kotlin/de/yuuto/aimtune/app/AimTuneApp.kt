@@ -45,7 +45,7 @@ class AimTuneApp(private val options: LaunchOptions) : ApplicationAdapter() {
         trainer = Trainer(options, source)
         val verticalFov = options.fov.verticalDegrees(options.fovReferenceAspect).toFloat()
         scene = TrainerScene(verticalFov, FlickConfig(durationNanos = 1).targetRadius.toFloat())
-        hud = Hud(options, source.name)
+        hud = Hud(options)
         Gdx.input.inputProcessor = object : InputAdapter() {
             override fun touchDown(screenX: Int, screenY: Int, pointer: Int, button: Int): Boolean {
                 if (button != Input.Buttons.LEFT) return false
@@ -73,7 +73,7 @@ class AimTuneApp(private val options: LaunchOptions) : ApplicationAdapter() {
     override fun resize(width: Int, height: Int) {
         if (width == 0 || height == 0) return
         scene.resize(width, height)
-        hud.resize(width, height)
+        hud.resize()
     }
 
     override fun render() {

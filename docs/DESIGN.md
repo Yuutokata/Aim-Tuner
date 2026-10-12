@@ -64,7 +64,7 @@ LibGDX `I18NBundle`: `assets/i18n/messages.properties` (English default) and `me
 
 - UI stage uses a 1920×1080 virtual size with a fit/scaling viewport; the 3D room has its own viewport.
 - Skin generated from `tokens.json` (colors, font sizes, radii) into `assets/ui/` (`uiskin.json` + atlas). Outlined buttons, cards and inputs use 9-patch drawables generated for radii 4/8/14.
-- Fonts: Inter and JetBrains Mono bundled and rasterized to bitmap fonts (e.g. gdx-freetype; verify version and the fonts' licenses at M2/M8).
+- Fonts: Inter 4.1 (Regular, Medium) and JetBrains Mono 2.304 (Regular), both SIL OFL 1.1, are bundled in `app/src/main/resources/assets/fonts/` with their license files and rasterized with gdx-freetype at the exact pixel size of the framebuffer (`Fonts.kt`), rebuilt when the window height changes by more than 8%. Scaling a bitmap font instead blurs the text.
 - Charts are custom actors drawn with `ShapeRenderer` (lines, filled band with alpha, dashed segments, dots), not Scene2D widgets.
 
 ## Deviations
