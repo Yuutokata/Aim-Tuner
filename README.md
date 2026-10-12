@@ -17,6 +17,8 @@ AimTune never touches game processes, never reads input outside its own focused 
 
 Until onboarding exists (milestone 4), the trainer takes your DPI, sensitivity in cm/360° and the game's FOV as arguments; see `LaunchOptions.USAGE` in `app` for all options. Click starts a round, Esc aborts it, F3 toggles the debug overlay.
 
+Finished rounds are analysed (first-movement error, corrections, path efficiency) and stored in a local SQLite database in `%APPDATA%\AimTune` (set `AIMTUNE_DATA_DIR` to use another folder).
+
 Gradle itself runs on whatever JDK `JAVA_HOME` points to (Gradle 9.6.0 supports JDK 17 up to 25). The project compiles for Java 21 through a Gradle toolchain, and the foojay resolver plugin downloads JDK 21 automatically if it isn't installed, so you don't need to install JDK 21 yourself.
 
 ## Documentation

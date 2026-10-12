@@ -24,9 +24,16 @@ raw input (counts + QPC timestamps) → `MouseEvent` stream → round recorder (
 - Compute: optimizer and fitting run on a background coroutine dispatcher; results posted back to the render thread.
 - Storage writes on an IO dispatcher.
 
-## Storage schema (draft, finalised in M3)
+## Storage (M3, implemented)
 
-`session(id, started_at, game, dpi, settings_json)`, `round(id, session_id, scenario, seed, cm360, blind, started_at, duration_ms, score)`, `mouse_event(round_id, t_us, dx, dy)`, `target_event(round_id, t_us, type, x, y, z)`, `metric(round_id, name, value)`. Settings: `settings.json` in `%APPDATA%/AimTune`.
+SQLite in `%APPDATA%\AimTuneimtune.db` (override with `AIMTUNE_DATA_DIR`; Linux/macOS fall back to `$XDG_DATA_HOME/aimtune` or `~/.local/share/aimtune`), plus `settings.json` next to it. Schema versions are tracked with `PRAGMA user_version` and an ordered migration list in `Database.kt`; a database from a newer version is refused.
+
+- `session(id, started_at_ms, game_id, dpi, kind)`: kind is `sensitivity` or `accel_ab`.
+- `round(id, session_id, scenario, seed, cm360, dpi, blind, started_at_ms, start_nanos, duration_nanos, mouse_event_count, mouse_events BLOB, metrics_version)`: the raw mouse reports of a round are one blob (format version byte + deflated zigzag-varint stream of time delta, dx, dy; see `MouseEventCodec`), about 5 bytes per report before compression.
+- `target_event(round_id, seq, type, time_offset_nanos, target_id, x, y, z, radius)`: `spawned`, `hit`, `miss`, times relative to the round start.
+- `metric(round_id, name, value)`: values derived when the round was saved (names in `toNamedValues()`); `metrics_version` says which definitions produced them. Metrics are always recomputable from the raw data. Scores are not stored: they are relative to all rounds and recomputed (see ALGORITHMS.md).
+
+Rounds are analysed and saved by `RoundProcessor` on a background thread. If the database cannot be opened the trainer still runs and reports "not saved".
 
 ## Extension points
 
