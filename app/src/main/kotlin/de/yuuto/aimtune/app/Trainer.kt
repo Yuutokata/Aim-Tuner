@@ -3,6 +3,7 @@ package de.yuuto.aimtune.app
 import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.math.ViewAngles
+import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.core.scenario.FlickConfig
 import de.yuuto.aimtune.core.scenario.FlickScenario
 import de.yuuto.aimtune.core.scenario.RoundSummary
@@ -16,18 +17,25 @@ import de.yuuto.aimtune.input.RawMouseSource
 enum class Phase { READY, RUNNING, FINISHED }
 
 /**
- * Round state machine of the milestone-2 trainer. Free of rendering calls; everything runs on the
- * render thread. Pausing mid-round is not supported: aborting returns to READY and discards the
- * round, so a measured round is never interrupted silently.
+ * Round state machine of the trainer. Free of rendering calls; everything runs on the render
+ * thread. Pausing mid-round is not supported: aborting returns to READY and discards the round,
+ * so a measured round is never interrupted silently. A completed round is handed to
+ * [onRoundFinished] as a [RoundRecording].
  */
-class Trainer(private val options: LaunchOptions, private val source: RawMouseSource) {
+class Trainer(
+    private val options: LaunchOptions,
+    private val source: RawMouseSource,
+    private val onRoundFinished: (RoundRecording) -> Unit = {},
+) {
     private val log = System.getLogger("aimtune.trainer")
     private val degreesPerCount = degreesPerCount(options.dpi, options.cm360)
     private val clock = source.clock
     private val roundNanos = options.roundSeconds * 1_000_000_000L
     private var roundStartNanos = 0L
+    private var roundSeed = 0L
     private var nextSeed = options.seed
     private var scenario: Scenario? = null
+    private val recordedMouse = ArrayList<MouseEvent>()
 
     var phase = Phase.READY
         private set
@@ -50,12 +58,13 @@ class Trainer(private val options: LaunchOptions, private val source: RawMouseSo
         if (phase == Phase.RUNNING) (roundStartNanos + roundNanos - nowNanos()).coerceAtLeast(0L) else 0L
 
     fun startRound() {
-        val seed = nextSeed++
-        log.log(System.Logger.Level.INFO, "starting flick round, seed $seed")
-        discardPendingMouse()
+        roundSeed = nextSeed++
+        log.log(System.Logger.Level.INFO, "starting flick round, seed $roundSeed")
+        source.drain { }
         view = ViewAngles()
         summary = null
-        scenario = FlickScenario(FlickConfig(durationNanos = roundNanos), seed)
+        recordedMouse.clear()
+        scenario = FlickScenario(FlickConfig(durationNanos = roundNanos), roundSeed)
         roundStartNanos = nowNanos()
         scenario?.start(roundStartNanos)
         phase = Phase.RUNNING
@@ -66,6 +75,7 @@ class Trainer(private val options: LaunchOptions, private val source: RawMouseSo
         if (phase != Phase.RUNNING) return
         log.log(System.Logger.Level.INFO, "round aborted")
         scenario = null
+        recordedMouse.clear()
         phase = Phase.READY
     }
 
@@ -73,10 +83,7 @@ class Trainer(private val options: LaunchOptions, private val source: RawMouseSo
     fun update() {
         applyPendingMouse()
         val s = scenario ?: return
-        if (phase == Phase.RUNNING && s.isFinished(nowNanos())) {
-            summary = summarize(s.events)
-            phase = Phase.FINISHED
-        }
+        if (phase == Phase.RUNNING && s.isFinished(nowNanos())) finishRound(s)
     }
 
     fun fire(): ShotResult {
@@ -87,13 +94,33 @@ class Trainer(private val options: LaunchOptions, private val source: RawMouseSo
         return s.fire(Vec3.ZERO, view.direction(), nowNanos())
     }
 
+    private fun finishRound(s: Scenario) {
+        val end = roundStartNanos + roundNanos
+        summary = summarize(s.events)
+        phase = Phase.FINISHED
+        onRoundFinished(
+            RoundRecording(
+                scenarioId = s.id,
+                seed = roundSeed,
+                dpi = options.dpi,
+                cm360 = options.cm360,
+                startNanos = roundStartNanos,
+                endNanos = end,
+                // Reports that arrived after the round's end belong to no round.
+                mouseEvents = recordedMouse.filter { it.timeNanos <= end },
+                targetEvents = s.events.toList(),
+            ),
+        )
+    }
+
     private fun applyPendingMouse() {
         source.drain { event ->
             lastEvent = event
             rate.record(event.timeNanos)
-            if (phase == Phase.RUNNING) view = view.rotatedByCounts(event.dx, event.dy, degreesPerCount)
+            if (phase == Phase.RUNNING) {
+                view = view.rotatedByCounts(event.dx, event.dy, degreesPerCount)
+                recordedMouse += event
+            }
         }
     }
-
-    private fun discardPendingMouse() = source.drain { }
 }

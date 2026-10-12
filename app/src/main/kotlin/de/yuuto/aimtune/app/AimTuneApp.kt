@@ -11,12 +11,15 @@ import de.yuuto.aimtune.app.input.GlfwMouseSource
 import de.yuuto.aimtune.core.scenario.FlickConfig
 import de.yuuto.aimtune.input.RawMouseSource
 import de.yuuto.aimtune.input.windows.WindowsRawInputSource
+import de.yuuto.aimtune.storage.AppPaths
+import de.yuuto.aimtune.storage.Database
 import org.lwjgl.glfw.GLFW
 
 /** LibGDX entry point of the milestone-2 flick trainer. */
 class AimTuneApp(private val options: LaunchOptions) : ApplicationAdapter() {
     private val log = System.getLogger("aimtune.app")
     private lateinit var source: RawMouseSource
+    private lateinit var processor: RoundProcessor
     private lateinit var trainer: Trainer
     private lateinit var scene: TrainerScene
     private lateinit var hud: Hud
@@ -42,7 +45,11 @@ class AimTuneApp(private val options: LaunchOptions) : ApplicationAdapter() {
         source.setWindowFocused(isWindowFocused())
         log.log(System.Logger.Level.INFO, "mouse source: ${source.name}")
 
-        trainer = Trainer(options, source)
+        processor = openProcessor()
+        trainer = Trainer(options, source) { recording ->
+            val startedAtMs = System.currentTimeMillis() - options.roundSeconds * MILLIS_PER_SECOND
+            processor.submit(recording, startedAtMs, blind = false)
+        }
         val verticalFov = options.fov.verticalDegrees(options.fovReferenceAspect).toFloat()
         scene = TrainerScene(verticalFov, FlickConfig(durationNanos = 1).targetRadius.toFloat())
         hud = Hud(options)
@@ -82,13 +89,14 @@ class AimTuneApp(private val options: LaunchOptions) : ApplicationAdapter() {
         Gdx.gl.glClearColor(Theme.bg.r, Theme.bg.g, Theme.bg.b, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
         scene.render(trainer.view, trainer.activeTarget)
-        hud.render(trainer, source, Gdx.graphics.framesPerSecond)
+        hud.render(trainer, source, processor.report, Gdx.graphics.framesPerSecond)
     }
 
     override fun dispose() {
         scene.dispose()
         hud.dispose()
         source.close()
+        processor.close()
     }
 
     private fun syncCursor() {
@@ -101,6 +109,17 @@ class AimTuneApp(private val options: LaunchOptions) : ApplicationAdapter() {
 
     private fun windowHandle(): Long = (Gdx.graphics as Lwjgl3Graphics).window.windowHandle
 
+    /** A storage failure (unwritable data dir, newer schema) must not stop the trainer; rounds are then analysed but not saved. */
+    private fun openProcessor(): RoundProcessor {
+        val database = try {
+            Database.open(AppPaths.default().databaseFile)
+        } catch (e: Exception) {
+            log.log(System.Logger.Level.ERROR, "rounds will not be saved: ${e.message}", e)
+            null
+        }
+        return RoundProcessor(database, options.dpi)
+    }
+
     private fun createSource(): RawMouseSource {
         val isWindows = System.getProperty("os.name").startsWith("Windows")
         return when (options.source) {
@@ -111,5 +130,9 @@ class AimTuneApp(private val options: LaunchOptions) : ApplicationAdapter() {
             }
             SourceKind.AUTO -> if (isWindows) WindowsRawInputSource() else GlfwMouseSource(windowHandle())
         }
+    }
+
+    private companion object {
+        const val MILLIS_PER_SECOND = 1000L
     }
 }

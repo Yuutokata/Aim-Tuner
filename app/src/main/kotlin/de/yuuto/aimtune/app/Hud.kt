@@ -41,7 +41,7 @@ class Hud(private val options: LaunchOptions) : Disposable {
         }
     }
 
-    fun render(trainer: Trainer, source: RawMouseSource, fps: Int) {
+    fun render(trainer: Trainer, source: RawMouseSource, report: RoundReport?, fps: Int) {
         camera.update()
         if (trainer.phase == Phase.RUNNING) drawCrosshair()
         batch.projectionMatrix = camera.combined
@@ -49,7 +49,7 @@ class Hud(private val options: LaunchOptions) : Disposable {
         when (trainer.phase) {
             Phase.READY -> drawReady()
             Phase.RUNNING -> drawRunning(trainer)
-            Phase.FINISHED -> drawFinished(trainer)
+            Phase.FINISHED -> drawFinished(trainer, report)
         }
         if (showDebug) drawDebug(trainer, source, fps)
         batch.end()
@@ -91,13 +91,42 @@ class Hud(private val options: LaunchOptions) : Disposable {
         text(fonts.body, "Esc aborts the round", margin, margin + fonts.body.lineHeight, Theme.textMuted, Align.left)
     }
 
-    private fun drawFinished(trainer: Trainer) {
+    private fun drawFinished(trainer: Trainer, report: RoundReport?) {
         val s = trainer.summary ?: return
         val ttk = s.meanTimeToHitNanos?.let { "%.0f ms".format(Locale.ROOT, it / 1e6) } ?: "-"
         text(fonts.title, "Round complete", width / 2, height * 0.62f, Theme.accentSoft, Align.center)
         text(fonts.mono, "Hits ${s.hits} / ${s.shots}   Accuracy %.0f %%".format(Locale.ROOT, s.accuracy * 100), width / 2, height * 0.54f, Theme.text, Align.center)
         text(fonts.mono, "Avg time to hit $ttk", width / 2, height * 0.49f, Theme.text, Align.center)
-        text(fonts.body, "Click for the next round  ·  Esc quits", width / 2, height * 0.44f, Theme.textMuted, Align.center)
+        drawReport(report, height * 0.44f)
+        text(fonts.body, "Click for the next round  ·  Esc quits", width / 2, height * 0.30f, Theme.textMuted, Align.center)
+    }
+
+    /** Analysis lines under the round summary: first-movement error, corrections, path efficiency, save state. */
+    private fun drawReport(report: RoundReport?, top: Float) {
+        val lines = when (report) {
+            null, RoundReport.Pending -> listOf("Analysing round …" to Theme.textMuted)
+            is RoundReport.Failed -> listOf("Analysis failed: ${report.message}" to Theme.caution)
+            is RoundReport.Done -> reportLines(report)
+        }
+        var y = top
+        lines.forEach { (line, color) ->
+            text(fonts.mono, line, width / 2, y, color, Align.center)
+            y -= fonts.mono.lineHeight
+        }
+    }
+
+    private fun reportLines(report: RoundReport.Done): List<Pair<String, Color>> {
+        val m = report.metrics
+        val error = m.meanFirstError?.let {
+            "First move %+.0f %% (%s)".format(Locale.ROOT, it * 100, if (it >= 0) "overshoot" else "undershoot")
+        }
+        return listOfNotNull(
+            error?.let { it to Theme.text },
+            m.meanCorrectiveSubmovements?.let { "Corrections %.1f per target".format(Locale.ROOT, it) to Theme.text },
+            m.meanPathEfficiency?.let { "Path efficiency %.0f %%".format(Locale.ROOT, it * 100) to Theme.text },
+            (if (report.saveError == null) "Saved" else "Not saved: ${report.saveError}") to
+                (if (report.saveError == null) Theme.textMuted else Theme.caution),
+        )
     }
 
     private fun drawDebug(trainer: Trainer, source: RawMouseSource, fps: Int) {
