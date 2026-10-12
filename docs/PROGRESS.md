@@ -73,7 +73,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Next steps
 
-1. User tests M3: run the trainer, finish a round, read the lines under the summary (first move +/- %, corrections per target, path efficiency, "Saved"), then check that `%APPDATA%\AimTuneimtune.db` exists. Overshooting flicks should show a positive first-move error, undershooting ones a negative one.
+1. User tests M3: run the trainer, finish a round, read the lines under the summary (first move +/- %, corrections per target, path efficiency, "Saved"), then check that `%APPDATA%\AimTune\aimtune.db` exists. Overshooting flicks should show a positive first-move error, undershooting ones a negative one.
 2. Then M4: game profiles, converters, onboarding, settings screen.
 
 ## Known bugs
