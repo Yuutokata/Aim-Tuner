@@ -88,6 +88,21 @@ class AccelRunTest {
     }
 
     @Test
+    fun `the analysis can start early from five rounds and says if they were enough`() {
+        val run = newRun()
+        repeat(AccelRun.MIN_CALIBRATION_ROUNDS - 1) { play(run, risingGainPlayer) }
+        assertTrue(!run.canAnalyseNow)
+        assertFailsWith<IllegalStateException> { run.analyseNow() }
+        play(run, risingGainPlayer)
+        assertTrue(run.canAnalyseNow)
+        run.analyseNow()
+        assertEquals(AccelPhase.ANALYSIS, run.phase)
+        assertEquals(AccelRun.MIN_CALIBRATION_ROUNDS, run.calibrationDone)
+        assertNotNull(run.fit)
+        assertTrue(!run.canAnalyseNow, "no early analysis once the calibration is over")
+    }
+
+    @Test
     fun `tracking is never part of the acceleration rounds`() {
         assertTrue(ScenarioKind.TRACKING !in AccelRun.CLICK_SCENARIOS)
     }

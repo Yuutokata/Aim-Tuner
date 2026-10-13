@@ -37,8 +37,16 @@ class AccelBetweenScreen(ctx: AppContext, private val run: AccelRun) : UiScreen(
         val footer = Table()
         footer.add(ui.button("Stop", Styles.SECONDARY) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
+        if (run.canAnalyseNow) {
+            footer.addButton(ui.button("Analyse now", Styles.SECONDARY) { analyseNow() }, minWidth = 220f).padRight(16f)
+        }
         footer.addButton(ui.button(if (done == 0) "Start" else "Next round", Styles.PRIMARY) { ctx.showAccelRound(run) }, minWidth = 220f)
         return ui.frame(null, content, footer)
+    }
+
+    private fun analyseNow() {
+        run.analyseNow()
+        ctx.showAccelStep(run)
     }
 
     override fun onEnter() = ctx.showAccelRound(run)
@@ -56,7 +64,8 @@ class AccelBetweenScreen(ctx: AppContext, private val run: AccelRun) : UiScreen(
 
     private fun explanation() = if (calibrating) {
         "Play as you normally would at your recommended sensitivity. The rounds mix flicks, small adjustments and target switching, " +
-            "because the curve is judged by how your first movements miss at different speeds."
+            "because the curve is judged by how your first movements miss at different speeds. " +
+            "From ${AccelRun.MIN_CALIBRATION_ROUNDS} rounds on you can analyse early; more rounds make the result more reliable."
     } else {
         "Every pair has one round with your plain sensitivity and one with the curve, in random order, with identical targets. " +
             "You are not told which is which. The test ends as soon as it is clear, or after ${run.maxTestRounds / 2} pairs."

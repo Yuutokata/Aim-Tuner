@@ -120,6 +120,15 @@ class AccelRun(
         }
     }
 
+    /** True once enough calibration rounds are played to analyse early, before all of them. */
+    val canAnalyseNow: Boolean get() = phase == AccelPhase.CALIBRATION && calibration.size >= minOf(MIN_CALIBRATION_ROUNDS, calibrationRounds)
+
+    /** Ends the calibration with the rounds played so far; the analysis says if they were enough. */
+    fun analyseNow() {
+        check(canAnalyseNow) { "too few calibration rounds for an analysis" }
+        finishCalibration()
+    }
+
     /** Begins the blind test of the recommended curve. */
     fun startTest() {
         check(phase == AccelPhase.ANALYSIS && candidate != null) { "there is no curve to test" }
@@ -143,7 +152,10 @@ class AccelRun(
     }
 
     companion object {
-        const val DEFAULT_CALIBRATION_ROUNDS = 15
+        const val DEFAULT_CALIBRATION_ROUNDS = 8
+
+        /** From this many rounds on the analysis can be started early; simulated players were found with 5, real data is weaker. */
+        const val MIN_CALIBRATION_ROUNDS = 5
         private const val CALIBRATION_SEED_MIX = 1_000L
 
         /** Scenarios with a first movement per target; micro-adjust is slow, flicks and switching fast. */
