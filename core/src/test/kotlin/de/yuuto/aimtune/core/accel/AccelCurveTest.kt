@@ -96,3 +96,24 @@ class AccelProcessorTest {
         assertEquals(AccelProcessor.speedInPerSecond(2.0, 1600.0), 1.25, 1e-12)
     }
 }
+
+class AccelSpecTest {
+    @Test
+    fun `every curve survives a round trip through its text form`() {
+        val curves = listOf(
+            NoAccel,
+            ClassicCurve(0.0831234567, exponent = 2.25, inputOffset = 1.5, cap = 1.8),
+            NaturalCurve(0.123456789, 0.7, inputOffset = 2.0),
+            PowerCurve(0.0421, 0.35, outputOffset = 1.0, cap = 1.6),
+        )
+        curves.forEach { assertEquals(it, AccelSpec.decode(AccelSpec.encode(it))) }
+    }
+
+    @Test
+    fun `bad text is rejected with a reason`() {
+        assertFailsWith<IllegalArgumentException> { AccelSpec.decode("jump;a=1") }
+        assertFailsWith<IllegalArgumentException> { AccelSpec.decode("classic;acceleration=0.1") }
+        assertFailsWith<IllegalArgumentException> { AccelSpec.decode("classic;acceleration=x;exponent=2;inputOffset=0;cap=0") }
+        assertFailsWith<IllegalArgumentException> { AccelSpec.decode("classic;acceleration=-1;exponent=2;inputOffset=0;cap=0") }
+    }
+}

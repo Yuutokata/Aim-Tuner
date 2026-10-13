@@ -10,7 +10,10 @@ import kotlin.math.sin
 data class ViewAngles(val yawDegrees: Double = 0.0, val pitchDegrees: Double = 0.0) {
 
     /** Applies raw mouse counts: positive [dx] turns right, positive [dy] (mouse down) looks down. */
-    fun rotatedByCounts(dx: Int, dy: Int, degreesPerCount: Double): ViewAngles {
+    fun rotatedByCounts(dx: Int, dy: Int, degreesPerCount: Double): ViewAngles = rotatedByCounts(dx.toDouble(), dy.toDouble(), degreesPerCount)
+
+    /** Counts scaled by an acceleration curve are no longer whole numbers. */
+    fun rotatedByCounts(dx: Double, dy: Double, degreesPerCount: Double): ViewAngles {
         val yaw = wrapDegrees(yawDegrees + dx * degreesPerCount)
         val pitch = (pitchDegrees - dy * degreesPerCount).coerceIn(-MAX_PITCH_DEGREES, MAX_PITCH_DEGREES)
         return ViewAngles(yaw, pitch)

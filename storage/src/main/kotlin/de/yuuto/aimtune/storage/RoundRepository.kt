@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.storage
 
+import de.yuuto.aimtune.core.accel.AccelSpec
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.metrics.RoundMetrics
 import de.yuuto.aimtune.core.recording.RoundRecording
@@ -33,6 +34,8 @@ data class RoundRow(
     val blind: Boolean,
     val startedAtMs: Long,
     val metrics: Map<String, Double>,
+    /** [AccelSpec] text of the curve the round was played with; null for plain sensitivity. */
+    val accel: String? = null,
 )
 
 /** Version of the metric definitions written with each round; raise it when ALGORITHMS.md changes them. */
@@ -72,7 +75,7 @@ class RoundRepository(private val database: Database) {
 
     fun loadRecording(roundId: Long): RoundRecording? = database.transaction { c ->
         c.prepareStatement(
-            "SELECT scenario, seed, dpi, cm360, start_nanos, duration_nanos, mouse_event_count, mouse_events FROM round WHERE id = ?",
+            "SELECT scenario, seed, dpi, cm360, start_nanos, duration_nanos, mouse_event_count, mouse_events, accel FROM round WHERE id = ?",
         ).use { s ->
             s.setLong(1, roundId)
             s.executeQuery().use { rs ->
@@ -87,6 +90,7 @@ class RoundRepository(private val database: Database) {
                     endNanos = start + rs.getLong(6),
                     mouseEvents = MouseEventCodec.decode(rs.getBytes(8), rs.getInt(7), start),
                     targetEvents = loadTargetEvents(c, roundId, start),
+                    accel = rs.getString(9)?.let(AccelSpec::decode),
                 )
             }
         }
@@ -105,7 +109,7 @@ class RoundRepository(private val database: Database) {
     fun rounds(sessionId: Long? = null): List<RoundRow> = database.transaction { c ->
         val where = if (sessionId == null) "" else "WHERE session_id = ?"
         c.prepareStatement(
-            "SELECT id, session_id, scenario, seed, cm360, blind, started_at_ms FROM round $where ORDER BY started_at_ms, id",
+            "SELECT id, session_id, scenario, seed, cm360, blind, started_at_ms, accel FROM round $where ORDER BY started_at_ms, id",
         ).use { s ->
             if (sessionId != null) s.setLong(1, sessionId)
             s.executeQuery().use { rs ->
@@ -117,12 +121,12 @@ class RoundRepository(private val database: Database) {
     }
 
     private fun roundRow(rs: ResultSet, metrics: Map<String, Double>) =
-        RoundRow(rs.getLong(1), rs.getLong(2), rs.getString(3), rs.getLong(4), rs.getDouble(5), rs.getInt(6) != 0, rs.getLong(7), metrics)
+        RoundRow(rs.getLong(1), rs.getLong(2), rs.getString(3), rs.getLong(4), rs.getDouble(5), rs.getInt(6) != 0, rs.getLong(7), metrics, rs.getString(8))
 
     private fun insertRound(c: Connection, sessionId: Long, r: RoundRecording, startedAtMs: Long, blind: Boolean): Long =
         c.prepareStatement(
             "INSERT INTO round (session_id, scenario, seed, cm360, dpi, blind, started_at_ms, start_nanos, duration_nanos, " +
-                "mouse_event_count, mouse_events, metrics_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "mouse_event_count, mouse_events, metrics_version, accel) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             Statement.RETURN_GENERATED_KEYS,
         ).use {
             it.setLong(1, sessionId)
@@ -137,6 +141,7 @@ class RoundRepository(private val database: Database) {
             it.setInt(10, r.mouseEvents.size)
             it.setBytes(11, MouseEventCodec.encode(r.mouseEvents, r.startNanos))
             it.setInt(12, METRICS_VERSION)
+            it.setString(13, r.accel?.let(AccelSpec::encode))
             it.executeUpdate()
             it.generatedKeys.use { keys -> keys.next(); keys.getLong(1) }
         }

@@ -1,5 +1,7 @@
 package de.yuuto.aimtune.core.recording
 
+import de.yuuto.aimtune.core.accel.AccelProcessor
+import de.yuuto.aimtune.core.accel.ClassicCurve
 import de.yuuto.aimtune.core.input.MouseEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,6 +16,20 @@ class ViewTrackTest {
         val v = ViewTrack(recording).viewAt(5)
         assertEquals(0.0, v.yawDegrees)
         assertEquals(0.0, v.pitchDegrees)
+    }
+
+    @Test
+    fun `the acceleration curve scales the counts of each report`() {
+        val curve = ClassicCurve(0.08)
+        val accelerated = recording.copy(accel = curve)
+        val track = ViewTrack(accelerated)
+        // 100 counts after a first report (longest time, 100 ms): 100 counts / 100 ms at 800 dpi = 1.25 in/s.
+        val firstScale = curve.multiplier(1.25)
+        assertEquals(firstScale, track.scales[0], 1e-12)
+        assertEquals(100 * firstScale * dpc, track.viewAt(10).yawDegrees, 1e-9)
+        // The second report (50 counts down) comes 10 ns later, i.e. the shortest time clamps the speed.
+        assertEquals(curve.multiplier(AccelProcessor.speedInPerSecond(50.0 / AccelProcessor.MIN_TIME_MS, 800.0)), track.scales[1], 1e-12)
+        assertEquals(ViewTrack(recording).scales.toList(), List(3) { 1.0 })
     }
 
     @Test

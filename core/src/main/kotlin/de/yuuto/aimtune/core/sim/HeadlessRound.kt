@@ -1,5 +1,7 @@
 package de.yuuto.aimtune.core.sim
 
+import de.yuuto.aimtune.core.accel.AccelCurve
+import de.yuuto.aimtune.core.accel.AccelProcessor
 import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.math.ViewAngles
@@ -28,7 +30,8 @@ object HeadlessRound {
         seed: Long,
         roundSeconds: Int = 45,
         sessionOffsetNanos: Long = 0L,
-    ): RoundRecording = of(ScenarioKind.FLICK, player, dpi, cm360, seed, roundSeconds, sessionOffsetNanos)
+        accel: AccelCurve? = null,
+    ): RoundRecording = of(ScenarioKind.FLICK, player, dpi, cm360, seed, roundSeconds, sessionOffsetNanos, accel)
 
     /** One round of [kind] with its default geometry. */
     fun of(
@@ -39,7 +42,8 @@ object HeadlessRound {
         seed: Long,
         roundSeconds: Int = 45,
         sessionOffsetNanos: Long = 0L,
-    ): RoundRecording = run(player, dpi, cm360, seed, roundSeconds, sessionOffsetNanos, kind.create(roundSeconds * NANOS_PER_SECOND, seed))
+        accel: AccelCurve? = null,
+    ): RoundRecording = run(player, dpi, cm360, seed, roundSeconds, sessionOffsetNanos, kind.create(roundSeconds * NANOS_PER_SECOND, seed), accel)
 
     fun run(
         player: SimulatedPlayer,
@@ -49,6 +53,7 @@ object HeadlessRound {
         roundSeconds: Int,
         sessionOffsetNanos: Long,
         scenario: Scenario,
+        accel: AccelCurve? = null,
     ): RoundRecording {
         val aimer = SimulatedAimer(player, dpi, cm360, seed xor AIMER_SEED_MIX, scenario.kind)
         val start = CLOCK_ORIGIN_NANOS
@@ -56,6 +61,7 @@ object HeadlessRound {
         val degPerCount = degreesPerCount(dpi, cm360)
         val mouse = ArrayList<MouseEvent>()
         var view = ViewAngles()
+        val processor = accel?.let { AccelProcessor(it, dpi) }
         var now = start
         scenario.start(now)
         aimer.reset(now, sessionOffsetNanos)
@@ -64,8 +70,10 @@ object HeadlessRound {
             // Same order as the trainer: the player sees the targets as of the last update, then the frame advances them.
             val step = aimer.step(now, scenario.targets)
             if (step.dx != 0 || step.dy != 0) {
-                mouse += MouseEvent(now, step.dx, step.dy)
-                view = view.rotatedByCounts(step.dx, step.dy, degPerCount)
+                val event = MouseEvent(now, step.dx, step.dy)
+                mouse += event
+                val scale = processor?.scaleFor(event) ?: 1.0
+                view = view.rotatedByCounts(step.dx * scale, step.dy * scale, degPerCount)
             }
             scenario.update(now)
             if (step.click) scenario.fire(Vec3.ZERO, view.direction(), now)
@@ -79,6 +87,7 @@ object HeadlessRound {
             endNanos = end,
             mouseEvents = mouse,
             targetEvents = scenario.events.toList(),
+            accel = accel,
         )
     }
 }

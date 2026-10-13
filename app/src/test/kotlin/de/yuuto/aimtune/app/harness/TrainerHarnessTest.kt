@@ -3,6 +3,8 @@ package de.yuuto.aimtune.app.harness
 import de.yuuto.aimtune.app.Phase
 import de.yuuto.aimtune.app.Trainer
 import de.yuuto.aimtune.app.TrainerConfig
+import de.yuuto.aimtune.core.accel.AccelCurve
+import de.yuuto.aimtune.core.accel.NaturalCurve
 import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.TargetEvent
@@ -34,12 +36,12 @@ class TrainerHarnessTest {
         dpi = dpi, cm360 = cm360, profile = checkNotNull(GameProfiles.load().find("valorant")), roundSeconds = ROUND_SECONDS, seed = seed,
     )
 
-    private fun playWithSimulatedSource(seed: Long, kind: ScenarioKind = ScenarioKind.FLICK): RoundRecording {
+    private fun playWithSimulatedSource(seed: Long, kind: ScenarioKind = ScenarioKind.FLICK, accel: AccelCurve? = null): RoundRecording {
         val clock = ManualClock(CLOCK_ORIGIN)
         var finished: RoundRecording? = null
         lateinit var trainer: Trainer
         val source = SimulatedMouseSource(player, dpi, cm360, seed, clock, kind) { trainer.activeTargets }
-        trainer = Trainer(config(seed).copy(scenario = kind), source) { finished = it }
+        trainer = Trainer(config(seed).copy(scenario = kind, accel = accel), source) { finished = it }
         source.start()
         source.beginRound()
         trainer.startRound()
@@ -80,6 +82,14 @@ class TrainerHarnessTest {
         for (kind in ScenarioKind.entries) {
             assertEquals(HeadlessRound.of(kind, player, dpi, cm360, 5, ROUND_SECONDS), playWithSimulatedSource(5, kind), kind.id)
         }
+    }
+
+    @Test
+    fun `a round with simulated acceleration is recorded alike by the trainer and the headless runner`() {
+        val curve = NaturalCurve(0.2, 1.5)
+        val headless = HeadlessRound.flick(player, dpi, cm360, 6, ROUND_SECONDS, accel = curve)
+        assertEquals(headless, playWithSimulatedSource(6, accel = curve))
+        assertEquals(curve, headless.accel)
     }
 
     @Test

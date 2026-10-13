@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.storage
 
+import de.yuuto.aimtune.core.accel.AccelSpec
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.core.scenario.Target
@@ -47,6 +48,7 @@ object RoundLogFile {
             mouseEventCount = recording.mouseEvents.size,
             mouseEvents = Base64.getEncoder().encodeToString(MouseEventCodec.encode(recording.mouseEvents, origin)),
             targetEvents = recording.targetEvents.map { it.toDto(origin) },
+            accel = recording.accel?.let(AccelSpec::encode),
         )
         return json.encodeToString(RoundLogDto.serializer(), dto)
     }
@@ -65,6 +67,7 @@ object RoundLogFile {
                 endNanos = dto.durationNanos,
                 mouseEvents = MouseEventCodec.decode(Base64.getDecoder().decode(dto.mouseEvents), dto.mouseEventCount, 0L),
                 targetEvents = dto.targetEvents.map { it.toEvent() },
+                accel = dto.accel?.let(AccelSpec::decode),
             )
         } catch (e: SerializationException) {
             throw RoundLogException("not a round log: ${e.message}", e)
@@ -86,6 +89,8 @@ private data class RoundLogDto(
     /** [MouseEventCodec] blob, Base64. */
     val mouseEvents: String,
     val targetEvents: List<TargetEventDto>,
+    /** [AccelSpec] text of the curve the round was played with; absent for none. */
+    val accel: String? = null,
 )
 
 @Serializable

@@ -123,7 +123,7 @@ private fun movementMetric(
         val along = (moved.x * toTarget.x + moved.y * toTarget.y) / distance
         (along - distance) / distance
     }
-    val path = angularPath(recording, t0, t1, targetPitch)
+    val path = angularPath(recording, track, t0, t1, targetPitch)
     return MovementMetric(
         targetId = spawn.target.id,
         timeToTargetNanos = t1 - t0,
@@ -136,12 +136,16 @@ private fun movementMetric(
     )
 }
 
-private fun angularPath(recording: RoundRecording, t0: Long, t1: Long, referencePitchDegrees: Double): Double {
+private fun angularPath(recording: RoundRecording, track: ViewTrack, t0: Long, t1: Long, referencePitchDegrees: Double): Double {
     val dpc = recording.degreesPerCount
     val yawScale = cos(Math.toRadians(referencePitchDegrees))
-    return recording.mouseEvents.asSequence()
-        .filter { it.timeNanos in t0..t1 }
-        .sumOf { hypot(it.dx * dpc * yawScale, it.dy * dpc) }
+    return recording.mouseEvents.indices.asSequence()
+        .filter { recording.mouseEvents[it].timeNanos in t0..t1 }
+        .sumOf { i ->
+            val e = recording.mouseEvents[i]
+            val scale = track.scales[i]
+            hypot(e.dx * scale * dpc * yawScale, e.dy * scale * dpc)
+        }
 }
 
 private fun directionAngles(target: Target): Pair<Double, Double> {

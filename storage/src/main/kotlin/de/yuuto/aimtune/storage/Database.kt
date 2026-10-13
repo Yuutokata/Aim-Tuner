@@ -53,6 +53,8 @@ private val MIGRATIONS = listOf(
         PRIMARY KEY (round_id, name)
     );
     """.trimIndent(),
+    // Version 2: the acceleration curve a round was played with (AccelSpec text), null for none.
+    "ALTER TABLE round ADD COLUMN accel TEXT;",
 )
 
 /** One SQLite connection guarded by a lock; the app is single-user so one writer is enough. */

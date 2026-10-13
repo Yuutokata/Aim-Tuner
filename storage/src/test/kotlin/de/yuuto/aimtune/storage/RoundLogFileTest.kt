@@ -6,6 +6,7 @@ import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class RoundLogFileTest {
     private val recording = HeadlessRound.flick(SimulatedPlayer(), 800.0, 45.0, seed = 11, roundSeconds = 10)
@@ -27,6 +28,15 @@ class RoundLogFileTest {
         )
         assertEquals(recording.targetEvents.map { it.timeNanos - recording.startNanos }, back.targetEvents.map { it.timeNanos })
         assertEquals(recording.targetEvents.map { it::class }, back.targetEvents.map { it::class })
+    }
+
+    @Test
+    fun `the acceleration of a round survives the log and old logs without it still load`() {
+        val curve = de.yuuto.aimtune.core.accel.ClassicCurve(0.05, cap = 1.8)
+        val accelerated = recording.copy(accel = curve)
+        assertEquals(curve, RoundLogFile.decode(RoundLogFile.encode(accelerated)).accel)
+        assertEquals(null, RoundLogFile.decode(RoundLogFile.encode(recording)).accel)
+        assertTrue(!RoundLogFile.encode(recording).contains("accel"), "a round without acceleration writes no accel field")
     }
 
     @Test

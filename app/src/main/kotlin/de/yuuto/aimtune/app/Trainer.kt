@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.app
 
+import de.yuuto.aimtune.core.accel.AccelProcessor
 import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.math.ViewAngles
@@ -34,6 +35,7 @@ class Trainer(
     private var nextSeed = config.seed
     private var scenario: Scenario? = null
     private val recordedMouse = ArrayList<MouseEvent>()
+    private var accelProcessor: AccelProcessor? = null
 
     var phase = Phase.READY
         private set
@@ -62,6 +64,7 @@ class Trainer(
         view = ViewAngles()
         summary = null
         recordedMouse.clear()
+        accelProcessor = config.accel?.let { AccelProcessor(it, config.dpi) }
         scenario = config.scenario.create(roundNanos, roundSeed)
         roundStartNanos = nowNanos()
         scenario?.start(roundStartNanos)
@@ -112,6 +115,7 @@ class Trainer(
                 // Reports that arrived after the round's end belong to no round.
                 mouseEvents = recordedMouse.filter { it.timeNanos <= end },
                 targetEvents = s.events.toList(),
+                accel = config.accel,
             ),
         )
     }
@@ -121,7 +125,8 @@ class Trainer(
             lastEvent = event
             rate.record(event.timeNanos)
             if (phase == Phase.RUNNING) {
-                view = view.rotatedByCounts(event.dx, event.dy, degreesPerCount)
+                val scale = accelProcessor?.scaleFor(event) ?: 1.0
+                view = view.rotatedByCounts(event.dx * scale, event.dy * scale, degreesPerCount)
                 recordedMouse += event
             }
         }

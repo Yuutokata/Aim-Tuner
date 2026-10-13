@@ -1,6 +1,8 @@
 package de.yuuto.aimtune.storage
 
 import de.yuuto.aimtune.core.input.MouseEvent
+import de.yuuto.aimtune.core.accel.AccelSpec
+import de.yuuto.aimtune.core.accel.NaturalCurve
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
 import de.yuuto.aimtune.core.recording.RoundRecording
@@ -67,6 +69,49 @@ class RoundRepositoryTest {
             val original = recording()
             val id = repo.saveRound(session, original, startedAtMs = 2_000, blind = true, metrics = computeRoundMetrics(original))
             assertEquals(original, repo.loadRecording(id))
+        }
+    }
+
+    @Test
+    fun `the acceleration of a round is stored and loaded`() {
+        Database.open(dir.resolve("a.db")).use { db ->
+            val repo = RoundRepository(db)
+            val session = repo.createSession(1, "valorant", 800.0, SessionKind.SENSITIVITY)
+            val curve = NaturalCurve(0.2, 1.4, inputOffset = 1.0)
+            val plain = recording()
+            val accelerated = plain.copy(accel = curve)
+            val plainId = repo.saveRound(session, plain, 1, blind = true, metrics = computeRoundMetrics(plain))
+            val accelId = repo.saveRound(session, accelerated, 2, blind = true, metrics = computeRoundMetrics(accelerated))
+
+            assertNull(repo.loadRecording(plainId)?.accel)
+            assertEquals(curve, repo.loadRecording(accelId)?.accel)
+            assertEquals(listOf(null, AccelSpec.encode(curve)), repo.rounds(session).map { it.accel })
+        }
+    }
+
+    @Test
+    fun `a database from before acceleration is migrated and keeps its rounds`() {
+        val file = dir.resolve("old.db")
+        java.sql.DriverManager.getConnection("jdbc:sqlite:$file").use { c ->
+            c.createStatement().use { s ->
+                s.execute("CREATE TABLE session (id INTEGER PRIMARY KEY, started_at_ms INTEGER NOT NULL, game_id TEXT, dpi REAL NOT NULL, kind TEXT NOT NULL)")
+                s.execute("INSERT INTO session VALUES (1, 5, 'valorant', 800.0, 'sensitivity')")
+                s.execute(
+                    "CREATE TABLE round (id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES session(id) ON DELETE CASCADE, scenario TEXT NOT NULL, " +
+                        "seed INTEGER NOT NULL, cm360 REAL NOT NULL, dpi REAL NOT NULL, blind INTEGER NOT NULL, started_at_ms INTEGER NOT NULL, start_nanos INTEGER NOT NULL, " +
+                        "duration_nanos INTEGER NOT NULL, mouse_event_count INTEGER NOT NULL, mouse_events BLOB NOT NULL, metrics_version INTEGER NOT NULL)",
+                )
+                s.execute("INSERT INTO round VALUES (1, 1, 'flick', 3, 45.0, 800.0, 1, 6, 0, 1000, 0, x'', 1)")
+                s.execute("CREATE TABLE target_event (round_id INTEGER NOT NULL, seq INTEGER NOT NULL, type TEXT NOT NULL, time_offset_nanos INTEGER NOT NULL, target_id INTEGER, x REAL, y REAL, z REAL, radius REAL, PRIMARY KEY (round_id, seq))")
+                s.execute("CREATE TABLE metric (round_id INTEGER NOT NULL, name TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (round_id, name))")
+                s.execute("PRAGMA user_version = 1")
+            }
+        }
+        Database.open(file).use { db ->
+            assertEquals(Database.CURRENT_VERSION, db.schemaVersion)
+            val rounds = RoundRepository(db).rounds()
+            assertEquals(listOf(45.0), rounds.map { it.cm360 })
+            assertNull(rounds.single().accel)
         }
     }
 
