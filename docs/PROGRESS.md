@@ -4,8 +4,8 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Current
 
-- **Milestone:** M8 Results, i18n, packaging (implemented, waiting for the user's hands-on test)
-- **Task:** results charts, history, i18n and packaging done; next README screenshots and CONTRIBUTING game guide check. M7 is pushed, its second hands-on part (analysis, blind test, Raw Accel import) is still open.
+- **Milestone:** M9 Review fixes (implemented, waiting for the user's hands-on test); M8 Results, i18n, packaging is implemented and waiting for the user's hands-on test
+- **Task:** fixes are in (see M9 below and docs/REVIEW.md status table). The target sizes are assumptions until R1b. M7's second hands-on part (analysis, blind test, Raw Accel import) is still open, and per the review the acceleration results should not be trusted before R2.
 
 ## Checklist
 
@@ -94,7 +94,32 @@ Single source of truth for project status. Update at the end of every task and b
 - [x] Packaging: `:app:jpackage` (JDK jpackage with a trimmed runtime, app image by default, installer with `-PinstallerType`; ADR 0005 explains why not the Badass plugin); the app image runs the screenshot tour, CI zips it on tags. Raw input and database from the packaged build are untested
 - [x] README screenshots (`docs/screenshots`, rendered by the tour), feature list and packaging notes; CONTRIBUTING "add a game" existed since M1, "add a language" added
 
+### M9 Review fixes (from docs/REVIEW.md; the user asked for "M8 – Review fixes", M8 was already taken by Results/i18n/packaging, so this is M9). Approved and implemented, not yet committed
+Order: the four items that change the numbers first (R1-R4), then the rest.
+- [x] R1 (C1, M5) Realism (values are assumptions until measured in the game, see the remaining item below): target angular size, distance and flick-angle distribution, strafe speed and scenario weights move into the `GameProfile` JSON (`verified` flag and sources per field); the scenarios take them from the profile; default round = one scenario with a mixed distance distribution; measure the real head size in the Valorant range (procedure in REVIEW.md) and replace the assumed values; document the sources in ALGORITHMS.md "Realism"
+- [ ] R1b (user) Measure a head in the game's shooting range (procedure in REVIEW.md, Realism), put the values into `games/valorant.json` and set `trainer.verified` to true
+- [x] R2 (C2) First-movement definition: first reach starts >= ~100 ms after the spawn, points to the target, covers >= ~30 % of the distance or exceeds a minimum peak speed; check on the real rounds (`RealDataReviewTest`: < 3 % with error < -0.5); add a real-round fixture (`--record`); "recompute stored metrics from the stored events" with `METRICS_VERSION` bump (Q4)
+- [x] R3 (C3) Remove consistency from the sensitivity objective (or make it distance-normalised and de-trended); `ReviewBiasTest` single-metric optima must be interior; warn in Settings about weights
+- [x] R4 (M1) Search range centred on the current value (log scale), pad width only a warning, plausibility check for extreme onboarding values
+- [x] R5 (M2) Within-session trend / warm-up discard in the optimizer; interleave design points; drift regression test with a cap on the confidence under drift
+- [x] R6 (M3) A/B test stricter (per-look 0.01 or O'Brien-Fleming, min 6 pairs, minimum effect size), permutation-based BIC threshold for the fit; null test with >= 500 runs; update ALGORITHMS.md numbers
+- [x] R7 (M4) Accel only (GetRawInputBuffer and 4/8 kHz not done, see REVIEW.md status) with the Raw Input source; same speed estimator for the fit and the driver simulation; jitter/batching tests; check 4/8 kHz with `GetRawInputBuffer` (Q1)
+- [x] R8 (M6, M8) First-shot accuracy metric; clicks read from the same raw packet stream and shot at the view of the click time
+- [x] R9 (M7) Valorant FOV (letterboxed to the profile aspect instead of measuring) at other aspect ratios: measure or fix to a 16:9 viewport, `aspectBehavior` in the profile
+- [ ] R10 (C4) Record real sessions of 2+ people over a sweep, fit/validate the simulated player against them, re-quote the convergence numbers
+- [x] R11 (M9) Cache optimizer hyperparameters / cap the history refit, one query for rounds + metrics (Q5)
+- [x] R12 Minor (except Q3, Q8, GetRawInputBuffer): Q1-Q3, Q6-Q9 of REVIEW.md
+- [x] R14 Detection power for weak effects (`ReviewAccelTest.detectionPower`, result in ALGORITHMS.md): curves of +-15 % are mostly not found or not confirmed
+- [x] R15 "Try a mild curve anyway" on the analysis screen (`trialAccel`, `AccelRun.startTrial`), same blind test, result marked as trial
+- [ ] R13 Release (done: README, THIRD-PARTY-NOTICES, link, SPEC/ALGORITHMS, CI smoke test; still open: load the exported settings.json into Raw Accel, installer test without a JDK): README for users (install, use, method in plain words, limitations), THIRD-PARTY-NOTICES, Raw Accel link, SPEC/ALGORITHMS corrections, CI smoke test of the packaged app, load the exported `settings.json` into Raw Accel, test an installer on a machine without a JDK
+- [x] Review done: `docs/REVIEW.md`, review experiments (`core/.../harness/review`, `storage/.../review`, gated by `AIMTUNE_REVIEW` / `AIMTUNE_REAL_DB`), permanent `UnitChainTest`
+
 ## Last session
+
+- Power test and trial curve: the detector misses rising gains of 15 % or less (0 of 25 offered) and finds 25 % in about half the runs; the analysis screen now offers a mild trial curve for the blind test when none was found. Known weakness: the A/B test cannot confirm a 15 % curve reliably; default of 8 calibration rounds is below what the tests used (15).
+
+- M9 fixes (R1-R9, R11, most of R12/R13; see REVIEW.md "Status after the M9 fixes"): profile-defined target geometry (angular sizes, flick-angle mix, strafe speed, stops) and letterboxed 16:9 trainer picture; first reach must be a reach (real data: bad first errors 15 % to 2.7 %) with automatic recompute of stored metrics; consistency out of the score, first-shot accuracy in; search range centred on the current value; per-session trend and interleaved design points in the optimizer with a drift warning; median speed bins and a stricter A/B test (null: 2 % better / 3 % worse in 500 runs, noisy flat players offered a curve in 6 %); acceleration only with per-report timestamps; clicks read from the raw packet stream and shot at their own view; README for users, THIRD-PARTY-NOTICES, CI smoke test. Open: R1b (measure a head in the game), R10 (validation with other people), Raw Accel import test, installer on a clean machine.
+- Review (REVIEW.md, no fixes): unit chain exact (new `UnitChainTest`); on the simulated player the optimum depends on target size (x0.64 per doubling of the radius, 117 cm/360 at head size vs 54 now), consistency favours low sensitivity, drift is not modelled (confidence 93 % at 40 % correct); on 20 real rounds 15 % of first movements are tremor fragments; A/B announces a winner in 12 % of null runs; search range cut off above the current value for small pads. Raw input timing from the real mouse is clean (1 kHz, no zero intervals); the packaged app image starts.
 
 - M8: `ChartActor` and the score chart on the results screen (fitted line, 95 % band, round dots, optimum marker), the wanted-gain chart on the acceleration analysis, the History screen (menu H, recommendation after each session, game filter), English and German texts through `I18NBundle` with a language select in Settings, `:app:jpackage` (app image with a trimmed runtime, CI zip on tags), README screenshots. 268 tests pass (1 skipped). All screens checked through screenshots in both languages; the packaged app image runs the screenshot tour. Not checked with a real mouse: History with real data, the language switch in Settings, raw input and SQLite from the packaged build.
 - M7: `core/accel` (Raw Accel curve models and per-report processor from the verified 1.7.1 source, analysis of error against speed, fits of classic/natural/power with BIC selection against no acceleration, blind A/B with a per-look corrected t test), accel in the round pipeline (recordings, view, trainer, storage schema 2, round logs), the simulated player expecting a speed-dependent gain, the Raw Accel `settings.json` export, the Acceleration menu with calibration, analysis, blind test and verdict screens, `RoundSession` shared with the blind test. 252 tests pass. On the simulated players the flow offers a curve to every rising-gain player, none of the flat ones, confirms it in 92 % of runs (median 5 pairs) and calls a harmful curve worse every time; a first version of the A/B test called a non-existent difference better in 40 % of runs because it looked after every pair without correcting for it, fixed with a per-look level and calibrated (1 of 30). The screens are only checked through screenshots and tests, not with a real mouse, and the exported file was not loaded into Raw Accel.
@@ -108,13 +133,15 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Next steps
 
+0. User tests M9 with `gradlew.bat :app:run`: the targets are now head-sized and much smaller (expect low accuracy at first), the pre-test notice says "Estimate", the between-rounds screen may warn about drift. Then R1b: measure a head in Valorant's range and set `verified`.
+
 1. User tests M8 with `gradlew.bat :app:run` (or the app image from `:app:jpackage`): Results (R) with the chart, History (H) after a few sessions, Settings → Language (Deutsch/English, applies at once, kept on Save), the packaged `AimTune.exe` (does it start, does raw input work, does it create the database).
 2. Still open from M7: the second hands-on part (analysis result, blind test, Raw Accel import of `settings.json`).
 3. Then decide about pushing M8 and what comes after the milestones (resume of an interrupted calibration, mixed-scenario confidence, refit with the curve on, see Open questions).
 
 ## Known bugs
 
-- none known; M4 UI has only been checked through rendered screenshots.
+- see docs/REVIEW.md: C1-C4 (targets too large, spurious first movements, consistency metric bias, no validation on real people), M1-M9. M4 UI has only been checked through rendered screenshots.
 
 ## Open questions
 
