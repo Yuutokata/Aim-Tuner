@@ -75,11 +75,16 @@ Single source of truth for project status. Update at the end of every task and b
 - [ ] Second hands-on test: tracking playable now, flick-only confidence rises as in M5, mixed scenarios opt-in
 
 ### M7 Accel
-- [ ] Verify Raw Accel modes, units, settings.json schema
-- [ ] Error-vs-speed analysis, gain function
-- [ ] Curve fitting + model selection
-- [ ] In-app simulation + blind A/B
-- [ ] Raw Accel export
+- [x] Verify Raw Accel modes, units, settings.json schema (read from a1xd/rawaccel v1.7.1 source; findings in ALGORITHMS.md "Acceleration")
+- [x] `core/accel`: `ClassicCurve`, `NaturalCurve`, `PowerCurve` (Velocity form, Raw Accel formulas) and `AccelProcessor` (per-report speed in in/s with the driver's time clamp); tests against values computed from the C++ formulas
+- [ ] Accel in the pipeline: `RoundRecording.accel`, view rebuilt with the curve, trainer applies it, storage keeps it
+- [ ] Simulated player wants a speed-dependent gain (plans with it, gets what the curve gives) so the analysis has something to find
+- [ ] Error-vs-speed analysis, desired gain curve
+- [ ] Curve fitting (classic, natural, power) + model selection against "no accel"
+- [ ] In-app simulation + blind A/B with a measurable-gain decision
+- [ ] Raw Accel export (settings.json), only offered when A/B shows a gain
+- [ ] Accel screens in the app
+- [ ] Hands-on test by the user
 
 ### M8 Results, i18n, packaging
 - [ ] Results view (sens + accel tabs) + charts + history + copy-to-clipboard
