@@ -26,6 +26,25 @@ Games are JSON profiles and need no code changes. Bundled profiles live in `game
 - `yaw`: degrees per count at sensitivity 1.
 - `fov`: the value the game shows, whether it is `horizontal` or `vertical`, and the aspect ratio it refers to. `scaling` is `hor_plus` (vertical angle kept when the window gets wider).
 - `sensitivity.decimals`: how many decimals the game accepts.
+- `fov.trainerAspect` (optional, default 16:9): the shape of the picture the trainer draws; the window is letterboxed to it, so the horizontal FOV is exactly what the game shows at that shape.
+- `trainer` (optional block): what the targets look like. Every field falls back to the defaults of `TrainerGeometry`, and `verified` stays `false` until the values were measured in the game (the app tells the user when they are estimates).
+
+```json
+"trainer": {
+  "clickTargetDiameterDegrees": { "min": 0.4, "max": 1.9 },
+  "clickTargetDistanceMeters": { "min": 6.0, "max": 30.0 },
+  "flickAngles": [{ "maxDegrees": 5, "weight": 0.3 }, { "maxDegrees": 10, "weight": 0.3 }, { "maxDegrees": 20, "weight": 0.2 }, { "maxDegrees": 40, "weight": 0.15 }, { "maxDegrees": 90, "weight": 0.05 }],
+  "microStepDegrees": { "min": 1.5, "max": 8.0 },
+  "switchingSeparationDegrees": 10.0,
+  "trackingDiameterDegrees": { "min": 2.0, "max": 3.7 },
+  "trackingDistanceMeters": 14.0,
+  "strafeSpeedMetersPerSecond": { "min": 3.0, "max": 6.0 },
+  "stopProbability": 0.25,
+  "verified": false
+}
+```
+
+Sizes are angles (degrees at the game's FOV), never meters or pixels; the distance only gives the scene depth. `flickAngles` is the distance of the next target from the previous one (where the crosshair is after a hit): buckets by upper limit and weight. How to measure a head in the game's shooting range is described in [docs/REVIEW.md](docs/REVIEW.md) ("Realism").
 
 Verify yaw and FOV against a current, reliable source and cite it in `sources` and the PR. Never guess values.
 
