@@ -7,7 +7,9 @@ import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.storage.Database
 import de.yuuto.aimtune.storage.RoundLogFile
 import de.yuuto.aimtune.storage.RoundRepository
+import de.yuuto.aimtune.storage.RoundRow
 import de.yuuto.aimtune.storage.SessionKind
+import de.yuuto.aimtune.storage.SessionRow
 import de.yuuto.aimtune.storage.scoreInputs
 import java.nio.file.Path
 import java.util.concurrent.Executors
@@ -22,6 +24,9 @@ sealed interface RoundReport {
 
     data class Failed(val message: String) : RoundReport
 }
+
+/** Everything the database holds about played sessions, for the history. */
+data class StoredHistory(val sessions: List<SessionRow>, val rounds: List<RoundRow>)
 
 /**
  * Computes metrics and stores finished rounds on a background thread so the render thread never
@@ -79,6 +84,17 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
         } catch (e: Exception) {
             log.log(System.Logger.Level.ERROR, "reading earlier rounds failed: ${e.message}", e)
             emptyList()
+        }
+    }
+
+    /** All stored sessions and rounds, read on the storage thread; empty without a database or if reading fails. */
+    fun storedHistory(): StoredHistory {
+        val repo = repository ?: return StoredHistory(emptyList(), emptyList())
+        return try {
+            executor.submit<StoredHistory> { StoredHistory(repo.sessions(), repo.rounds()) }.get()
+        } catch (e: Exception) {
+            log.log(System.Logger.Level.ERROR, "reading the history failed: ${e.message}", e)
+            StoredHistory(emptyList(), emptyList())
         }
     }
 

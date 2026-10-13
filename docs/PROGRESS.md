@@ -5,7 +5,7 @@ Single source of truth for project status. Update at the end of every task and b
 ## Current
 
 - **Milestone:** M8 Results, i18n, packaging (in progress)
-- **Task:** results charts done; next history, i18n, jpackage, README. M7 is pushed, its second hands-on part (analysis, blind test, Raw Accel import) is still open.
+- **Task:** results charts and history done; next i18n, jpackage, README. M7 is pushed, its second hands-on part (analysis, blind test, Raw Accel import) is still open.
 
 ## Checklist
 
@@ -89,7 +89,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ### M8 Results, i18n, packaging
 - [x] Chart actor (`ChartActor`/`ChartSpec`: grid, bands, dashed lines, dots, markers), score chart on the results screen, wanted-gain chart on the accel analysis screen (no results tab, see DESIGN.md)
-- [ ] History (+ line chart per session, game filter)
+- [x] History screen (menu H): per-session recommendation (refit on the rounds up to that session, background), chart, table of the newest sessions, game filter; accel A/B sessions listed without a recommendation
 - [ ] i18n en/de
 - [ ] jpackage installer
 - [ ] README screenshots, CONTRIBUTING "add a game"

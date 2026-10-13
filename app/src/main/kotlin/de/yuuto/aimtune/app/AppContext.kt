@@ -14,7 +14,10 @@ import de.yuuto.aimtune.app.screens.AccelAnalysisScreen
 import de.yuuto.aimtune.app.screens.AccelBetweenScreen
 import de.yuuto.aimtune.app.screens.AccelIntroScreen
 import de.yuuto.aimtune.app.screens.AccelResultScreen
+import de.yuuto.aimtune.app.history.HistoryEntry
+import de.yuuto.aimtune.app.history.buildHistory
 import de.yuuto.aimtune.app.screens.BetweenRoundsScreen
+import de.yuuto.aimtune.app.screens.HistoryScreen
 import de.yuuto.aimtune.app.screens.MainMenuScreen
 import de.yuuto.aimtune.app.screens.OnboardingScreen
 import de.yuuto.aimtune.app.screens.PreTestScreen
@@ -37,6 +40,7 @@ import de.yuuto.aimtune.input.RawMouseSource
 import de.yuuto.aimtune.storage.RawAccelExport
 import de.yuuto.aimtune.storage.SettingsException
 import java.nio.file.Path
+import java.util.concurrent.CompletableFuture
 
 /**
  * The services every screen shares, and the navigation between screens. Created once in
@@ -150,6 +154,22 @@ class AppContext(
     }
 
     fun showAccel() = switchTo(AccelIntroScreen(this))
+
+    /** The history of stored sessions; the recommendation after each one is computed in the background. */
+    fun showHistory() = switchTo(HistoryScreen(this, loadHistory()))
+
+    private fun loadHistory(): CompletableFuture<List<HistoryEntry>> {
+        val config = trainerConfig()
+        val setup = settings.current
+        val pad = setup.padWidthCm
+        if (config == null || pad == null) return CompletableFuture.completedFuture(emptyList())
+        val range = searchRange(setup.aimStyleOrNull() ?: AimStyle.MIXED, config.cm360, pad)
+        val weights = metricWeights()
+        return CompletableFuture.supplyAsync {
+            val stored = processor.storedHistory()
+            buildHistory(stored.sessions, stored.rounds, weights, range)
+        }
+    }
 
     /** Starts the acceleration steps at the recommended sensitivity; back to the intro if there is none yet. */
     fun startAccelRun() {

@@ -8,11 +8,15 @@ import com.badlogic.gdx.utils.ScreenUtils
 import de.yuuto.aimtune.app.accel.AccelPhase
 import de.yuuto.aimtune.app.accel.sampleAccelRun
 import de.yuuto.aimtune.app.blind.sampleBlindRun
+import de.yuuto.aimtune.app.history.HistoryEntry
+import de.yuuto.aimtune.app.screens.HistoryScreen
 import de.yuuto.aimtune.app.screens.TrainerScreen
 import de.yuuto.aimtune.app.setup.SetupStep
 import de.yuuto.aimtune.core.scenario.ScenarioKind
+import de.yuuto.aimtune.storage.SessionKind
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.CompletableFuture
 
 private const val FRAMES_BEFORE_CAPTURE = 4
 private const val OPAQUE = 255.toByte()
@@ -52,10 +56,20 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("blind-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
         Step("between-rounds") { sample?.let(ctx::showBetweenRounds) },
         Step("results") { sample?.let(ctx::stopBlindTest) },
+        Step("history") { ctx.switchTo(HistoryScreen(ctx, CompletableFuture.completedFuture(sampleHistory()))) },
     )
     private val sample by lazy { ctx.trainerConfig()?.let(::sampleBlindRun) }
     private var index = -1
     private var frames = 0
+
+    private fun sampleHistory(): List<HistoryEntry> {
+        val day = 24L * 60 * 60 * 1000
+        val start = System.currentTimeMillis() - 9 * day
+        val trend = listOf(47.5 to 31, 45.8 to 44, 44.1 to 52, 44.9 to 63, 43.6 to 71, 43.9 to 78, 43.4 to 83)
+        return trend.mapIndexed { i, (cm, confidence) ->
+            HistoryEntry(i + 1L, start + i * day, "valorant", SessionKind.SENSITIVITY, 10, cm, confidence)
+        } + HistoryEntry(8, start + 8 * day, "valorant", SessionKind.ACCEL_AB, 14, null, null)
+    }
 
     private fun accelSample(until: AccelPhase) = ctx.trainerConfig()?.let { sampleAccelRun(it, until) }
 

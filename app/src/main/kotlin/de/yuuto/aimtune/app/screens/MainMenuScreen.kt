@@ -42,6 +42,8 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
         left.add(menuItem("Acceleration", "optional speed curve for Raw Accel", "A") { ctx.showAccel() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
+        left.add(menuItem("History", "past sessions and how the recommendation moved", "H") { ctx.showHistory() })
+            .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
         left.add(menuItem("Settings", "DPI, game, round length and score weights", "S") { ctx.showSettings() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).left().row()
         ctx.startupProblems.forEach { left.add(ui.label(it, Styles.CAUTION, wrap = true)).width(MENU_WIDTH).left().padTop(PROBLEM_GAP).row() }
@@ -61,6 +63,7 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
         Input.Keys.S -> true.also { ctx.showSettings() }
         Input.Keys.R -> true.also { ctx.showStoredResults() }
         Input.Keys.A -> true.also { ctx.showAccel() }
+        Input.Keys.H -> true.also { ctx.showHistory() }
         else -> false
     }
 
