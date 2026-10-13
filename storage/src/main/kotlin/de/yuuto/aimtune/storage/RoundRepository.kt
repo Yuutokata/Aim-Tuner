@@ -93,13 +93,13 @@ class RoundRepository(private val database: Database) {
     }
 
     /**
-     * The blind flick rounds of every sensitivity session with this game and DPI, oldest first: the
-     * data the optimizer merges across sessions. Rounds played without blinding are left out.
+     * The blind rounds (of any scenario) of every sensitivity session with this game and DPI, oldest
+     * first: the data the optimizer merges across sessions. Rounds played without blinding are left out.
      */
-    fun blindFlickRounds(gameId: String?, dpi: Double): List<RoundRow> =
+    fun blindRounds(gameId: String?, dpi: Double): List<RoundRow> =
         sessions().filter { it.kind == SessionKind.SENSITIVITY && it.gameId == gameId && it.dpi == dpi }
             .flatMap { rounds(it.id) }
-            .filter { it.blind && it.scenario == FLICK }
+            .filter { it.blind }
 
     /** Rounds of [sessionId], or of all sessions when null, oldest first. */
     fun rounds(sessionId: Long? = null): List<RoundRow> = database.transaction { c ->
@@ -165,6 +165,13 @@ class RoundRepository(private val database: Database) {
                         s.setInt(5, event.targetId)
                     }
                     is TargetEvent.Miss -> s.setString(3, MISS)
+                    is TargetEvent.Waypoint -> {
+                        s.setString(3, WAYPOINT)
+                        s.setInt(5, event.targetId)
+                        s.setDouble(6, event.center.x)
+                        s.setDouble(7, event.center.y)
+                        s.setDouble(8, event.center.z)
+                    }
                 }
                 s.addBatch()
             }
@@ -198,6 +205,7 @@ class RoundRepository(private val database: Database) {
                                 SPAWNED -> TargetEvent.Spawned(time, Target(rs.getInt(3), Vec3(rs.getDouble(4), rs.getDouble(5), rs.getDouble(6)), rs.getDouble(7)))
                                 HIT -> TargetEvent.Hit(time, rs.getInt(3))
                                 MISS -> TargetEvent.Miss(time)
+                                WAYPOINT -> TargetEvent.Waypoint(time, rs.getInt(3), Vec3(rs.getDouble(4), rs.getDouble(5), rs.getDouble(6)))
                                 else -> error("unknown target event type '$type'")
                             },
                         )
@@ -215,10 +223,10 @@ class RoundRepository(private val database: Database) {
         }
 
     private companion object {
-        const val FLICK = "flick"
         const val SPAWNED = "spawned"
         const val HIT = "hit"
         const val MISS = "miss"
+        const val WAYPOINT = "waypoint"
     }
 }
 
@@ -233,6 +241,8 @@ fun RoundMetrics.toNamedValues(): Map<String, Double> = buildMap {
     errorSpread?.let { put("error_spread", it) }
     meanCorrectiveSubmovements?.let { put("mean_corrective_submovements", it) }
     meanPathEfficiency?.let { put("mean_path_efficiency", it) }
+    trackingOnTargetRatio?.let { put("tracking_on_target_ratio", it) }
+    trackingMeanDistanceDegrees?.let { put("tracking_mean_distance_deg", it) }
 }
 
 /** The stored metrics a round's score is computed from, as [de.yuuto.aimtune.core.metrics.RoundMetrics.scoreInputs] would give them. */
@@ -241,4 +251,5 @@ fun RoundRow.scoreInputs(): Map<ScoreMetric, Double> = buildMap {
     metrics["accuracy"]?.takeIf { shots > 0 }?.let { put(ScoreMetric.ACCURACY, it) }
     metrics["mean_time_to_hit_ms"]?.let { put(ScoreMetric.TIME_TO_HIT, it) }
     metrics["error_spread"]?.let { put(ScoreMetric.CONSISTENCY, it) }
+    metrics["tracking_on_target_ratio"]?.let { put(ScoreMetric.TRACKING, it) }
 }

@@ -67,7 +67,7 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
         val repo = repository ?: return emptyList()
         return try {
             executor.submit<List<PastRound>> {
-                repo.blindFlickRounds(gameId, dpi).map { PastRound(it.sessionId, it.cm360, it.scoreInputs()) }
+                repo.blindRounds(gameId, dpi).map { PastRound(it.sessionId, it.cm360, it.scoreInputs(), it.scenario) }
             }.get()
         } catch (e: Exception) {
             log.log(System.Logger.Level.ERROR, "reading earlier rounds failed: ${e.message}", e)

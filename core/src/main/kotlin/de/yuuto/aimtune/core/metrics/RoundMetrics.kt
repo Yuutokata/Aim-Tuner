@@ -5,6 +5,7 @@ import de.yuuto.aimtune.core.analysis.Submovement
 import de.yuuto.aimtune.core.analysis.segmentSubmovements
 import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.core.recording.ViewTrack
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.scenario.TargetEvent
 import de.yuuto.aimtune.core.scenario.summarize
@@ -48,18 +49,26 @@ data class RoundMetrics(
     val errorSpread: Double?,
     val meanCorrectiveSubmovements: Double?,
     val meanPathEfficiency: Double?,
+    /** Share of the round the crosshair was on the moving target; only for tracking rounds. */
+    val trackingOnTargetRatio: Double? = null,
+    /** Mean angle between crosshair and the moving target's center in degrees; only for tracking rounds. */
+    val trackingMeanDistanceDegrees: Double? = null,
 )
 
-/** Computes the flick metrics of a round from its recording, as defined in docs/ALGORITHMS.md. */
+/** Computes the metrics of a round from its recording, as defined in docs/ALGORITHMS.md. */
 fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = MetricsParams()): RoundMetrics {
     val summary = summarize(recording.targetEvents)
     val submovements = segmentSubmovements(recording.mouseEvents, recording.dpi, params.segmentation)
     val track = ViewTrack(recording)
     val spawns = recording.targetEvents.filterIsInstance<TargetEvent.Spawned>().associateBy { it.target.id }
-    val movements = recording.targetEvents.filterIsInstance<TargetEvent.Hit>().mapNotNull { hit ->
-        val spawn = spawns[hit.targetId] ?: return@mapNotNull null
-        movementMetric(recording, track, submovements, spawn, hit, params)
+    val hitEvents = recording.targetEvents.filterIsInstance<TargetEvent.Hit>()
+    val movements = hitEvents.mapIndexedNotNull { index, hit ->
+        val spawn = spawns[hit.targetId] ?: return@mapIndexedNotNull null
+        // The reach starts at the later of the target's spawn and the previous hit (several targets can wait at once).
+        val from = maxOf(spawn.timeNanos, hitEvents.getOrNull(index - 1)?.timeNanos ?: spawn.timeNanos)
+        movementMetric(recording, track, submovements, spawn, from, hit, params)
     }
+    val tracking = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.TRACKING) computeTrackingMetrics(recording, track) else null
     val errors = movements.mapNotNull { it.firstErrorRatio }
     return RoundMetrics(
         hits = summary.hits,
@@ -72,6 +81,8 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
         errorSpread = errors.sampleStdDevOrNull(),
         meanCorrectiveSubmovements = movements.map { it.correctiveSubmovements.toDouble() }.averageOrNull(),
         meanPathEfficiency = movements.mapNotNull { it.pathEfficiency }.averageOrNull(),
+        trackingOnTargetRatio = tracking?.onTargetRatio,
+        trackingMeanDistanceDegrees = tracking?.meanDistanceDegrees,
     )
 }
 
@@ -92,10 +103,11 @@ private fun movementMetric(
     track: ViewTrack,
     submovements: List<Submovement>,
     spawn: TargetEvent.Spawned,
+    fromNanos: Long,
     hit: TargetEvent.Hit,
     params: MetricsParams,
 ): MovementMetric? {
-    val t0 = spawn.timeNanos
+    val t0 = fromNanos
     val t1 = hit.timeNanos
     val start = track.viewAt(t0)
     val (targetYaw, targetPitch) = directionAngles(spawn.target)

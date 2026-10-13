@@ -4,8 +4,6 @@ import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.math.ViewAngles
 import de.yuuto.aimtune.core.recording.RoundRecording
-import de.yuuto.aimtune.core.scenario.FlickConfig
-import de.yuuto.aimtune.core.scenario.FlickScenario
 import de.yuuto.aimtune.core.scenario.RoundSummary
 import de.yuuto.aimtune.core.scenario.Scenario
 import de.yuuto.aimtune.core.scenario.ShotResult
@@ -48,7 +46,7 @@ class Trainer(
     val rate = EventRateMeter()
 
     val degreesPerCountValue: Double get() = degreesPerCount
-    val activeTarget: Target? get() = if (phase == Phase.RUNNING) scenario?.targets?.firstOrNull() else null
+    val activeTargets: List<Target> get() = if (phase == Phase.RUNNING) scenario?.targets.orEmpty() else emptyList()
     val hits: Int get() = scenario?.let { summarize(it.events).hits } ?: 0
     val misses: Int get() = scenario?.let { summarize(it.events).misses } ?: 0
 
@@ -59,12 +57,12 @@ class Trainer(
 
     fun startRound() {
         roundSeed = nextSeed++
-        log.log(System.Logger.Level.INFO, "starting flick round, seed $roundSeed")
+        log.log(System.Logger.Level.INFO, "starting ${config.scenario.id} round, seed $roundSeed")
         source.drain { }
         view = ViewAngles()
         summary = null
         recordedMouse.clear()
-        scenario = FlickScenario(FlickConfig(durationNanos = roundNanos), roundSeed)
+        scenario = config.scenario.create(roundNanos, roundSeed)
         roundStartNanos = nowNanos()
         scenario?.start(roundStartNanos)
         phase = Phase.RUNNING
@@ -83,15 +81,20 @@ class Trainer(
     fun update() {
         applyPendingMouse()
         val s = scenario ?: return
-        if (phase == Phase.RUNNING && s.isFinished(nowNanos())) finishRound(s)
+        if (phase != Phase.RUNNING) return
+        val now = nowNanos()
+        s.update(now)
+        if (s.isFinished(now)) finishRound(s)
     }
 
     fun fire(): ShotResult {
         val s = scenario ?: return ShotResult.IGNORED
         if (phase != Phase.RUNNING) return ShotResult.IGNORED
-        // Bring the view up to date first so the shot uses the latest mouse input.
+        // Bring the view and moving targets up to date first so the shot uses the latest state.
         applyPendingMouse()
-        return s.fire(Vec3.ZERO, view.direction(), nowNanos())
+        val now = nowNanos()
+        s.update(now)
+        return s.fire(Vec3.ZERO, view.direction(), now)
     }
 
     private fun finishRound(s: Scenario) {

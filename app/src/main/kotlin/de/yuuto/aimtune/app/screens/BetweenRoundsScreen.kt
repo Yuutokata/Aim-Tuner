@@ -32,7 +32,10 @@ class BetweenRoundsScreen(ctx: AppContext, private val run: BlindRun) : UiScreen
         val test = run.test
         val content = Table()
         content.add(ui.label("${run.completedRoundLabel()} complete", Styles.HEADING)).left().padBottom(SECTION_GAP).row()
-        test.lastOutcome?.let { content.add(statCards(it)).left().padBottom(24f).row() }
+        test.lastOutcome?.let {
+            content.add(ui.caps(it.scenario.displayName)).left().padBottom(12f).row()
+            content.add(statCards(it)).left().padBottom(24f).row()
+        }
         content.add(ui.label("Your sensitivity stays hidden until you stop the test.", Styles.CAPTION_MUTED)).left().padBottom(SECTION_GAP).row()
         content.add(confidenceBlock()).left()
 
@@ -57,6 +60,11 @@ class BetweenRoundsScreen(ctx: AppContext, private val run: BlindRun) : UiScreen
 
     private fun statCards(outcome: RoundOutcome): Table {
         val row = Table()
+        if (!outcome.scenario.usesClicks) {
+            val onTarget = outcome.trackingOnTargetRatio?.let { "%.0f %%".format(Locale.ROOT, it * 100) } ?: "-"
+            row.add(statCard("Time on target", onTarget)).width(CARD_WIDTH)
+            return row
+        }
         val time = outcome.meanTimeToHitMs?.let { "%.0f ms".format(Locale.ROOT, it) } ?: "-"
         row.add(statCard("Hits", "${outcome.hits} / ${outcome.shots}")).width(CARD_WIDTH).padRight(CARD_GAP)
         row.add(statCard("Accuracy", "%.0f %%".format(Locale.ROOT, outcome.accuracy * 100))).width(CARD_WIDTH).padRight(CARD_GAP)
@@ -87,6 +95,7 @@ class BetweenRoundsScreen(ctx: AppContext, private val run: BlindRun) : UiScreen
         block.add(ui.label("${result.confidencePercent} %", Styles.NUMBER_XL)).left().padBottom(8f).row()
         block.add(progressBar(result.confidencePercent / 100f)).left().padBottom(8f).row()
         val note = when {
+            result.atRangeEdge -> "The best value so far is at the edge of the tested range. More rounds will check whether it really is the best."
             result.confidencePercent >= target -> "Target of $target % reached. More rounds can still refine it."
             else -> "About ${roundsText(result.roundsToTarget)} to reach $target %."
         }

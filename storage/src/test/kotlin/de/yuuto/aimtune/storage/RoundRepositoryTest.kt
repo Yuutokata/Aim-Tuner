@@ -4,8 +4,11 @@ import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
 import de.yuuto.aimtune.core.recording.RoundRecording
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.scenario.TargetEvent
+import de.yuuto.aimtune.core.sim.HeadlessRound
+import de.yuuto.aimtune.core.sim.SimulatedPlayer
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import kotlin.test.Test
@@ -96,7 +99,7 @@ class RoundRepositoryTest {
     }
 
     @Test
-    fun `blind flick rounds are gathered across sessions of one game and dpi`() {
+    fun `blind rounds are gathered across sessions of one game and dpi`() {
         Database.open(dir.resolve("a.db")).use { db ->
             val repo = RoundRepository(db)
             val m = computeRoundMetrics(recording())
@@ -110,12 +113,30 @@ class RoundRepositoryTest {
             repo.saveRound(b, recording(cm360 = 45.0), 20, blind = true, metrics = m)
             for (other in listOf(otherGame, otherDpi, accel)) repo.saveRound(other, recording(cm360 = 99.0), 30, blind = true, metrics = m)
 
-            val rounds = repo.blindFlickRounds("valorant", 800.0)
+            val rounds = repo.blindRounds("valorant", 800.0)
             assertEquals(listOf(30.0, 45.0), rounds.map { it.cm360 })
             assertEquals(listOf(a, b), rounds.map { it.sessionId })
             val inputs = rounds.first().scoreInputs()
             assertEquals(0.5, inputs.getValue(de.yuuto.aimtune.core.score.ScoreMetric.ACCURACY), 1e-12)
             assertEquals(m.meanTimeToHitMs, inputs[de.yuuto.aimtune.core.score.ScoreMetric.TIME_TO_HIT])
+        }
+    }
+
+    @Test
+    fun `a tracking round keeps its waypoints and its tracking score input`() {
+        Database.open(dir.resolve("a.db")).use { db ->
+            val repo = RoundRepository(db)
+            val session = repo.createSession(1, "valorant", 800.0, SessionKind.SENSITIVITY)
+            val original = HeadlessRound.of(ScenarioKind.TRACKING, SimulatedPlayer(), 800.0, 50.0, seed = 3, roundSeconds = 10)
+            val metrics = computeRoundMetrics(original)
+            assertTrue(original.targetEvents.any { it is TargetEvent.Waypoint })
+            val id = repo.saveRound(session, original, startedAtMs = 5, blind = true, metrics = metrics)
+
+            assertEquals(original, repo.loadRecording(id))
+            val row = repo.blindRounds("valorant", 800.0).single()
+            assertEquals("tracking", row.scenario)
+            assertEquals(metrics.trackingOnTargetRatio, row.scoreInputs()[de.yuuto.aimtune.core.score.ScoreMetric.TRACKING])
+            assertNull(row.scoreInputs()[de.yuuto.aimtune.core.score.ScoreMetric.ACCURACY])
         }
     }
 

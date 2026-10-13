@@ -20,6 +20,12 @@ sealed interface TargetEvent {
     data class Spawned(override val timeNanos: Long, val target: Target) : TargetEvent
     data class Hit(override val timeNanos: Long, val targetId: Int) : TargetEvent
     data class Miss(override val timeNanos: Long) : TargetEvent
+
+    /**
+     * A moving target is at [center] at [timeNanos]. Between two waypoints of the same target it
+     * moves on the path [TargetPath] defines; the [Spawned] event is its first waypoint.
+     */
+    data class Waypoint(override val timeNanos: Long, val targetId: Int, val center: Vec3) : TargetEvent
 }
 
 enum class ShotResult { HIT, MISS, IGNORED }
@@ -29,11 +35,19 @@ enum class ShotResult { HIT, MISS, IGNORED }
  * the caller passes the current time (nanoseconds, any monotonic origin) into every call.
  */
 interface Scenario {
-    val id: String
+    val kind: ScenarioKind
+    val id: String get() = kind.id
     val targets: List<Target>
     val events: List<TargetEvent>
 
     fun start(nowNanos: Long)
+
+    /**
+     * Brings moving targets up to [nowNanos]; call it before reading [targets] or firing. Events are
+     * stamped with their scheduled time, so the log does not depend on how often this is called.
+     */
+    fun update(nowNanos: Long) = Unit
+
     fun isFinished(nowNanos: Long): Boolean
     fun fire(origin: Vec3, direction: Vec3, nowNanos: Long): ShotResult
 }

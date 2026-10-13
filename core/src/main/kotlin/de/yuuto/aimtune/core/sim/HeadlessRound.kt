@@ -4,9 +4,8 @@ import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.math.ViewAngles
 import de.yuuto.aimtune.core.recording.RoundRecording
-import de.yuuto.aimtune.core.scenario.FlickConfig
-import de.yuuto.aimtune.core.scenario.FlickScenario
 import de.yuuto.aimtune.core.scenario.Scenario
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.units.degreesPerCount
 
 private const val NANOS_PER_MS = 1_000_000L
@@ -29,10 +28,18 @@ object HeadlessRound {
         seed: Long,
         roundSeconds: Int = 45,
         sessionOffsetNanos: Long = 0L,
-    ): RoundRecording = run(
-        player, dpi, cm360, seed, roundSeconds, sessionOffsetNanos,
-        FlickScenario(FlickConfig(durationNanos = roundSeconds * NANOS_PER_SECOND), seed),
-    )
+    ): RoundRecording = of(ScenarioKind.FLICK, player, dpi, cm360, seed, roundSeconds, sessionOffsetNanos)
+
+    /** One round of [kind] with its default geometry. */
+    fun of(
+        kind: ScenarioKind,
+        player: SimulatedPlayer,
+        dpi: Double,
+        cm360: Double,
+        seed: Long,
+        roundSeconds: Int = 45,
+        sessionOffsetNanos: Long = 0L,
+    ): RoundRecording = run(player, dpi, cm360, seed, roundSeconds, sessionOffsetNanos, kind.create(roundSeconds * NANOS_PER_SECOND, seed))
 
     fun run(
         player: SimulatedPlayer,
@@ -43,7 +50,7 @@ object HeadlessRound {
         sessionOffsetNanos: Long,
         scenario: Scenario,
     ): RoundRecording {
-        val aimer = SimulatedAimer(player, dpi, cm360, seed xor AIMER_SEED_MIX)
+        val aimer = SimulatedAimer(player, dpi, cm360, seed xor AIMER_SEED_MIX, scenario.kind)
         val start = CLOCK_ORIGIN_NANOS
         val end = start + roundSeconds * NANOS_PER_SECOND
         val degPerCount = degreesPerCount(dpi, cm360)
@@ -54,11 +61,13 @@ object HeadlessRound {
         aimer.reset(now, sessionOffsetNanos)
         while (now < end) {
             now += NANOS_PER_MS
-            val step = aimer.step(now, scenario.targets.firstOrNull())
+            // Same order as the trainer: the player sees the targets as of the last update, then the frame advances them.
+            val step = aimer.step(now, scenario.targets)
             if (step.dx != 0 || step.dy != 0) {
                 mouse += MouseEvent(now, step.dx, step.dy)
                 view = view.rotatedByCounts(step.dx, step.dy, degPerCount)
             }
+            scenario.update(now)
             if (step.click) scenario.fire(Vec3.ZERO, view.direction(), now)
         }
         return RoundRecording(

@@ -1,5 +1,7 @@
 package de.yuuto.aimtune.core.sim
 
+import de.yuuto.aimtune.core.math.Vec3
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.units.degreesPerCount
 import kotlin.math.PI
@@ -24,7 +26,9 @@ data class AimerStep(val dx: Int, val dy: Int, val click: Boolean) {
 /**
  * Deterministic synthetic aimer. Per target it waits a reaction time, makes a minimum-jerk primary
  * reach with a noisy endpoint, then repeatedly checks its error after a feedback delay and corrects
- * until it is on the target, and clicks. It never reads a clock: the caller passes the time into
+ * until it is on the target, and clicks. With several targets visible it goes for the one nearest
+ * to its aim and sticks to it. For [ScenarioKind.TRACKING] it follows the target instead (see
+ * [trackStep]) and never clicks. It never reads a clock: the caller passes the time into
  * [step], which the headless runner and `SimulatedMouseSource` both do. The aimer assumes the view
  * starts at yaw 0 / pitch 0 when [reset] is called, like the trainer.
  */
@@ -33,12 +37,15 @@ class SimulatedAimer(
     dpi: Double,
     private val cm360: Double,
     seed: Long,
+    private val kind: ScenarioKind = ScenarioKind.FLICK,
 ) {
     private class Reach(val startNanos: Long, val durationNanos: Long, val dYaw: Double, val dPitch: Double) {
         val endNanos: Long get() = startNanos + durationNanos
     }
 
     private data class Offset(val x: Double, val y: Double)
+
+    private class Observation(val timeNanos: Long, val center: Vec3)
 
     private enum class Mode { NO_TARGET, REACTING, MOVING, SETTLING, CLICKING }
 
@@ -55,6 +62,9 @@ class SimulatedAimer(
     private var roundStartNanos = 0L
     private var sessionOffsetNanos = 0L
     private var corrections = 0
+    private val seenTargets = HashSet<Int>()
+    private val observations = ArrayDeque<Observation>()
+    private var nextControlNanos = 0L
 
     /** Starts a round: the view is at (0, 0); [sessionOffsetNanos] is the time already spent in the session (fatigue). */
     fun reset(nowNanos: Long, sessionOffsetNanos: Long = 0L) {
@@ -67,14 +77,95 @@ class SimulatedAimer(
         targetId = -1
         roundStartNanos = nowNanos
         this.sessionOffsetNanos = sessionOffsetNanos
+        seenTargets.clear()
+        observations.clear()
+        nextControlNanos = nowNanos
     }
 
-    fun step(nowNanos: Long, target: Target?): AimerStep {
+    fun step(nowNanos: Long, target: Target?): AimerStep = step(nowNanos, listOfNotNull(target))
+
+    /** One poll with all [targets] currently visible. */
+    fun step(nowNanos: Long, targets: List<Target>): AimerStep {
+        if (kind == ScenarioKind.TRACKING) return trackStep(nowNanos, targets.firstOrNull())
+        val target = choose(nowNanos, targets)
+        val seenBefore = target != null && target.id in seenTargets
+        targets.forEach { seenTargets += it.id }
+        return clickStep(nowNanos, target, seenBefore)
+    }
+
+    /** Keeps the current target while it is there, otherwise the one nearest to the aim. */
+    private fun choose(nowNanos: Long, targets: List<Target>): Target? {
+        targets.firstOrNull { it.id == targetId }?.let { return it }
+        return targets.minByOrNull { target -> errorTo(nowNanos, target).let { hypot(it.x, it.y) } }
+    }
+
+    /**
+     * Follows the target like a person does: it sees the target's position [SimulatedPlayer.trackingLagMs]
+     * late, partly anticipates the motion during that delay, and every 40 ms corrects a share of the
+     * remaining error. Corrections are noisy and limited by the hand's smooth speed.
+     */
+    private fun trackStep(nowNanos: Long, target: Target?): AimerStep {
+        if (target == null) return emitCounts(nowNanos, click = false)
+        observations.addLast(Observation(nowNanos, target.center))
+        while (observations.size > 1 && observations.first().timeNanos < nowNanos - ms(TRACK_HISTORY_MS)) observations.removeFirst()
+        if (nowNanos >= nextControlNanos) {
+            controlTracking(nowNanos)
+            nextControlNanos = nowNanos + ms(TRACK_STEP_MS)
+        }
+        return emitCounts(nowNanos, click = false)
+    }
+
+    private fun controlTracking(nowNanos: Long) {
+        val fatigue = fatigue(nowNanos)
+        val lagNanos = ms(player.trackingLagMs * fatigue)
+        val delayed = observationAt(nowNanos - lagNanos) ?: return
+        val earlier = observationAt(nowNanos - lagNanos - ms(VELOCITY_WINDOW_MS)) ?: delayed
+        val seen = anglesOf(delayed.center)
+        val before = anglesOf(earlier.center)
+        val seconds = (delayed.timeNanos - earlier.timeNanos) / NANOS_PER_SECOND
+        // The hand needs about half a reach to deliver a command, so that delay is anticipated too.
+        val lead = player.trackingPrediction * (lagNanos + ms(TRACK_REACH_MS) / 2) / NANOS_PER_SECOND
+        val predictedYaw = if (seconds > 0.0) seen.first + (seen.first - before.first) / seconds * lead else seen.first
+        val predictedPitch = if (seconds > 0.0) seen.second + (seen.second - before.second) / seconds * lead else seen.second
+
+        val (yaw, pitch) = committedAngles()
+        val errorX = (predictedYaw - yaw) * cos(Math.toRadians(predictedPitch))
+        val errorY = predictedPitch - pitch
+        var moveX = errorX * player.trackingGain
+        var moveY = errorY * player.trackingGain
+        var amplitude = hypot(moveX, moveY)
+
+        val stepSeconds = TRACK_STEP_MS / MS_PER_S
+        val nominalCmPerS = amplitude * cm360 / FULL_TURN / stepSeconds
+        val effectiveCm360 = cm360 / (player.optimumScale * player.gainPreference(nominalCmPerS))
+        val reachLimit = player.trackingMaxHandSpeedCmPerS * stepSeconds * FULL_TURN / effectiveCm360
+        if (amplitude > reachLimit) {
+            moveX *= reachLimit / amplitude
+            moveY *= reachLimit / amplitude
+            amplitude = reachLimit
+        }
+        val sigma = player.noiseLevel * fatigue *
+            sqrt(sq(player.signalNoise * amplitude) + sq(player.handNoiseCm * player.trackingNoiseShare * FULL_TURN / effectiveCm360))
+        moveX += sigma * gaussian()
+        moveY += sigma * gaussian()
+        foldFinished(nowNanos)
+        reaches += Reach(nowNanos, ms(TRACK_REACH_MS), moveX / cos(Math.toRadians(pitch + moveY / 2.0)), moveY)
+    }
+
+    private fun observationAt(timeNanos: Long): Observation? = observations.lastOrNull { it.timeNanos <= timeNanos }
+
+    private fun anglesOf(center: Vec3): Pair<Double, Double> =
+        Math.toDegrees(atan2(center.x, -center.z)) to Math.toDegrees(asin(center.y / center.length))
+
+    /** Where the aim ends up once every reach under way has finished. */
+    private fun committedAngles(): Pair<Double, Double> = (baseYaw + reaches.sumOf { it.dYaw }) to (basePitch + reaches.sumOf { it.dPitch })
+
+    private fun clickStep(nowNanos: Long, target: Target?, seenBefore: Boolean): AimerStep {
         if (target == null) {
             mode = Mode.NO_TARGET
             return emitCounts(nowNanos, click = false)
         }
-        if (target.id != targetId) beginTarget(nowNanos, target)
+        if (target.id != targetId) beginTarget(nowNanos, target, seenBefore)
         var click = false
         when (mode) {
             Mode.REACTING -> if (nowNanos >= wakeNanos) planReach(nowNanos, target, primary = true)
@@ -95,12 +186,13 @@ class SimulatedAimer(
         return emitCounts(nowNanos, click)
     }
 
-    private fun beginTarget(nowNanos: Long, target: Target) {
+    private fun beginTarget(nowNanos: Long, target: Target, seenBefore: Boolean) {
         targetId = target.id
         corrections = 0
         mode = Mode.REACTING
-        val reaction = player.reactionMeanMs + player.reactionSdMs * gaussian()
-        wakeNanos = nowNanos + ms(max(MIN_REACTION_MS, reaction) * fatigue(nowNanos))
+        val mean = if (seenBefore) player.reacquireMs else player.reactionMeanMs
+        val reaction = mean + player.reactionSdMs * gaussian()
+        wakeNanos = nowNanos + ms(max(MIN_REACTION_MS * if (seenBefore) REACQUIRE_FLOOR else 1.0, reaction) * fatigue(nowNanos))
     }
 
     private fun decide(nowNanos: Long, target: Target) {
@@ -224,7 +316,15 @@ class SimulatedAimer(
         const val MS_PER_S = 1000.0
         const val NANOS_PER_MS = 1_000_000.0
         const val NANOS_PER_MINUTE = 60_000_000_000.0
+        const val NANOS_PER_SECOND = 1_000_000_000.0
         const val MIN_REACTION_MS = 120.0
+
+        /** A target that was already in view may be re-acquired faster than the usual minimum reaction. */
+        const val REACQUIRE_FLOOR = 0.5
+        const val TRACK_STEP_MS = 40.0
+        const val TRACK_REACH_MS = 80.0
+        const val TRACK_HISTORY_MS = 600.0
+        const val VELOCITY_WINDOW_MS = 100.0
         const val MIN_REACH_MS = 60.0
         const val MIN_WIDTH_DEGREES = 0.3
         const val CORRECTION_SPEEDUP = 0.6

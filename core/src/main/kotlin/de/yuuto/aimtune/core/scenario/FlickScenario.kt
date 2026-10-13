@@ -27,7 +27,7 @@ data class FlickConfig(
  * one so every target needs a real flick.
  */
 class FlickScenario(private val config: FlickConfig, seed: Long) : Scenario {
-    override val id = "flick"
+    override val kind = ScenarioKind.FLICK
 
     private val random = Random(seed)
     private val eventLog = mutableListOf<TargetEvent>()

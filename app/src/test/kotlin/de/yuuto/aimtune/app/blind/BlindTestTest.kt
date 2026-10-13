@@ -1,11 +1,15 @@
 package de.yuuto.aimtune.app.blind
 
+import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
+import de.yuuto.aimtune.core.scenario.ScenarioKind
+import de.yuuto.aimtune.core.scenario.ScenarioSchedule
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.score.scoreInputs
 import de.yuuto.aimtune.core.sim.HeadlessRound
 import de.yuuto.aimtune.core.sim.SimulatedPlayer
 import de.yuuto.aimtune.core.units.SearchRange
+import de.yuuto.aimtune.games.GameProfiles
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.test.Test
@@ -61,6 +65,41 @@ class BlindTestTest {
             assertEquals(20, result.rounds)
             assertEquals(2, result.sessions)
             assertTrue(abs(ln(result.optimumCm360 / 50.0)) < 0.5, "merged optimum ${result.optimumCm360}")
+        }
+    }
+
+    @Test
+    fun `a run that rotates scenarios scores each against its own rounds and keeps the outcome per scenario`() {
+        val schedule = ScenarioSchedule(ScenarioKind.entries.toSet(), MetricWeights.DEFAULT)
+        BlindTest(range, MetricWeights.DEFAULT, emptyList(), seed = 5).use { test ->
+            repeat(16) { i ->
+                val kind = schedule.kindFor(i)
+                val cm360 = test.nextCm360()
+                val metrics = computeRoundMetrics(HeadlessRound.of(kind, player, 800.0, cm360, 600L + i, roundSeconds = 20))
+                test.recordRound(cm360, metrics, kind)
+                val outcome = assertNotNull(test.lastOutcome)
+                assertEquals(kind, outcome.scenario)
+                assertEquals(kind == ScenarioKind.TRACKING, outcome.trackingOnTargetRatio != null)
+            }
+            val result = assertNotNull(test.step().result)
+            assertEquals(16, result.rounds)
+            assertTrue(result.optimumCm360 in range)
+        }
+    }
+
+    @Test
+    fun `the scenario of the next round follows the schedule and the sensitivity stays in range`() {
+        val schedule = ScenarioSchedule(setOf(ScenarioKind.FLICK, ScenarioKind.TRACKING), MetricWeights.DEFAULT)
+        val config = TrainerConfig(800.0, 45.0, checkNotNull(GameProfiles.load().find("valorant")), 20, seed = 1)
+        BlindTest(range, MetricWeights.DEFAULT, emptyList(), seed = 6).use { test ->
+            val run = BlindRun(test, runKey = 1, baseConfig = config, nextSeed = 100, schedule = schedule)
+            repeat(6) { i ->
+                val next = run.nextRoundConfig()
+                assertEquals(schedule.kindFor(i), next.scenario)
+                assertTrue(next.cm360 in range)
+                assertEquals(100L + i, next.seed)
+                test.recordRound(next.cm360, computeRoundMetrics(HeadlessRound.of(next.scenario, player, 800.0, next.cm360, next.seed, roundSeconds = 10)), next.scenario)
+            }
         }
     }
 

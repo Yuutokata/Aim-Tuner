@@ -80,6 +80,36 @@ class ScoreCalculatorTest {
     }
 
     @Test
+    fun `every scenario is scored against its own rounds`() {
+        // Micro rounds are all much easier than flick rounds; pooled, every micro round would look excellent.
+        val flick = listOf(round(0.60, 900.0), round(0.70, 800.0), round(0.80, 700.0))
+        val micro = listOf(round(0.90, 400.0), round(0.95, 350.0), round(0.99, 300.0))
+        val rounds = flick + micro
+        val scenarios = List(3) { "flick" } + List(3) { "micro" }
+
+        val pooled = calculator.scoreRounds(rounds).map { assertNotNull(it) }
+        val separate = calculator.scoreRounds(rounds, scenarios).map { assertNotNull(it) }
+
+        assertTrue(pooled.take(3).all { it < pooled[3] }, "pooled, the easy scenario dominates: $pooled")
+        assertTrue(separate[0] < 50 && separate[2] > 50 && separate[3] < 50 && separate[5] > 50, "separate: $separate")
+    }
+
+    @Test
+    fun `a scenario with too few rounds has no score yet while others do`() {
+        val rounds = List(3) { round(0.6 + it * 0.1, 700.0 - it * 100) } + List(2) { round(0.9, 300.0 + it) }
+        val scores = calculator.scoreRounds(rounds, List(3) { "flick" } + List(2) { "micro" })
+        assertTrue(scores.take(3).all { it != null } && scores.drop(3).all { it == null })
+    }
+
+    @Test
+    fun `tracking rounds are scored on tracking alone`() {
+        val tracking = listOf(0.30, 0.40, 0.50).map { mapOf(ScoreMetric.TRACKING to it) }
+        val scores = calculator.scoreRounds(tracking, List(3) { "tracking" }).map { assertNotNull(it) }
+        assertTrue(scores[0] < scores[1] && scores[1] < scores[2])
+        assertEquals(50.0, scores[1], 0.5)
+    }
+
+    @Test
     fun `normal cdf matches known values`() {
         assertEquals(0.5, normalCdf(0.0), 1e-7)
         assertEquals(0.97500, normalCdf(1.96), 1e-4)

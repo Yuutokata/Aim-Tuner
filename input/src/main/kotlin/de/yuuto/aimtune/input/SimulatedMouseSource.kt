@@ -1,6 +1,7 @@
 package de.yuuto.aimtune.input
 
 import de.yuuto.aimtune.core.input.MouseEvent
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.sim.AIMER_SEED_MIX
 import de.yuuto.aimtune.core.sim.ManualClock
@@ -10,7 +11,7 @@ import java.util.ArrayDeque
 
 /**
  * A synthetic player as a [RawMouseSource], for tests and the screenshot tour. It reads the current
- * target from [activeTarget] (the scenario's, via the trainer) and produces raw counts with
+ * targets from [activeTargets] (the scenario's, via the trainer) and produces raw counts with
  * timestamps. Time is virtual: the driver advances the [clock] (1 ms per step for 1000 Hz), calls
  * [tick], lets the consumer drain, and fires a shot when [consumeClick] says so. Call [beginRound]
  * right before a round starts. Like every source it delivers nothing while the window is unfocused.
@@ -21,9 +22,10 @@ class SimulatedMouseSource(
     cm360: Double,
     seed: Long,
     override val clock: ManualClock,
-    private val activeTarget: () -> Target?,
+    kind: ScenarioKind = ScenarioKind.FLICK,
+    private val activeTargets: () -> List<Target>,
 ) : RawMouseSource {
-    private val aimer = SimulatedAimer(player, dpi, cm360, seed xor AIMER_SEED_MIX)
+    private val aimer = SimulatedAimer(player, dpi, cm360, seed xor AIMER_SEED_MIX, kind)
     private val queue = ArrayDeque<MouseEvent>()
     private var focused = true
     private var started = false
@@ -53,7 +55,7 @@ class SimulatedMouseSource(
     fun tick() {
         if (!started || !focused) return
         val now = clock.nowNanos()
-        val step = aimer.step(now, activeTarget())
+        val step = aimer.step(now, activeTargets())
         if (step.dx != 0 || step.dy != 0) {
             queue.add(MouseEvent(now, step.dx, step.dy))
             eventsReceived++

@@ -89,6 +89,39 @@ class SensitivityOptimizerTest {
     }
 
     @Test
+    fun `scenarios with their own score level combine into one result`() {
+        val optimizer = SensitivityOptimizer(range, 9)
+        val random = Random(9)
+        var history = emptyList<Observation>()
+        repeat(32) { i ->
+            val group = i % 2
+            val s = optimizer.suggestNext(history)
+            // Group 1 scores 25 points higher at every sensitivity.
+            history = history + Observation(0, s.cm360, score(s.cm360, random) + group * 25.0, group)
+        }
+        val result = assertNotNull(optimizer.analyze(history))
+        assertTrue(abs(ln(result.optimumCm360 / truth)) < 0.25, "optimum ${result.optimumCm360}")
+        assertTrue(result.hyper.groupVariance > 0.0, "the offset between the groups must be modelled")
+    }
+
+    @Test
+    fun `a slope that only ends at the edge of the range is flagged and not confident`() {
+        val optimizer = SensitivityOptimizer(range, 5)
+        val random = Random(5)
+        var history = emptyList<Observation>()
+        repeat(30) {
+            val s = optimizer.suggestNext(history)
+            // The score keeps rising toward the largest cm/360 of the range.
+            history = history + Observation(0, s.cm360, 20.0 * ln(s.cm360 / range.minCm360) + 2.0 * (random.nextDouble() - 0.5))
+        }
+        val result = assertNotNull(optimizer.analyze(history))
+        assertTrue(result.atRangeEdge, "optimum ${result.optimumCm360}")
+        assertTrue(result.confidencePercent <= 50)
+        assertTrue(result.recommendMoreRounds)
+        assertTrue(!assertNotNull(run(30, 2).let { (o, h) -> o.analyze(h) }).atRangeEdge)
+    }
+
+    @Test
     fun `rounds of several sessions merge into one result`() {
         val optimizer = SensitivityOptimizer(range, 7)
         val random = Random(7)

@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.storage
 
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.score.ScoreMetric
 import de.yuuto.aimtune.core.units.AimStyle
@@ -27,6 +28,8 @@ data class AppSettings(
     val padHeightCm: Double? = null,
     val roundSeconds: Int = DEFAULT_ROUND_SECONDS,
     val metricWeights: Map<String, Double> = DEFAULT_WEIGHTS,
+    /** Ids of the scenarios a blind test plays ([ScenarioKind.id]); how often each is played follows [metricWeights]. */
+    val scenarios: List<String> = DEFAULT_SCENARIOS,
 ) {
     /** @throws SettingsException describing the first invalid field. */
     fun validate() {
@@ -42,6 +45,13 @@ data class AppSettings(
         if (roundSeconds <= 0) throw SettingsException("roundSeconds must be positive, was $roundSeconds")
         aimStyleOrNull()
         toMetricWeights()
+        enabledScenarios()
+    }
+
+    /** @throws SettingsException for unknown scenario ids or an empty selection. */
+    fun enabledScenarios(): Set<ScenarioKind> {
+        if (scenarios.isEmpty()) throw SettingsException("at least one scenario must be enabled")
+        return scenarios.map { id -> ScenarioKind.fromId(id) ?: throw SettingsException("unknown scenario '$id'") }.toSet()
     }
 
     /** @throws SettingsException if [aimStyle] is set to something that is not an aim style. */
@@ -65,5 +75,6 @@ data class AppSettings(
         const val CURRENT_VERSION = 1
         const val DEFAULT_ROUND_SECONDS = 45
         val DEFAULT_WEIGHTS: Map<String, Double> = MetricWeights.DEFAULT.values.mapKeys { it.key.name }
+        val DEFAULT_SCENARIOS: List<String> = ScenarioKind.entries.map { it.id }
     }
 }

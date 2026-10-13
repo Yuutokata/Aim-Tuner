@@ -20,7 +20,7 @@ import de.yuuto.aimtune.core.scenario.Target
  * Plain 3D room with one sphere per target. The camera sits at the origin and uses the vertical
  * FOV derived from the game profile's FOV, independent of the window aspect ratio.
  */
-class TrainerScene(verticalFovDegrees: Float, private val targetRadius: Float) : Disposable {
+class TrainerScene(verticalFovDegrees: Float, private val modelRadius: Double = DEFAULT_MODEL_RADIUS) : Disposable {
     private val camera = PerspectiveCamera(verticalFovDegrees, 16f, 9f).apply {
         near = NEAR_PLANE
         far = FAR_PLANE
@@ -40,7 +40,7 @@ class TrainerScene(verticalFovDegrees: Float, private val targetRadius: Float) :
     private val room = ModelInstance(roomModel).apply { transform.setToTranslation(0f, 0f, ROOM_CENTER_Z) }
 
     private val targetModel: Model = ModelBuilder().createSphere(
-        targetRadius * 2, targetRadius * 2, targetRadius * 2, SPHERE_DIVISIONS, SPHERE_DIVISIONS,
+        modelRadius.toFloat() * 2, modelRadius.toFloat() * 2, modelRadius.toFloat() * 2, SPHERE_DIVISIONS, SPHERE_DIVISIONS,
         Material(ColorAttribute.createDiffuse(Theme.accentSoft), ColorAttribute.createEmissive(Theme.accentSoft)),
         (Usage.Position or Usage.Normal).toLong(),
     )
@@ -51,7 +51,7 @@ class TrainerScene(verticalFovDegrees: Float, private val targetRadius: Float) :
         camera.viewportHeight = height.toFloat()
     }
 
-    fun render(view: ViewAngles, target: Target?) {
+    fun render(view: ViewAngles, targets: List<Target>) {
         val direction = view.direction()
         camera.position.set(0f, 0f, 0f)
         camera.direction.set(direction.x.toFloat(), direction.y.toFloat(), direction.z.toFloat())
@@ -60,8 +60,9 @@ class TrainerScene(verticalFovDegrees: Float, private val targetRadius: Float) :
 
         batch.begin(camera)
         batch.render(room, environment)
-        if (target != null) {
-            targetInstance.transform.setToTranslation(target.center.x.toFloat(), target.center.y.toFloat(), target.center.z.toFloat())
+        for (target in targets) {
+            val scale = (target.radius / modelRadius).toFloat()
+            targetInstance.transform.setToTranslation(target.center.x.toFloat(), target.center.y.toFloat(), target.center.z.toFloat()).scale(scale, scale, scale)
             batch.render(targetInstance, environment)
         }
         batch.end()
@@ -74,6 +75,8 @@ class TrainerScene(verticalFovDegrees: Float, private val targetRadius: Float) :
     }
 
     private companion object {
+        /** The sphere model is built once at this radius and scaled per target. */
+        const val DEFAULT_MODEL_RADIUS = 1.0
         const val NEAR_PLANE = 0.05f
         const val FAR_PLANE = 200f
         const val ROOM_WIDTH = 80f

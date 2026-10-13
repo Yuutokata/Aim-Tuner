@@ -5,6 +5,7 @@ import de.yuuto.aimtune.core.optimizer.Observation
 import de.yuuto.aimtune.core.optimizer.OptimizationResult
 import de.yuuto.aimtune.core.optimizer.OptimizerConfig
 import de.yuuto.aimtune.core.optimizer.SensitivityOptimizer
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.score.ScoreCalculator
 import de.yuuto.aimtune.core.score.ScoreMetric
@@ -33,20 +34,25 @@ fun playBlindTest(
     roundSeconds: Int = 45,
     sessionOf: (Int) -> Long = { 0L },
     playerFor: (Int) -> SimulatedPlayer = { player },
+    scenarioFor: (Int) -> ScenarioKind = { ScenarioKind.FLICK },
+    weights: MetricWeights = MetricWeights.DEFAULT,
 ): SimulatedTest {
     val optimizer = SensitivityOptimizer(range, seed, config)
-    val calculator = ScoreCalculator(MetricWeights.DEFAULT)
+    val calculator = ScoreCalculator(weights)
     val inputs = mutableListOf<Map<ScoreMetric, Double>>()
+    val scenarios = mutableListOf<String>()
     val cm360s = mutableListOf<Double>()
     var history = emptyList<Observation>()
     repeat(rounds) { index ->
         val cm360 = optimizer.suggestNext(history).cm360
         val roundSeed = seed * 7_919L + index
         val offset = index * roundSeconds * 1_000_000_000L
-        inputs += computeRoundMetrics(HeadlessRound.flick(playerFor(index), TEST_DPI, cm360, roundSeed, roundSeconds, offset)).scoreInputs()
+        val kind = scenarioFor(index)
+        inputs += computeRoundMetrics(HeadlessRound.of(kind, playerFor(index), TEST_DPI, cm360, roundSeed, roundSeconds, offset)).scoreInputs()
+        scenarios += kind.id
         cm360s += cm360
-        val scores = calculator.scoreRounds(inputs)
-        history = cm360s.indices.map { Observation(sessionOf(it), cm360s[it], scores[it] ?: UNKNOWN_SCORE) }
+        val scores = calculator.scoreRounds(inputs, scenarios)
+        history = cm360s.indices.map { Observation(sessionOf(it), cm360s[it], scores[it] ?: UNKNOWN_SCORE, group = scenarios[it].hashCode()) }
     }
     return SimulatedTest(optimizer.analyze(history), history, cm360s)
 }

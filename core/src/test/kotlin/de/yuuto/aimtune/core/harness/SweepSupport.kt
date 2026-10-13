@@ -1,6 +1,7 @@
 package de.yuuto.aimtune.core.harness
 
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.score.ScoreCalculator
 import de.yuuto.aimtune.core.score.scoreInputs
@@ -26,12 +27,13 @@ fun meanScores(
     roundsEach: Int,
     seed: Long,
     roundSeconds: Int = 45,
+    kind: ScenarioKind = ScenarioKind.FLICK,
 ): List<Double> {
     val inputs = grid.flatMapIndexed { gi, cm ->
         List(roundsEach) { r ->
             val roundSeed = seed * 1_000_003L + gi * 1_009L + r
             val offset = (gi * roundsEach + r) * roundSeconds * 1_000_000_000L
-            computeRoundMetrics(HeadlessRound.flick(player, TEST_DPI, cm, roundSeed, roundSeconds, offset)).scoreInputs()
+            computeRoundMetrics(HeadlessRound.of(kind, player, TEST_DPI, cm, roundSeed, roundSeconds, offset)).scoreInputs()
         }
     }
     val scores = ScoreCalculator(MetricWeights.DEFAULT).scoreRounds(inputs)

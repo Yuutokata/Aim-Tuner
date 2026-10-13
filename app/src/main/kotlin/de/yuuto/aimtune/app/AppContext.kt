@@ -18,6 +18,8 @@ import de.yuuto.aimtune.app.screens.UiScreen
 import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.setup.SetupStep
 import de.yuuto.aimtune.app.ui.UiHolder
+import de.yuuto.aimtune.core.scenario.ScenarioKind
+import de.yuuto.aimtune.core.scenario.ScenarioSchedule
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.units.AimStyle
 import de.yuuto.aimtune.core.units.searchRange
@@ -76,10 +78,16 @@ class AppContext(
         } catch (e: SettingsException) {
             MetricWeights.DEFAULT
         }
+        val enabled = try {
+            setup.enabledScenarios()
+        } catch (e: SettingsException) {
+            ScenarioKind.entries.toSet()
+        }
         val past = processor.pastBlindRounds(setup.gameId, config.dpi)
         val seed = nextSeed++
         val test = BlindTest(range, weights, past, seed)
-        showBlindRound(BlindRun(test, runKey = System.currentTimeMillis(), baseConfig = config, nextSeed = nextSeed++))
+        val schedule = ScenarioSchedule(enabled, weights)
+        showBlindRound(BlindRun(test, runKey = System.currentTimeMillis(), baseConfig = config, nextSeed = nextSeed++, schedule = schedule))
     }
 
     /** One blind round at the sensitivity the optimizer picked (hidden from the user). */

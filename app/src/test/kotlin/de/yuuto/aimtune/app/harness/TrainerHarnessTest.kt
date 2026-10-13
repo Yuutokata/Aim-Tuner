@@ -4,6 +4,7 @@ import de.yuuto.aimtune.app.Phase
 import de.yuuto.aimtune.app.Trainer
 import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.core.recording.RoundRecording
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.TargetEvent
 import de.yuuto.aimtune.core.sim.HeadlessRound
 import de.yuuto.aimtune.core.sim.ManualClock
@@ -33,12 +34,12 @@ class TrainerHarnessTest {
         dpi = dpi, cm360 = cm360, profile = checkNotNull(GameProfiles.load().find("valorant")), roundSeconds = ROUND_SECONDS, seed = seed,
     )
 
-    private fun playWithSimulatedSource(seed: Long): RoundRecording {
+    private fun playWithSimulatedSource(seed: Long, kind: ScenarioKind = ScenarioKind.FLICK): RoundRecording {
         val clock = ManualClock(CLOCK_ORIGIN)
         var finished: RoundRecording? = null
         lateinit var trainer: Trainer
-        val source = SimulatedMouseSource(player, dpi, cm360, seed, clock) { trainer.activeTarget }
-        trainer = Trainer(config(seed), source) { finished = it }
+        val source = SimulatedMouseSource(player, dpi, cm360, seed, clock, kind) { trainer.activeTargets }
+        trainer = Trainer(config(seed).copy(scenario = kind), source) { finished = it }
         source.start()
         source.beginRound()
         trainer.startRound()
@@ -71,6 +72,13 @@ class TrainerHarnessTest {
     fun `the trainer driven by the simulated source records exactly what the headless runner records`() {
         for (seed in listOf(1L, 2L, 3L)) {
             assertEquals(HeadlessRound.flick(player, dpi, cm360, seed, ROUND_SECONDS), playWithSimulatedSource(seed), "seed $seed")
+        }
+    }
+
+    @Test
+    fun `every scenario recorded by the trainer equals the headless runner`() {
+        for (kind in ScenarioKind.entries) {
+            assertEquals(HeadlessRound.of(kind, player, dpi, cm360, 5, ROUND_SECONDS), playWithSimulatedSource(5, kind), kind.id)
         }
     }
 

@@ -1,6 +1,7 @@
 package de.yuuto.aimtune.storage
 
 import de.yuuto.aimtune.core.units.AimStyle
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.score.ScoreMetric
 import org.junit.jupiter.api.io.TempDir
@@ -75,6 +76,20 @@ class SettingsStoreTest {
         val w: MetricWeights = AppSettings(metricWeights = mapOf("ACCURACY" to 3.0, "CONSISTENCY" to 1.0)).toMetricWeights()
         assertEquals(setOf(ScoreMetric.ACCURACY, ScoreMetric.CONSISTENCY), w.values.keys)
         assertEquals(MetricWeights.DEFAULT, AppSettings().toMetricWeights())
+    }
+
+    @Test
+    fun `enabled scenarios default to all, survive a round trip and reject bad selections`() {
+        assertEquals(ScenarioKind.entries.toSet(), AppSettings().enabledScenarios())
+        val file = dir.resolve("old.json")
+        Files.writeString(file, """{"version":1,"dpi":800.0}""")
+        assertEquals(ScenarioKind.entries.toSet(), SettingsStore(file).load().enabledScenarios())
+
+        val store = store()
+        store.save(AppSettings(scenarios = listOf("flick", "tracking")))
+        assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.TRACKING), store.load().enabledScenarios())
+        assertFailsWith<SettingsException> { store().save(AppSettings(scenarios = emptyList())) }
+        assertFailsWith<SettingsException> { store().save(AppSettings(scenarios = listOf("flick", "juggling"))) }
     }
 
     @Test

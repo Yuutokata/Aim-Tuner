@@ -102,17 +102,20 @@ private data class TargetEventDto(
 private const val SPAWNED = "spawned"
 private const val HIT = "hit"
 private const val MISS = "miss"
+private const val WAYPOINT = "waypoint"
 
 private fun TargetEvent.toDto(origin: Long): TargetEventDto = when (this) {
     is TargetEvent.Spawned -> TargetEventDto(SPAWNED, timeNanos - origin, target.id, target.center.x, target.center.y, target.center.z, target.radius)
     is TargetEvent.Hit -> TargetEventDto(HIT, timeNanos - origin, targetId)
     is TargetEvent.Miss -> TargetEventDto(MISS, timeNanos - origin)
+    is TargetEvent.Waypoint -> TargetEventDto(WAYPOINT, timeNanos - origin, targetId, center.x, center.y, center.z)
 }
 
 private fun TargetEventDto.toEvent(): TargetEvent = when (type) {
     SPAWNED -> TargetEvent.Spawned(t, Target(requireField(id, "id"), Vec3(requireField(x, "x"), requireField(y, "y"), requireField(z, "z")), requireField(radius, "radius")))
     HIT -> TargetEvent.Hit(t, requireField(id, "id"))
     MISS -> TargetEvent.Miss(t)
+    WAYPOINT -> TargetEvent.Waypoint(t, requireField(id, "id"), Vec3(requireField(x, "x"), requireField(y, "y"), requireField(z, "z")))
     else -> throw IllegalArgumentException("unknown target event type '$type'")
 }
 

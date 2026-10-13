@@ -36,6 +36,18 @@ data class SimulatedPlayer(
      */
     val gainPreference: (Double) -> Double = { 1.0 },
     val maxCorrections: Int = 8,
+    /** Reaction to a target that was already visible (switching), instead of one that just appeared. */
+    val reacquireMs: Double = 110.0,
+    /** Delay between what the target does and what the hand reacts to while tracking. */
+    val trackingLagMs: Double = 150.0,
+    /** Share of the target's motion during that delay the player anticipates (0 = none, 1 = perfect). */
+    val trackingPrediction: Double = 0.8,
+    /** Fraction of the remaining error corrected per control step (every 40 ms). */
+    val trackingGain: Double = 0.7,
+    /** Fastest the hand can move while tracking smoothly; slower than a flick, so a high cm/360 falls behind fast targets. */
+    val trackingMaxHandSpeedCmPerS: Double = 8.0,
+    /** Hand noise per control step as a multiple of the flick hand noise (smooth pursuit is less precise than a flick). */
+    val trackingNoiseShare: Double = 2.0,
 ) {
     init {
         require(noiseLevel >= 0.0 && fatiguePerMinute >= 0.0 && optimumScale > 0.0) { "invalid player parameters" }

@@ -1,7 +1,10 @@
 package de.yuuto.aimtune.core.sim
 
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.TargetEvent
+import de.yuuto.aimtune.core.score.ScoreMetric
+import de.yuuto.aimtune.core.score.scoreInputs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -56,6 +59,50 @@ class HeadlessRoundTest {
         assertEquals(25.0, low.declaredOptimumCm360, 1e-9)
         assertTrue(hits(low, 25.0) > hits(base, 25.0))
         assertTrue(hits(base, 50.0) > hits(low, 50.0))
+    }
+
+    @Test
+    fun `the simulated player plays every click scenario and the analysis sees its movements`() {
+        for (kind in listOf(ScenarioKind.FLICK, ScenarioKind.MICRO, ScenarioKind.SWITCHING)) {
+            val rec = HeadlessRound.of(kind, SimulatedPlayer(), 800.0, 60.0, 3, 30)
+            assertEquals(kind.id, rec.scenarioId)
+            assertEquals(rec, HeadlessRound.of(kind, SimulatedPlayer(), 800.0, 60.0, 3, 30), "${kind.id} must be deterministic")
+            val metrics = computeRoundMetrics(rec)
+            assertTrue(metrics.hits >= 10, "${kind.id}: ${metrics.hits} hits")
+            assertTrue(metrics.accuracy > 0.5, "${kind.id}: accuracy ${metrics.accuracy}")
+            assertTrue(metrics.movements.size >= 8 && metrics.errorSpread != null, "${kind.id}: ${metrics.movements.size} analysed movements")
+            assertTrue(metrics.trackingOnTargetRatio == null)
+        }
+    }
+
+    @Test
+    fun `switching is faster per hit than flicking because the next target is already known`() {
+        fun meanTime(kind: ScenarioKind) = (1L..4L).map { computeRoundMetrics(HeadlessRound.of(kind, SimulatedPlayer(), 800.0, 55.0, it, 30)).meanTimeToHitMs!! }.average()
+        assertTrue(meanTime(ScenarioKind.SWITCHING) < meanTime(ScenarioKind.FLICK))
+    }
+
+    @Test
+    fun `tracking is measured by time on target and needs no clicks`() {
+        val rec = HeadlessRound.of(ScenarioKind.TRACKING, SimulatedPlayer(), 800.0, 60.0, 3, 30)
+        assertTrue(rec.targetEvents.none { it is TargetEvent.Hit || it is TargetEvent.Miss })
+        val metrics = computeRoundMetrics(rec)
+        assertEquals(0, metrics.shots)
+        assertEquals(setOf(ScoreMetric.TRACKING), metrics.scoreInputs().keys)
+        assertTrue(metrics.trackingOnTargetRatio!! in 0.15..0.9, "on target ${metrics.trackingOnTargetRatio}")
+        assertTrue(metrics.trackingMeanDistanceDegrees!! in 0.2..10.0, "distance ${metrics.trackingMeanDistanceDegrees}")
+    }
+
+    @Test
+    fun `a player who keeps up is on target and one who does not move is not`() {
+        val sharp = SimulatedPlayer(
+            signalNoise = 0.0, handNoiseCm = 1e-4, trackingLagMs = 10.0, trackingPrediction = 1.0, trackingMaxHandSpeedCmPerS = 1000.0,
+        )
+        val following = computeRoundMetrics(HeadlessRound.of(ScenarioKind.TRACKING, sharp, 800.0, 50.0, 8, 30)).trackingOnTargetRatio!!
+        assertTrue(following > 0.8, "following $following")
+
+        val rec = HeadlessRound.of(ScenarioKind.TRACKING, sharp, 800.0, 50.0, 8, 30)
+        val still = computeRoundMetrics(rec.copy(mouseEvents = emptyList())).trackingOnTargetRatio!!
+        assertTrue(still < 0.3, "standing still $still")
     }
 
     @Test

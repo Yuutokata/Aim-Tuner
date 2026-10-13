@@ -1,0 +1,151 @@
+package de.yuuto.aimtune.core.scenario
+
+import de.yuuto.aimtune.core.math.Vec3
+import de.yuuto.aimtune.core.math.ViewAngles
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.sign
+import kotlin.math.sin
+import kotlin.random.Random
+
+/** Geometry and motion of the tracking scenario. Distances and radius are in scene units (meters). */
+data class TrackingConfig(
+    val durationNanos: Long,
+    val maxYawDegrees: Double = 35.0,
+    val maxPitchDegrees: Double = 15.0,
+    val distance: Double = 14.0,
+    val targetRadius: Double = 0.4,
+    /** Angular speed of each straight segment, drawn uniformly. */
+    val minSpeedDegreesPerSecond: Double = 12.0,
+    val maxSpeedDegreesPerSecond: Double = 40.0,
+    val minSegmentSeconds: Double = 0.5,
+    val maxSegmentSeconds: Double = 1.4,
+) {
+    init {
+        require(durationNanos > 0) { "durationNanos must be positive" }
+        require(0.0 < minSpeedDegreesPerSecond && minSpeedDegreesPerSecond <= maxSpeedDegreesPerSecond) { "invalid speed range" }
+        require(0.0 < minSegmentSeconds && minSegmentSeconds <= maxSegmentSeconds) { "invalid segment length range" }
+        require(distance > 0.0 && targetRadius > 0.0) { "distance and radius must be positive" }
+    }
+}
+
+/**
+ * One target moves through the field in straight segments with changing speed and heading; the
+ * player keeps the crosshair on it. No clicks are needed: how long the crosshair is on the target
+ * is measured. The motion is planned from the seed at construction. Each segment's end is logged as
+ * a [TargetEvent.Waypoint] when the segment starts (stamped with its arrival time), so the log
+ * always covers the segment in progress when a round ends.
+ */
+class TrackingScenario(private val config: TrackingConfig, seed: Long) : Scenario {
+    override val kind = ScenarioKind.TRACKING
+
+    private class Point(val offsetNanos: Long, val center: Vec3)
+
+    private val random = Random(seed)
+    private val plan = buildPlan()
+    private val eventLog = mutableListOf<TargetEvent>()
+    private var startNanos: Long? = null
+    private var currentNanos = 0L
+    private var loggedPoints = 0
+
+    override val targets: List<Target>
+        get() = startNanos?.let { listOf(Target(TARGET_ID, positionAt(currentNanos - it), config.targetRadius)) } ?: emptyList()
+
+    override val events: List<TargetEvent> get() = eventLog
+
+    override fun start(nowNanos: Long) {
+        startNanos = nowNanos
+        currentNanos = nowNanos
+        eventLog += TargetEvent.Spawned(nowNanos, Target(TARGET_ID, plan.first().center, config.targetRadius))
+        loggedPoints = 1
+        logAnnouncedWaypoints(nowNanos)
+    }
+
+    override fun update(nowNanos: Long) {
+        if (startNanos == null) return
+        currentNanos = nowNanos
+        logAnnouncedWaypoints(nowNanos)
+    }
+
+    override fun isFinished(nowNanos: Long): Boolean {
+        val start = startNanos ?: return false
+        return nowNanos - start >= config.durationNanos
+    }
+
+    /** Tracking is not about clicking; shots do nothing. */
+    override fun fire(origin: Vec3, direction: Vec3, nowNanos: Long): ShotResult = ShotResult.IGNORED
+
+    /** Logs the waypoint that ends the segment [nowNanos] is in, and any earlier one not logged yet. */
+    private fun logAnnouncedWaypoints(nowNanos: Long) {
+        val start = checkNotNull(startNanos)
+        val relative = nowNanos - start
+        while (loggedPoints < plan.size && plan[loggedPoints - 1].offsetNanos <= relative) {
+            val point = plan[loggedPoints]
+            eventLog += TargetEvent.Waypoint(start + point.offsetNanos, TARGET_ID, point.center)
+            loggedPoints++
+        }
+    }
+
+    private fun positionAt(relativeNanos: Long): Vec3 {
+        val after = plan.indexOfFirst { it.offsetNanos > relativeNanos }
+        if (after == -1) return plan.last().center
+        val a = plan[after - 1]
+        val b = plan[after]
+        return TargetPath.interpolate(a.center, b.center, (relativeNanos - a.offsetNanos).toDouble() / (b.offsetNanos - a.offsetNanos))
+    }
+
+    private fun buildPlan(): List<Point> {
+        var yaw = random.nextDouble(-config.maxYawDegrees, config.maxYawDegrees) * START_SPREAD
+        var pitch = random.nextDouble(-config.maxPitchDegrees, config.maxPitchDegrees) * START_SPREAD
+        val durations = mutableListOf<Double>()
+        var total = 0.0
+        while (total * NANOS_PER_SECOND <= config.durationNanos) {
+            durations += random.nextDouble(config.minSegmentSeconds, config.maxSegmentSeconds)
+            total += durations.last()
+        }
+        // Speeds and headings are spread evenly over their ranges (in random order), so every round
+        // is about equally hard and rounds differ in shape, not in difficulty.
+        val speeds = stratified(durations.size, config.minSpeedDegreesPerSecond, config.maxSpeedDegreesPerSecond)
+        val headings = stratified(durations.size, 0.0, 2 * Math.PI)
+        val points = mutableListOf(Point(0L, center(yaw, pitch)))
+        var offset = 0L
+        durations.indices.forEach { i ->
+            val (nextYaw, nextPitch) = nextAngles(yaw, pitch, reach = speeds[i] * durations[i], preferredHeading = headings[i])
+            yaw = nextYaw
+            pitch = nextPitch
+            offset += (durations[i] * NANOS_PER_SECOND).toLong()
+            points += Point(offset, center(yaw, pitch))
+        }
+        return points
+    }
+
+    /** [count] values, one random value from each of [count] equal slices of [low]..[high], in random order. */
+    private fun stratified(count: Int, low: Double, high: Double): List<Double> =
+        List(count) { low + (high - low) * (it + random.nextDouble()) / count }.shuffled(random)
+
+    /** The preferred heading for [reach] degrees if it stays in the field, otherwise another one, or a turn back toward the middle. */
+    private fun nextAngles(yaw: Double, pitch: Double, reach: Double, preferredHeading: Double): Pair<Double, Double> {
+        repeat(MAX_HEADING_ATTEMPTS) { attempt ->
+            val heading = if (attempt == 0) preferredHeading else random.nextDouble(0.0, 2 * Math.PI)
+            val nextYaw = yaw + reach * cos(heading)
+            val nextPitch = pitch + reach * sin(heading) * PITCH_SHARE
+            if (abs(nextYaw) <= config.maxYawDegrees && abs(nextPitch) <= config.maxPitchDegrees) return nextYaw to nextPitch
+        }
+        return (yaw - yaw.sign * min(abs(yaw), reach)) to (pitch - pitch.sign * min(abs(pitch), reach * PITCH_SHARE))
+    }
+
+    private fun center(yaw: Double, pitch: Double): Vec3 = ViewAngles.directionOf(yaw, pitch) * config.distance
+
+    private companion object {
+        const val TARGET_ID = 0
+        const val NANOS_PER_SECOND = 1_000_000_000.0
+        const val MAX_HEADING_ATTEMPTS = 30
+
+        /** Vertical motion is damped: the field is much shorter than wide. */
+        const val PITCH_SHARE = 0.5
+
+        /** The target starts in the inner part of the field. */
+        const val START_SPREAD = 0.6
+    }
+}

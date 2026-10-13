@@ -2,6 +2,7 @@ package de.yuuto.aimtune.app
 
 import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.setup.SetupStep
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.games.GameProfile
 import de.yuuto.aimtune.games.GameProfiles
 import de.yuuto.aimtune.storage.AppSettings
@@ -13,6 +14,7 @@ data class TrainerConfig(
     val profile: GameProfile,
     val roundSeconds: Int,
     val seed: Long,
+    val scenario: ScenarioKind = ScenarioKind.FLICK,
 )
 
 /** The trainer config for saved [settings], or null while onboarding is incomplete. */

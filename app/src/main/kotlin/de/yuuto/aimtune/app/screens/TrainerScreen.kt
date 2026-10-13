@@ -13,12 +13,11 @@ import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.app.TrainerScene
 import de.yuuto.aimtune.app.blind.BlindRun
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
-import de.yuuto.aimtune.core.scenario.FlickConfig
 
 private const val MILLIS_PER_SECOND = 1000L
 
 /**
- * The 3D flick trainer: room, targets, HUD and the round state machine. Without a [blind] run it is
+ * The 3D trainer: room, targets, HUD and the round state machine for the scenario in [config]. Without a [blind] run it is
  * the free trainer at the current sensitivity; with one it plays a single blind round at the
  * sensitivity in [config] (chosen by the optimizer, never shown) and then moves on to the
  * between-rounds screen.
@@ -32,11 +31,11 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
             ctx.processor.submit(recording, startedAtMs, blind = false, gameId = gameId)
         } else {
             ctx.processor.submit(recording, startedAtMs, blind = true, gameId = gameId, runKey = blind.runKey)
-            blind.test.recordRound(config.cm360, computeRoundMetrics(recording))
+            blind.test.recordRound(config.cm360, computeRoundMetrics(recording), config.scenario)
             blindRoundDone = true
         }
     }
-    private val scene = TrainerScene(config.profile.verticalFovDegrees.toFloat(), FlickConfig(durationNanos = 1).targetRadius.toFloat())
+    private val scene = TrainerScene(config.profile.verticalFovDegrees.toFloat())
     private val hud = Hud(config, ctx.ui.tokens, roundLabel = blind?.nextRoundLabel())
 
     /** Exposed for the screenshot tour. */
@@ -85,7 +84,7 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
         val bg = ctx.ui.tokens.bg
         Gdx.gl.glClearColor(bg.r, bg.g, bg.b, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
-        scene.render(trainer.view, trainer.activeTarget)
+        scene.render(trainer.view, trainer.activeTargets)
         hud.render(trainer, ctx.source, ctx.processor.report, Gdx.graphics.framesPerSecond, ctx.ui.skin.fonts)
     }
 

@@ -18,6 +18,7 @@ import de.yuuto.aimtune.app.ui.caps
 import de.yuuto.aimtune.app.ui.frame
 import de.yuuto.aimtune.app.ui.label
 import de.yuuto.aimtune.app.ui.onChange
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.ScoreMetric
 import de.yuuto.aimtune.storage.AppSettings
 import java.util.Locale
@@ -31,6 +32,8 @@ private const val WEIGHTS_WIDTH = 640f
 private const val SLIDER_ROW_GAP = 28f
 private const val SEGMENT_WIDTH = 100f
 private const val SEGMENT_GAP = 8f
+private const val SCENARIO_WIDTH = 300f
+private const val SCENARIOS_GAP = 40f
 private const val FOOTER_BUTTON_HEIGHT = 64f
 private val ROUND_LENGTHS = listOf(30, 45, 60, 90)
 
@@ -46,6 +49,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
     private var draft = SetupDraft.fromSettings(ctx.settings.current)
     private var roundSeconds = ctx.settings.current.roundSeconds
     private val weights = ctx.settings.current.metricWeights.toMutableMap()
+    private val scenarios = ctx.settings.current.scenarios.toMutableSet()
     private var message: Pair<String, Boolean>? = null
     private var liveCm: Label? = null
     private var totalLabel: Label? = null
@@ -62,9 +66,12 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         val runSetup = ui.button("Run setup again", Styles.SECONDARY) { ctx.showOnboarding(SetupStep.DPI, afterFinish = ctx::showSettings) }
         addRow(left, "Aim style and mousepad", Table().also { it.add(runSetup).height(CONTROL_HEIGHT) })
 
+        val right = Table()
+        right.add(weightsBlock()).left().row()
+        right.add(scenariosBlock()).left().padTop(SCENARIOS_GAP)
         val content = Table()
         content.add(left).top().left()
-        content.add(weightsBlock()).top().left().padLeft(COLUMN_GAP).padTop(ui.tokens.footerHeight)
+        content.add(right).top().left().padLeft(COLUMN_GAP).padTop(ui.tokens.footerHeight)
         return ui.frame(null, content, footer())
     }
 
@@ -169,6 +176,32 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         return row
     }
 
+    private fun scenariosBlock(): Table {
+        val block = Table()
+        block.add(ui.caps("Scenarios")).left().padBottom(8f).row()
+        block.add(ui.label("What a blind test plays. How often follows the weights above.", Styles.CAPTION_MUTED)).left().padBottom(24f).row()
+        val grid = Table()
+        ScenarioKind.entries.forEachIndexed { index, kind ->
+            val button: TextButton = ui.button(kind.displayName, Styles.TILE) { toggleScenario(kind) }
+            button.setProgrammaticChangeEvents(false)
+            button.isChecked = kind.id in scenarios
+            grid.add(button).width(SCENARIO_WIDTH).height(CONTROL_HEIGHT).padRight(SEGMENT_GAP).padBottom(SEGMENT_GAP)
+            if (index % 2 == 1) grid.row()
+        }
+        block.add(grid).left()
+        return block
+    }
+
+    private fun toggleScenario(kind: ScenarioKind) {
+        if (kind.id in scenarios && scenarios.size == 1) {
+            message = "At least one scenario has to stay on." to false
+        } else {
+            if (!scenarios.remove(kind.id)) scenarios += kind.id
+            message = null
+        }
+        rebuild()
+    }
+
     private fun percentText(metric: ScoreMetric) = "%.0f %%".format(Locale.ROOT, weights[metric.name] ?: 0.0)
 
     private fun totalText() = "Total %.0f %%".format(Locale.ROOT, weights.values.sum())
@@ -180,7 +213,8 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
             rebuild()
             return
         }
-        val base: AppSettings = ctx.settings.current.copy(roundSeconds = roundSeconds, metricWeights = weights.toMap())
+        val enabled = ScenarioKind.entries.map { it.id }.filter { it in scenarios }
+        val base: AppSettings = ctx.settings.current.copy(roundSeconds = roundSeconds, metricWeights = weights.toMap(), scenarios = enabled)
         val error = ctx.settings.save(draft.toSettings(base, ctx.profiles))
         if (error == null) {
             ctx.showMenu()
@@ -194,7 +228,9 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         roundSeconds = AppSettings.DEFAULT_ROUND_SECONDS
         weights.clear()
         weights.putAll(AppSettings.DEFAULT_WEIGHTS)
-        message = "Round length and weights reset. Press Save to keep them." to true
+        scenarios.clear()
+        scenarios.addAll(AppSettings.DEFAULT_SCENARIOS)
+        message = "Round length, weights and scenarios reset. Press Save to keep them." to true
         rebuild()
     }
 

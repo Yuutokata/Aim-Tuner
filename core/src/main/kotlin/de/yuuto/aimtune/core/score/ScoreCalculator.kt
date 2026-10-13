@@ -36,11 +36,12 @@ data class MetricWeights(val values: Map<ScoreMetric, Double>) {
     }
 }
 
-/** The metric values of a round that the score uses; tracking is added with the tracking scenario (M6). */
+/** The metric values of a round that the score uses; a round only has the metrics its scenario produces. */
 fun RoundMetrics.scoreInputs(): Map<ScoreMetric, Double> = buildMap {
     if (shots > 0) put(ScoreMetric.ACCURACY, accuracy)
     meanTimeToHitMs?.let { put(ScoreMetric.TIME_TO_HIT, it) }
     errorSpread?.let { put(ScoreMetric.CONSISTENCY, it) }
+    trackingOnTargetRatio?.let { put(ScoreMetric.TRACKING, it) }
 }
 
 /**
@@ -54,8 +55,23 @@ class ScoreCalculator(private val weights: MetricWeights, private val minRounds:
         require(minRounds >= 2) { "a baseline needs at least 2 rounds" }
     }
 
-    /** One score per round, or null when no metric of that round has a usable baseline. */
-    fun scoreRounds(rounds: List<Map<ScoreMetric, Double>>): List<Double?> {
+    /**
+     * One score per round, or null when no metric of that round has a usable baseline. With
+     * [scenarios] (the scenario id of each round) every scenario gets its own baselines: a micro
+     * round is easier than a flick round, and comparing them would only measure the scenario.
+     */
+    fun scoreRounds(rounds: List<Map<ScoreMetric, Double>>, scenarios: List<String>? = null): List<Double?> {
+        if (scenarios == null) return scoreGroup(rounds)
+        require(scenarios.size == rounds.size) { "one scenario per round expected" }
+        val scores = arrayOfNulls<Double>(rounds.size)
+        for (indices in rounds.indices.groupBy { scenarios[it] }.values) {
+            val scored = scoreGroup(indices.map { rounds[it] })
+            indices.forEachIndexed { position, index -> scores[index] = scored[position] }
+        }
+        return scores.toList()
+    }
+
+    private fun scoreGroup(rounds: List<Map<ScoreMetric, Double>>): List<Double?> {
         val baselines = ScoreMetric.entries.mapNotNull { metric -> baseline(metric, rounds)?.let { metric to it } }.toMap()
         return rounds.map { round -> scoreRound(round, baselines) }
     }

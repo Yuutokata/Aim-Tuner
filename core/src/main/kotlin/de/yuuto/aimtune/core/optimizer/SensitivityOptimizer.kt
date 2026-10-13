@@ -24,6 +24,8 @@ data class CurvePoint(val cm360: Double, val meanScore: Double, val sdScore: Dou
  */
 data class OptimizationResult(
     val optimumCm360: Double,
+    /** True when [optimumCm360] is at an end of the searched range, so a better value may lie outside it. */
+    val atRangeEdge: Boolean,
     val intervalLowCm360: Double,
     val intervalHighCm360: Double,
     val confidencePercent: Int,
@@ -112,12 +114,17 @@ class SensitivityOptimizer(
         val summary = sampleOptimum(posterior, best, negligible, Random(seed xor (history.size.toLong() * SEED_MIX)))
         val maxEi = expectedImprovement(posterior).max()
         // With few rounds the noise is unknown, so a high confidence would be an artifact of the fit.
+        val optimumX = refinedOptimumX(posterior, best)
+        // A best value at the edge of the searched range may only be the end of a slope: the real optimum can lie outside.
+        val atEdge = optimumX - lnLo < EDGE_FRACTION * width || lnHi - optimumX < EDGE_FRACTION * width
         val rawConfidence = (100.0 * summary.probabilityNegligibleLoss).toInt()
-        val confidence = if (history.size < config.minRoundsForFullConfidence) minOf(rawConfidence, EARLY_CONFIDENCE_CAP) else rawConfidence
+        val limited = history.size < config.minRoundsForFullConfidence || atEdge
+        val confidence = if (limited) minOf(rawConfidence, LIMITED_CONFIDENCE_CAP) else rawConfidence
         val target = config.targetConfidencePercent
         val more = confidence < target && history.size < config.maxRounds
         return OptimizationResult(
-            optimumCm360 = exp(refinedOptimumX(posterior, best)),
+            optimumCm360 = exp(optimumX),
+            atRangeEdge = atEdge,
             intervalLowCm360 = exp(summary.lowX),
             intervalHighCm360 = exp(summary.highX),
             confidencePercent = confidence,
@@ -224,10 +231,11 @@ class SensitivityOptimizer(
     /** Best hyperparameters from a small grid by marginal likelihood, scaled to the search range. */
     private fun fitBest(history: List<Observation>): GaussianProcess? {
         val multiSession = history.map { it.sessionId }.distinct().size > 1
+        val multiGroup = history.map { it.group }.distinct().size > 1
         var best: GaussianProcess? = null
         for (ls in LENGTHSCALE_FACTORS) for (sv in SIGNAL_VARIANCES) for (nv in NOISE_VARIANCES) {
-            for (tv in if (multiSession) SESSION_VARIANCES else listOf(0.0)) {
-                val gp = GaussianProcess.fit(history, GpHyperParams(ls * width, sv, nv, tv)) ?: continue
+            for (tv in if (multiSession) SESSION_VARIANCES else listOf(0.0)) for (gv in if (multiGroup) GROUP_VARIANCES else listOf(0.0)) {
+                val gp = GaussianProcess.fit(history, GpHyperParams(ls * width, sv, nv, tv, gv)) ?: continue
                 if (best == null || gp.logMarginalLikelihood > best.logMarginalLikelihood) best = gp
             }
         }
@@ -246,12 +254,16 @@ class SensitivityOptimizer(
         const val MIN_SD = 1e-9
         const val SAMPLING_JITTER = 1e-6
         const val Z_80 = 1.2816
-        const val EARLY_CONFIDENCE_CAP = 50
+        const val LIMITED_CONFIDENCE_CAP = 50
+
+        /** An optimum within this share of the log range width from either end counts as at the edge. */
+        const val EDGE_FRACTION = 0.02
         const val MAX_ROUNDS_ESTIMATE = 40
         val SEED_MIX = 0x9E3779B97F4A7C15uL.toLong()
-        val LENGTHSCALE_FACTORS = listOf(0.12, 0.2, 0.3, 0.45, 0.7, 1.2)
+        val LENGTHSCALE_FACTORS = listOf(0.12, 0.2, 0.3, 0.45, 0.7)
         val SIGNAL_VARIANCES = listOf(0.5, 1.0, 2.0)
         val NOISE_VARIANCES = listOf(0.15, 0.3, 0.5, 0.8, 1.2)
         val SESSION_VARIANCES = listOf(0.0, 0.1, 0.4)
+        val GROUP_VARIANCES = listOf(0.0, 0.4)
     }
 }

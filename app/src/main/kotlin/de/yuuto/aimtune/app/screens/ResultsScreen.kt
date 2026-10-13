@@ -84,10 +84,11 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
         card.add(ui.caps("Confidence")).left().row()
         card.add(ui.label("${result.confidencePercent} %", Styles.NUMBER_LG)).left().padTop(8f).row()
         card.add(ui.label("${data.rounds} rounds · ${data.sessions} ${if (data.sessions == 1) "session" else "sessions"}", Styles.CAPTION_MUTED)).left().padTop(4f).row()
-        val advice = if (result.recommendMoreRounds) {
-            "More rounds would make this more certain: about ${result.roundsToTarget} more ${if (result.roundsToTarget == 1) "round" else "rounds"}."
-        } else {
-            "More rounds are unlikely to change this noticeably."
+        val advice = when {
+            result.atRangeEdge -> "The best value is at the edge of the range that was tested, so a better one may lie outside it."
+            result.recommendMoreRounds ->
+                "More rounds would make this more certain: about ${result.roundsToTarget} more ${if (result.roundsToTarget == 1) "round" else "rounds"}."
+            else -> "More rounds are unlikely to change this noticeably."
         }
         card.add(ui.label(advice, Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(16f)
         return card

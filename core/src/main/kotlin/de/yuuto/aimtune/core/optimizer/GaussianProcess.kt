@@ -6,8 +6,11 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.sqrt
 
-/** One round as the optimizer sees it: where it was played and the round's score. */
-data class Observation(val sessionId: Long, val cm360: Double, val score: Double) {
+/**
+ * One round as the optimizer sees it: where it was played and the round's score. [group] says which
+ * kind of round it was (the scenario); scores of one group share an unknown level of their own.
+ */
+data class Observation(val sessionId: Long, val cm360: Double, val score: Double, val group: Int = 0) {
     init {
         require(cm360 > 0.0 && cm360.isFinite() && score.isFinite()) { "invalid observation" }
     }
@@ -18,13 +21,15 @@ data class Observation(val sessionId: Long, val cm360: Double, val score: Double
 
 /**
  * Hyperparameters on standardized scores (mean 0, sd 1) and `x = ln(cm360)`.
- * [sessionVariance] is the variance of a per-session offset (a better or worse day).
+ * [sessionVariance] is the variance of a per-session offset (a better or worse day),
+ * [groupVariance] the same for a per-group (scenario) offset.
  */
 data class GpHyperParams(
     val lengthscale: Double,
     val signalVariance: Double,
     val noiseVariance: Double,
     val sessionVariance: Double,
+    val groupVariance: Double = 0.0,
 )
 
 /** Posterior of the score function on a set of points, in the units of the scores. */
@@ -43,9 +48,10 @@ internal fun matern52(r: Double, lengthscale: Double): Double {
 private val SQRT5 = sqrt(5.0)
 
 /**
- * Gaussian process regression of the round score over `ln(cm360)`: `y = f(x) + offset(session) + noise`
- * with a Matern 5/2 prior on f. The session offsets are integrated out through an extra
- * "same session" covariance term, so rounds of several sessions combine into one estimate of f.
+ * Gaussian process regression of the round score over `ln(cm360)`:
+ * `y = f(x) + offset(session) + offset(group) + noise` with a Matern 5/2 prior on f. The offsets are
+ * integrated out through extra "same session" and "same group" covariance terms, so rounds of
+ * several sessions and scenarios combine into one estimate of f.
  * Scores are standardized internally; results come back in score units.
  */
 class GaussianProcess private constructor(
@@ -94,6 +100,7 @@ class GaussianProcess private constructor(
                 for (j in 0 until n) {
                     var v = hyper.signalVariance * matern52(xs[i] - xs[j], hyper.lengthscale)
                     if (observations[i].sessionId == observations[j].sessionId) v += hyper.sessionVariance
+                    if (observations[i].group == observations[j].group) v += hyper.groupVariance
                     if (i == j) v += hyper.noiseVariance
                     k[i * n + j] = v
                 }

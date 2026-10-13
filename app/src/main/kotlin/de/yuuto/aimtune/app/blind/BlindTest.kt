@@ -6,6 +6,7 @@ import de.yuuto.aimtune.core.optimizer.OptimizationResult
 import de.yuuto.aimtune.core.optimizer.OptimizerConfig
 import de.yuuto.aimtune.core.optimizer.SensitivityOptimizer
 import de.yuuto.aimtune.core.optimizer.Suggestion
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.score.ScoreCalculator
 import de.yuuto.aimtune.core.score.ScoreMetric
@@ -14,13 +15,24 @@ import de.yuuto.aimtune.core.units.SearchRange
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 
-/** A stored round of an earlier session, reduced to what the optimizer needs. */
-data class PastRound(val sessionId: Long, val cm360: Double, val inputs: Map<ScoreMetric, Double>)
+/** A stored round of an earlier session, reduced to what the optimizer needs; [scenario] is the scenario id. */
+data class PastRound(val sessionId: Long, val cm360: Double, val inputs: Map<ScoreMetric, Double>, val scenario: String = ScenarioKind.FLICK.id)
 
-/** What the user may see about a finished round; the sensitivity is deliberately not part of it. */
-data class RoundOutcome(val hits: Int, val shots: Int, val accuracy: Double, val meanTimeToHitMs: Double?) {
+/**
+ * What the user may see about a finished round; the sensitivity is deliberately not part of it.
+ * Click scenarios have hits and time to hit, tracking has the share of time on target.
+ */
+data class RoundOutcome(
+    val scenario: ScenarioKind,
+    val hits: Int,
+    val shots: Int,
+    val accuracy: Double,
+    val meanTimeToHitMs: Double?,
+    val trackingOnTargetRatio: Double? = null,
+) {
     companion object {
-        fun of(metrics: RoundMetrics) = RoundOutcome(metrics.hits, metrics.shots, metrics.accuracy, metrics.meanTimeToHitMs)
+        fun of(scenario: ScenarioKind, metrics: RoundMetrics) =
+            RoundOutcome(scenario, metrics.hits, metrics.shots, metrics.accuracy, metrics.meanTimeToHitMs, metrics.trackingOnTargetRatio)
     }
 }
 
@@ -73,18 +85,18 @@ class BlindTest(
 
     val sessionCount: Int get() = (past.map { it.sessionId } + if (played.isEmpty()) emptyList() else listOf(CURRENT_RUN)).distinct().size
 
-    /** Adds a finished round played at [cm360] and starts the analysis. */
-    fun recordRound(cm360: Double, metrics: RoundMetrics) {
-        played += PastRound(CURRENT_RUN, cm360, metrics.scoreInputs())
-        lastOutcome = RoundOutcome.of(metrics)
+    /** Adds a finished round of [scenario] played at [cm360] and starts the analysis. */
+    fun recordRound(cm360: Double, metrics: RoundMetrics, scenario: ScenarioKind = ScenarioKind.FLICK) {
+        played += PastRound(CURRENT_RUN, cm360, metrics.scoreInputs(), scenario.id)
+        lastOutcome = RoundOutcome.of(scenario, metrics)
         job = schedule(past + played)
     }
 
     private fun schedule(rounds: List<PastRound>): CompletableFuture<BlindStep> {
         val snapshot = rounds.toList()
         return CompletableFuture.supplyAsync({
-            val scores = ScoreCalculator(weights).scoreRounds(snapshot.map { it.inputs })
-            val history = snapshot.indices.map { Observation(snapshot[it].sessionId, snapshot[it].cm360, scores[it] ?: UNKNOWN_SCORE) }
+            val scores = ScoreCalculator(weights).scoreRounds(snapshot.map { it.inputs }, snapshot.map { it.scenario })
+            val history = observations(snapshot, scores)
             BlindStep(optimizer.analyze(history), optimizer.suggestNext(history))
         }, executor)
     }
@@ -110,9 +122,12 @@ class BlindTest(
             config: OptimizerConfig = OptimizerConfig(),
         ): OptimizationResult? {
             if (rounds.isEmpty()) return null
-            val scores = ScoreCalculator(weights).scoreRounds(rounds.map { it.inputs })
-            val history = rounds.indices.map { Observation(rounds[it].sessionId, rounds[it].cm360, scores[it] ?: UNKNOWN_SCORE) }
-            return SensitivityOptimizer(range, seed = 0L, config).analyze(history)
+            val scores = ScoreCalculator(weights).scoreRounds(rounds.map { it.inputs }, rounds.map { it.scenario })
+            return SensitivityOptimizer(range, seed = 0L, config).analyze(observations(rounds, scores))
         }
+
+        /** The optimizer's view of [rounds] with their [scores]; each scenario is its own group. */
+        private fun observations(rounds: List<PastRound>, scores: List<Double?>): List<Observation> =
+            rounds.indices.map { Observation(rounds[it].sessionId, rounds[it].cm360, scores[it] ?: UNKNOWN_SCORE, rounds[it].scenario.hashCode()) }
     }
 }
