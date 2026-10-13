@@ -79,8 +79,8 @@ Single source of truth for project status. Update at the end of every task and b
 - [x] `core/accel`: `ClassicCurve`, `NaturalCurve`, `PowerCurve` (Velocity form, Raw Accel formulas) and `AccelProcessor` (per-report speed in in/s with the driver's time clamp); tests against values computed from the C++ formulas
 - [x] Accel in the pipeline: `RoundRecording.accel`, view rebuilt with the curve, trainer and headless runner apply it, storage (schema version 2) and round logs keep it
 - [x] Simulated player wants a speed-dependent gain (`gainPreference`, in in/s; it plans with it and gets what the curve gives, sees its true view) so the analysis has something to find
-- [ ] Error-vs-speed analysis, desired gain curve
-- [ ] Curve fitting (classic, natural, power) + model selection against "no accel"
+- [x] Error-vs-speed analysis (`AccelAnalysis`: wanted gain per speed bin, normalized to the average movement; all click scenarios pooled, because flicks alone cover too narrow a speed range)
+- [x] Curve fitting (`fitAccel`: classic, natural, power with a free overall factor) + model selection against "no accel" (BIC gain of 10 and at least 8 % gain change)
 - [ ] In-app simulation + blind A/B with a measurable-gain decision
 - [ ] Raw Accel export (settings.json), only offered when A/B shows a gain
 - [ ] Accel screens in the app
