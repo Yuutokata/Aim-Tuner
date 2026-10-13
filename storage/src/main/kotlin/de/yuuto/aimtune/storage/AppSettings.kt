@@ -16,7 +16,10 @@ data class AppSettings(
     val version: Int = CURRENT_VERSION,
     val language: String? = null,
     val dpi: Double? = null,
+    /** Id of a game profile, or `custom` together with [customYaw] and [customFovDegrees]. */
     val gameId: String? = null,
+    val customYaw: Double? = null,
+    val customFovDegrees: Double? = null,
     val inGameSensitivity: Double? = null,
     /** [AimStyle] name; stored as text so the core enum stays free of serialization. */
     val aimStyle: String? = null,
@@ -32,6 +35,8 @@ data class AppSettings(
         }
         positive("dpi", dpi)
         positive("inGameSensitivity", inGameSensitivity)
+        positive("customYaw", customYaw)
+        positive("customFovDegrees", customFovDegrees)
         positive("padWidthCm", padWidthCm)
         positive("padHeightCm", padHeightCm)
         if (roundSeconds <= 0) throw SettingsException("roundSeconds must be positive, was $roundSeconds")
