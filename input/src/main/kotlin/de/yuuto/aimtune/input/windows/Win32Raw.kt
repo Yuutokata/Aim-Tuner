@@ -24,10 +24,15 @@ internal const val RIDEV_INPUTSINK = 0x00000100
 
 internal const val MOUSE_MOVE_ABSOLUTE = 0x01
 
+/** SystemParametersInfo action: three ints, the third is the mouse acceleration level (0 = off). */
+internal const val SPI_GETMOUSE = 0x0003
+
 /** Raw input functions that JNA's platform module does not wrap. */
 @Suppress("FunctionName")
 internal interface User32Raw : StdCallLibrary {
     fun RegisterRawInputDevices(devices: RawInputDevice, count: Int, size: Int): Boolean
+
+    fun SystemParametersInfoW(action: Int, param: Int, value: IntArray, winIni: Int): Boolean
 
     /** Returns bytes copied, or -1 on error (UINT cast to Int). */
     fun GetRawInputData(rawInput: Pointer, command: Int, data: Pointer?, size: IntByReference, headerSize: Int): Int
