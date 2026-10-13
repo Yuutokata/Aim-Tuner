@@ -83,7 +83,7 @@ Single source of truth for project status. Update at the end of every task and b
 - [x] Curve fitting (`fitAccel`: classic, natural, power with a free overall factor) + model selection against "no accel" (BIC gain of 10 and at least 8 % gain change)
 - [x] Blind A/B (`AccelAbPlan`, `evaluateAb`): pairs of rounds with the same scenario and targets in counterbalanced order, paired t interval with a Pocock-style per-look level; calibrated on simulated rounds with no difference (1 of 30 false "better", 0 "worse"); the end-to-end `AccelPipelineTest` shows analysis -> fit -> A/B on the simulated players
 - [x] Raw Accel export (`RawAccelExport`: settings.json in the 1.7.1 layout, Velocity form, factor in the output DPI); checked against the required properties and validation rules read from the source, but not loaded into Raw Accel itself (see open questions)
-- [ ] Accel screens in the app
+- [x] Accel screens in the app (menu "Acceleration": intro with the Raw Accel check, calibration and test rounds through `RoundSession`, analysis, verdict with export and copy)
 - [ ] Hands-on test by the user
 
 ### M8 Results, i18n, packaging

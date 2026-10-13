@@ -3,9 +3,17 @@ package de.yuuto.aimtune.app
 import com.badlogic.gdx.Game
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Screen
+import de.yuuto.aimtune.app.accel.AccelPhase
+import de.yuuto.aimtune.app.accel.AccelRun
+import de.yuuto.aimtune.app.accel.AccelSession
 import de.yuuto.aimtune.app.blind.BlindRun
+import de.yuuto.aimtune.app.blind.BlindSession
 import de.yuuto.aimtune.app.blind.BlindTest
 import de.yuuto.aimtune.app.blind.PastRound
+import de.yuuto.aimtune.app.screens.AccelAnalysisScreen
+import de.yuuto.aimtune.app.screens.AccelBetweenScreen
+import de.yuuto.aimtune.app.screens.AccelIntroScreen
+import de.yuuto.aimtune.app.screens.AccelResultScreen
 import de.yuuto.aimtune.app.screens.BetweenRoundsScreen
 import de.yuuto.aimtune.app.screens.MainMenuScreen
 import de.yuuto.aimtune.app.screens.OnboardingScreen
@@ -20,12 +28,15 @@ import de.yuuto.aimtune.app.setup.SetupStep
 import de.yuuto.aimtune.app.ui.UiHolder
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.ScenarioSchedule
+import de.yuuto.aimtune.core.optimizer.OptimizationResult
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.units.AimStyle
 import de.yuuto.aimtune.core.units.searchRange
 import de.yuuto.aimtune.games.GameProfiles
 import de.yuuto.aimtune.input.RawMouseSource
+import de.yuuto.aimtune.storage.RawAccelExport
 import de.yuuto.aimtune.storage.SettingsException
+import java.nio.file.Path
 
 /**
  * The services every screen shares, and the navigation between screens. Created once in
@@ -42,6 +53,8 @@ class AppContext(
     val gate: MouseGate,
     /** Problems found at startup (unreadable settings or game files) to show on the main menu. */
     val startupProblems: List<String>,
+    /** Where exported Raw Accel files go; null without a data folder. */
+    val exportDir: Path? = null,
 ) {
     private var nextSeed = options.seed ?: System.nanoTime()
 
@@ -73,11 +86,7 @@ class AppContext(
         val pad = setup.padWidthCm
         if (config == null || pad == null) return showOnboarding(afterFinish = ::showPreTest)
         val range = searchRange(setup.aimStyleOrNull() ?: AimStyle.MIXED, config.cm360, pad)
-        val weights = try {
-            setup.toMetricWeights()
-        } catch (e: SettingsException) {
-            MetricWeights.DEFAULT
-        }
+        val weights = metricWeights()
         val enabled = try {
             setup.enabledScenarios()
         } catch (e: SettingsException) {
@@ -91,7 +100,7 @@ class AppContext(
     }
 
     /** One blind round at the sensitivity the optimizer picked (hidden from the user). */
-    fun showBlindRound(run: BlindRun) = switchTo(TrainerScreen(this, run.nextRoundConfig(), run))
+    fun showBlindRound(run: BlindRun) = switchTo(TrainerScreen(this, run.nextRoundConfig(), BlindSession(this, run)))
 
     fun showBetweenRounds(run: BlindRun) = switchTo(BetweenRoundsScreen(this, run))
 
@@ -105,19 +114,66 @@ class AppContext(
 
     /** Results of the stored blind rounds, computed now; null until onboarding is complete. */
     fun showStoredResults() {
-        val config = trainerConfig() ?: return showOnboarding(afterFinish = ::showMenu)
-        val setup = settings.current
-        val pad = setup.padWidthCm ?: return showOnboarding(afterFinish = ::showMenu)
-        val range = searchRange(setup.aimStyleOrNull() ?: AimStyle.MIXED, config.cm360, pad)
-        val weights = try {
-            setup.toMetricWeights()
-        } catch (e: SettingsException) {
-            MetricWeights.DEFAULT
-        }
-        val rounds: List<PastRound> = processor.pastBlindRounds(setup.gameId, config.dpi)
-        val result = BlindTest.analyzeStored(range, weights, rounds)
-        val data = ResultsData(config.profile, config.dpi, config.cm360, result, rounds.size, rounds.map { it.sessionId }.distinct().size)
+        val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
+        val config = stored.config
+        val data = ResultsData(
+            config.profile, config.dpi, config.cm360, stored.result, stored.rounds.size, stored.rounds.map { it.sessionId }.distinct().size,
+        )
         switchTo(ResultsScreen(this, data))
+    }
+
+    /** The stored blind rounds of the current game and DPI and what they say; null until onboarding is complete. */
+    private fun storedAnalysis(): StoredAnalysis? {
+        val config = trainerConfig() ?: return null
+        val setup = settings.current
+        val pad = setup.padWidthCm ?: return null
+        val range = searchRange(setup.aimStyleOrNull() ?: AimStyle.MIXED, config.cm360, pad)
+        val weights = metricWeights()
+        val rounds = processor.pastBlindRounds(setup.gameId, config.dpi)
+        return StoredAnalysis(config, weights, rounds, BlindTest.analyzeStored(range, weights, rounds))
+    }
+
+    private fun metricWeights(): MetricWeights = try {
+        settings.current.toMetricWeights()
+    } catch (e: SettingsException) {
+        MetricWeights.DEFAULT
+    }
+
+    private class StoredAnalysis(val config: TrainerConfig, val weights: MetricWeights, val rounds: List<PastRound>, val result: OptimizationResult?)
+
+    /** The sensitivity the acceleration steps start from: the optimizer's result over the stored blind rounds, if there is one. */
+    fun accelBaseline(): AccelBaseline? {
+        val stored = storedAnalysis() ?: return null
+        val result = stored.result ?: return null
+        return AccelBaseline(result.optimumCm360, result.confidencePercent, stored.rounds.size)
+    }
+
+    fun showAccel() = switchTo(AccelIntroScreen(this))
+
+    /** Starts the acceleration steps at the recommended sensitivity; back to the intro if there is none yet. */
+    fun startAccelRun() {
+        val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
+        val result = stored.result ?: return showAccel()
+        val run = AccelRun(stored.config.copy(cm360 = result.optimumCm360), stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++)
+        showAccelStep(run)
+    }
+
+    /** The screen that fits the run: a round while one is due, otherwise the analysis or the verdict. */
+    fun showAccelStep(run: AccelRun) = switchTo(
+        when (run.phase) {
+            AccelPhase.CALIBRATION, AccelPhase.TEST -> AccelBetweenScreen(this, run)
+            AccelPhase.ANALYSIS -> AccelAnalysisScreen(this, run)
+            AccelPhase.DONE -> AccelResultScreen(this, run)
+        },
+    )
+
+    fun showAccelRound(run: AccelRun) = switchTo(TrainerScreen(this, run.nextRoundConfig(), AccelSession(this, run)))
+
+    /** Writes the Raw Accel settings.json of the tested curve; the path, or the reason it failed. */
+    fun exportAccel(run: AccelRun): Result<Path> = runCatching {
+        val candidate = checkNotNull(run.candidate) { "there is no curve to export" }
+        val dir = checkNotNull(exportDir) { "no data folder to write to" }
+        RawAccelExport.write(dir, candidate.curve, run.dpi, candidate.sensitivityFactor)
     }
 
     /** Number of stored blind rounds for the current setup, for the menu. */
@@ -152,3 +208,6 @@ class AppContext(
 
     val currentScreen: Screen? get() = game.screen
 }
+
+/** The sensitivity the acceleration steps start from, with how sure the optimizer is about it. */
+data class AccelBaseline(val cm360: Double, val confidencePercent: Int, val rounds: Int)

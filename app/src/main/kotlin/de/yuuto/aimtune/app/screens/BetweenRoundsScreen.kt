@@ -1,7 +1,6 @@
 package de.yuuto.aimtune.app.screens
 
 import com.badlogic.gdx.scenes.scene2d.Actor
-import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import de.yuuto.aimtune.app.AppContext
 import de.yuuto.aimtune.app.blind.BlindRun
@@ -12,6 +11,7 @@ import de.yuuto.aimtune.app.ui.button
 import de.yuuto.aimtune.app.ui.caps
 import de.yuuto.aimtune.app.ui.frame
 import de.yuuto.aimtune.app.ui.label
+import de.yuuto.aimtune.app.ui.progressBar
 import java.util.Locale
 
 private const val CARD_WIDTH = 300f
@@ -93,7 +93,7 @@ class BetweenRoundsScreen(ctx: AppContext, private val run: BlindRun) : UiScreen
         }
         val target = TARGET_PERCENT
         block.add(ui.label("${result.confidencePercent} %", Styles.NUMBER_XL)).left().padBottom(8f).row()
-        block.add(progressBar(result.confidencePercent / 100f)).left().padBottom(8f).row()
+        block.add(ui.progressBar(result.confidencePercent / 100f, BAR_WIDTH)).left().padBottom(8f).row()
         val note = when {
             result.atRangeEdge -> "The best value so far is at the edge of the tested range. More rounds will check whether it really is the best."
             result.confidencePercent >= target -> "Target of $target % reached. More rounds can still refine it."
@@ -103,18 +103,9 @@ class BetweenRoundsScreen(ctx: AppContext, private val run: BlindRun) : UiScreen
         return block
     }
 
-    private fun progressBar(fraction: Float): Table {
-        val bar = Table()
-        val filled = (BAR_WIDTH * fraction).coerceIn(0f, BAR_WIDTH)
-        if (filled > 0f) bar.add(Image(ui.stepOn)).width(filled).height(BAR_HEIGHT)
-        if (filled < BAR_WIDTH) bar.add(Image(ui.stepOff)).width(BAR_WIDTH - filled).height(BAR_HEIGHT)
-        return bar
-    }
-
     private fun roundsText(count: Int) = if (count == 1) "1 more round" else "$count more rounds"
 
     private companion object {
         const val TARGET_PERCENT = 85
-        const val BAR_HEIGHT = 8f
     }
 }

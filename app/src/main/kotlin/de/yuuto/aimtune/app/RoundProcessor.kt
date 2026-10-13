@@ -37,20 +37,27 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
 
     // Only touched on the executor thread.
     private var sessionId: Long? = null
-    private var sessionKey: Triple<Double, String?, Long?>? = null
+    private var sessionKey: List<Any?>? = null
 
     @Volatile
     var report: RoundReport? = null
         private set
 
-    /** [runKey] separates the rounds of one blind test run into their own session; null keeps them with the game and DPI. */
-    fun submit(recording: RoundRecording, startedAtMs: Long, blind: Boolean, gameId: String?, runKey: Long? = null) {
+    /** [runKey] separates the rounds of one blind test run into their own session; null keeps them with the game and DPI. [kind] is the session type the rounds belong to. */
+    fun submit(
+        recording: RoundRecording,
+        startedAtMs: Long,
+        blind: Boolean,
+        gameId: String?,
+        runKey: Long? = null,
+        kind: SessionKind = SessionKind.SENSITIVITY,
+    ) {
         report = RoundReport.Pending
         executor.execute {
             export(recording, startedAtMs)
             report = try {
                 val metrics = computeRoundMetrics(recording)
-                RoundReport.Done(metrics, store(recording, metrics, startedAtMs, blind, gameId, runKey))
+                RoundReport.Done(metrics, store(recording, metrics, startedAtMs, blind, gameId, runKey, kind))
             } catch (e: Exception) {
                 log.log(System.Logger.Level.ERROR, "round analysis failed", e)
                 RoundReport.Failed(e.message ?: e.javaClass.simpleName)
@@ -85,12 +92,12 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
     }
 
     /** Returns null on success or a short reason; storage problems must not lose the analysis. */
-    private fun store(recording: RoundRecording, metrics: RoundMetrics, startedAtMs: Long, blind: Boolean, gameId: String?, runKey: Long?): String? {
+    private fun store(recording: RoundRecording, metrics: RoundMetrics, startedAtMs: Long, blind: Boolean, gameId: String?, runKey: Long?, kind: SessionKind): String? {
         val repo = repository ?: return "storage unavailable"
         return try {
-            val key = Triple(recording.dpi, gameId, runKey)
+            val key = listOf(recording.dpi, gameId, runKey, kind)
             val session = sessionId.takeIf { sessionKey == key }
-                ?: repo.createSession(startedAtMs, gameId, recording.dpi, SessionKind.SENSITIVITY).also {
+                ?: repo.createSession(startedAtMs, gameId, recording.dpi, kind).also {
                     sessionId = it
                     sessionKey = key
                 }

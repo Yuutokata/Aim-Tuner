@@ -5,6 +5,8 @@ import com.badlogic.gdx.graphics.Pixmap
 import com.badlogic.gdx.graphics.PixmapIO
 import com.badlogic.gdx.utils.BufferUtils
 import com.badlogic.gdx.utils.ScreenUtils
+import de.yuuto.aimtune.app.accel.AccelPhase
+import de.yuuto.aimtune.app.accel.sampleAccelRun
 import de.yuuto.aimtune.app.blind.sampleBlindRun
 import de.yuuto.aimtune.app.screens.TrainerScreen
 import de.yuuto.aimtune.app.setup.SetupStep
@@ -41,6 +43,11 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("tracking-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
         Step("switching-ready") { showScenario(ScenarioKind.SWITCHING) },
         Step("switching-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
+        Step("accel-intro") { ctx.showAccel() },
+        Step("accel-calibration") { accelSample(AccelPhase.CALIBRATION)?.let(ctx::showAccelStep) },
+        Step("accel-analysis") { accelSample(AccelPhase.ANALYSIS)?.let(ctx::showAccelStep) },
+        Step("accel-test") { accelSample(AccelPhase.TEST)?.let(ctx::showAccelStep) },
+        Step("accel-result") { accelSample(AccelPhase.DONE)?.let(ctx::showAccelStep) },
         Step("blind-ready") { sample?.let(ctx::showBlindRound) },
         Step("blind-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
         Step("between-rounds") { sample?.let(ctx::showBetweenRounds) },
@@ -49,6 +56,8 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
     private val sample by lazy { ctx.trainerConfig()?.let(::sampleBlindRun) }
     private var index = -1
     private var frames = 0
+
+    private fun accelSample(until: AccelPhase) = ctx.trainerConfig()?.let { sampleAccelRun(it, until) }
 
     private fun showScenario(kind: ScenarioKind) {
         ctx.trainerConfig()?.let { ctx.switchTo(TrainerScreen(ctx, it.copy(scenario = kind))) }

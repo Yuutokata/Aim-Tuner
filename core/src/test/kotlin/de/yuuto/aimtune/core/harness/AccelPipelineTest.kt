@@ -142,4 +142,27 @@ class AccelPipelineTest {
         assertTrue(harmful.count { it.status == AbStatus.ACCEL_WORSE } >= 7, "harmful curve judged worse in ${harmful.count { it.status == AbStatus.ACCEL_WORSE }} of 10")
         assertTrue(harmful.none { it.status == AbStatus.ACCEL_BETTER })
     }
+
+    /** How often a real improvement is confirmed within the 10 pairs, and how many pairs that takes. */
+    @Test
+    fun `the blind test confirms a real improvement most of the time within ten pairs`() {
+        val lines = mutableListOf<String>()
+        var confirmedAll = 0
+        var offeredAll = 0
+        for (base in listOf(43.295, 55.37)) {
+            val runs = (1L..30L).map { runAccelPipeline(wantsRisingGain, base, it) }
+            val offered = runs.filter { it.fit.recommended != null }
+            val confirmed = offered.filter { it.verdict?.status == AbStatus.ACCEL_BETTER }
+            val pairs = confirmed.mapNotNull { it.verdict?.pairs }.sorted()
+            lines += "base %.1f cm/360: curve offered %d of 30, confirmed %d of %d offered, pairs needed median %s, worst %s, undecided %d".format(
+                base, offered.size, confirmed.size, offered.size, pairs.getOrNull(pairs.size / 2), pairs.lastOrNull(),
+                offered.count { it.verdict?.status == AbStatus.NO_DIFFERENCE },
+            )
+            confirmedAll += confirmed.size
+            offeredAll += offered.size
+        }
+        publishReport("accel-ab-power.txt", lines.joinToString("\n") + "\n")
+        assertTrue(offeredAll >= 54, "curve offered in $offeredAll of 60")
+        assertTrue(confirmedAll >= offeredAll * 0.6, "confirmed $confirmedAll of $offeredAll")
+    }
 }

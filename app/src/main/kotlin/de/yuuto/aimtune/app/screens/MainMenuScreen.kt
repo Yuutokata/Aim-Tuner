@@ -40,6 +40,8 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
         left.add(menuItem("Results", resultsSubtitle(), "R") { ctx.showStoredResults() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
+        left.add(menuItem("Acceleration", "optional speed curve for Raw Accel", "A") { ctx.showAccel() })
+            .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
         left.add(menuItem("Settings", "DPI, game, round length and score weights", "S") { ctx.showSettings() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).left().row()
         ctx.startupProblems.forEach { left.add(ui.label(it, Styles.CAUTION, wrap = true)).width(MENU_WIDTH).left().padTop(PROBLEM_GAP).row() }
@@ -58,6 +60,7 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
     override fun onKey(keycode: Int): Boolean = when (keycode) {
         Input.Keys.S -> true.also { ctx.showSettings() }
         Input.Keys.R -> true.also { ctx.showStoredResults() }
+        Input.Keys.A -> true.also { ctx.showAccel() }
         else -> false
     }
 

@@ -7,36 +7,35 @@ import com.badlogic.gdx.Screen
 import com.badlogic.gdx.graphics.GL20
 import de.yuuto.aimtune.app.AppContext
 import de.yuuto.aimtune.app.Hud
+import de.yuuto.aimtune.app.RoundSession
 import de.yuuto.aimtune.app.Phase
 import de.yuuto.aimtune.app.Trainer
 import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.app.TrainerScene
-import de.yuuto.aimtune.app.blind.BlindRun
-import de.yuuto.aimtune.core.metrics.computeRoundMetrics
 
 private const val MILLIS_PER_SECOND = 1000L
 
 /**
  * The 3D trainer: room, targets, HUD and the round state machine for the scenario in [config]. Without a [blind] run it is
- * the free trainer at the current sensitivity; with one it plays a single blind round at the
- * sensitivity in [config] (chosen by the optimizer, never shown) and then moves on to the
- * between-rounds screen.
+ * the free trainer at the current sensitivity; with a [session] it plays a single round with the
+ * settings in [config] (for the blind test the sensitivity is chosen by the optimizer and never shown)
+ * and then lets the session decide what comes next.
  */
-class TrainerScreen(private val ctx: AppContext, private val config: TrainerConfig, private val blind: BlindRun? = null) : Screen {
-    private var blindRoundDone = false
+class TrainerScreen(private val ctx: AppContext, private val config: TrainerConfig, private val session: RoundSession? = null) : Screen {
+    private var sessionRoundDone = false
     private val trainer = Trainer(config, ctx.source) { recording ->
         val startedAtMs = System.currentTimeMillis() - config.roundSeconds * MILLIS_PER_SECOND
         val gameId = ctx.settings.current.gameId
-        if (blind == null) {
+        if (session == null) {
             ctx.processor.submit(recording, startedAtMs, blind = false, gameId = gameId)
         } else {
-            ctx.processor.submit(recording, startedAtMs, blind = true, gameId = gameId, runKey = blind.runKey)
-            blind.test.recordRound(config.cm360, computeRoundMetrics(recording), config.scenario)
-            blindRoundDone = true
+            ctx.processor.submit(recording, startedAtMs, blind = session.storeBlind, gameId = gameId, runKey = session.runKey, kind = session.sessionKind)
+            session.onRoundFinished(config, recording)
+            sessionRoundDone = true
         }
     }
     private val scene = TrainerScene(config.profile.verticalFovDegrees.toFloat())
-    private val hud = Hud(config, ctx.ui.tokens, roundLabel = blind?.nextRoundLabel())
+    private val hud = Hud(config, ctx.ui.tokens, roundLabel = session?.label)
 
     /** Exposed for the screenshot tour. */
     val roundPhase: Phase get() = trainer.phase
@@ -61,10 +60,10 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
                 when (keycode) {
                     Input.Keys.ESCAPE -> when {
                         trainer.phase == Phase.RUNNING -> trainer.abort()
-                        blind != null -> ctx.stopBlindTest(blind)
+                        session != null -> session.stop()
                         else -> ctx.showMenu()
                     }
-                    Input.Keys.F3 -> if (blind == null) hud.showDebug = !hud.showDebug
+                    Input.Keys.F3 -> if (session == null) hud.showDebug = !hud.showDebug
                     else -> return false
                 }
                 syncCursor()
@@ -76,8 +75,8 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
 
     override fun render(delta: Float) {
         trainer.update()
-        if (blindRoundDone && blind != null) {
-            ctx.showBetweenRounds(blind)
+        if (sessionRoundDone && session != null) {
+            session.showNext()
             return
         }
         syncCursor()

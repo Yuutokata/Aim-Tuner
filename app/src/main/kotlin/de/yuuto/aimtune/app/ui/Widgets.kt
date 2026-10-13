@@ -16,6 +16,7 @@ private const val BRAND_GAP = 12f
 private const val CONTENT_TOP_PADDING = 64f
 private const val BUTTON_HEIGHT = 64f
 private const val BUTTON_PADDING = 36f
+private const val PROGRESS_HEIGHT = 8f
 
 fun UiSkin.label(text: CharSequence, style: String = Styles.BODY, wrap: Boolean = false): Label =
     Label(text, skin, style).also { it.wrap = wrap }
@@ -33,6 +34,15 @@ fun Actor.onChange(action: () -> Unit) {
     addListener(object : ChangeListener() {
         override fun changed(event: ChangeEvent, actor: Actor) = action()
     })
+}
+
+/** A thin progress bar of the given [width]: the part up to [fraction] filled with the accent color. */
+fun UiSkin.progressBar(fraction: Float, width: Float, height: Float = PROGRESS_HEIGHT): Table {
+    val bar = Table()
+    val filled = (width * fraction).coerceIn(0f, width)
+    if (filled > 0f) bar.add(Image(stepOn)).width(filled).height(height)
+    if (filled < width) bar.add(Image(stepOff)).width(width - filled).height(height)
+    return bar
 }
 
 /** Fixed height for buttons in the footer row. */
