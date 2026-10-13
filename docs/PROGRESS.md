@@ -46,6 +46,14 @@ Single source of truth for project status. Update at the end of every task and b
 - [x] Screenshot tour (`--screenshots <dir>`) for design review
 - [ ] Hands-on test by the user: first launch goes through onboarding, settings persist, trainer uses the game's FOV
 
+### Verification harness (cross-cutting, requested after M4)
+- [x] `SimulatedPlayer`/`SimulatedAimer` (Fitts' law, signal-dependent noise, reaction time, configurable optimum and gain preference, fatigue) + `ManualClock` + `HeadlessRound`
+- [x] `SimulatedMouseSource` (trainer driven by the simulated player records exactly what `HeadlessRound` records)
+- [x] Headless end-to-end test: rounds -> segmentation -> metrics -> score -> baseline estimator vs ground truth, many seeds and noise levels, convergence report
+- [x] `RoundLogFile` raw event logs, `ReplayMouseSource`, `--record <dir>`, fixture regression test
+- [x] `:app:screenshots` task renders every screen offscreen to `app/build/screenshots/`
+- [ ] Optimizer (M5), more scenarios (M6) and accel fitting (M7) plug into the harness when they exist; the end-to-end test then asserts the recovered optimum/curve against the same ground truth
+
 ### M5 Bayesian optimizer
 - [ ] GP + acquisition, noise, repeats, session offsets
 - [ ] Blind test flow, confidence, multi-session merge
@@ -69,6 +77,8 @@ Single source of truth for project status. Update at the end of every task and b
 - [ ] README screenshots, CONTRIBUTING "add a game"
 
 ## Last session
+
+- Verification harness (see checklist): simulated player, headless runner, simulated and replay mouse sources, round log files, `--record`, fixture regression test, `:app:screenshots`. 161 tests pass. Model parameters were tuned by hand so the optimum is interior and flat-topped; convergence numbers are documented in ALGORITHMS.md. The accel and optimizer parts of the requested end-to-end test cannot exist yet.
 
 - M4: game profiles (Valorant, CS2, custom yaw/FOV), search range, onboarding, pre-test notice, settings screen, UI skin from the design tokens, mouse gate (raw input only in the trainer while focused), screenshot tour. Launch options are now dev-only. 140 unit tests pass; I compared 8 rendered screens against the mockups but could not click through the app myself.
 - M3: segmentation, metrics, score, SQLite storage + settings store, trainer integration.
@@ -94,4 +104,5 @@ Single source of truth for project status. Update at the end of every task and b
 - Mockups show a fixed "round 4 / 10" and "about 20 min"; the spec wants flexible length and stop-anytime. Plan: the 10 is a suggested session length, "Stop for today" always available, "Continue session" needs persisted session state (M3/M5).
 - Export Raw Accel settings needs a save location: LibGDX has no file dialog (options: native dialog via LWJGL tinyfd, or fixed folder). Decide at M7.
 - Apex, Overwatch 2 and Fortnite tiles are omitted until yaw/FOV are verified (Valorant, CS2 and a custom yaw/FOV tile ship).
+- The simulated player is a model I made up (reaction, Fitts, noise terms); it checks that the pipeline recovers a known optimum, not that real humans behave this way. Revisit its parameters with real recordings (`--record`).
 - Segmentation thresholds and the score's 0-100 mapping are starting values; revisit with real recordings and the simulated player (M5/M7).

@@ -27,6 +27,7 @@ Dependency direction: `app` → `storage`/`input`/`games` → `core`. `core` dep
 - Build + tests: `./gradlew build`
 - Tests only: `./gradlew test`
 - Run app: `./gradlew :app:run` (dev-only options in `LaunchOptions.USAGE`; `--screenshots <dir>` renders the UI screens to PNGs)
+- UI screenshots for design review: `./gradlew :app:screenshots` (writes `app/build/screenshots/`, hidden window)
 - Package installer: `./gradlew :app:jpackage` (added in M8)
 
 ## JDK setup

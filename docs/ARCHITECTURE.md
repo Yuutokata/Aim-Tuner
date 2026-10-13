@@ -45,6 +45,27 @@ Rounds are analysed and saved by `RoundProcessor` on a background thread. If the
 - Games: `games` loads `GameProfile` JSON (bundled + user files); `core.SearchRange` derives the optimizer range from aim style and pad width.
 - `ScreenshotTour` (`--screenshots <dir>`) renders every screen with in-memory sample settings, for design review.
 
+## Verification harness
+
+Everything below runs without a human or a window (except the screenshots, which need a GPU context but a hidden window).
+
+| Part | Where | What it does |
+|---|---|---|
+| `SimulatedPlayer`, `SimulatedAimer` | `core/sim` | Synthetic aimer (model in ALGORITHMS.md). Pure, seeded, never reads a clock. |
+| `ManualClock` | `core/sim` | Virtual time, advanced by the driver. |
+| `HeadlessRound` | `core/sim` | One round of a `Scenario` against a player on a 1000 Hz virtual clock; returns the `RoundRecording` the app would save. Used for sweeps (about 5 ms per 45 s round). |
+| `SimulatedMouseSource` | `input` | The same aimer as a `RawMouseSource`: reads the active target, produces counts with timestamps; the driver calls `tick()` and `consumeClick()`. Lets the real `Trainer` be tested. |
+| `RoundLogFile` | `storage` | One round as a JSON raw event log (settings, seed, mouse reports as the compact codec blob, target events; times relative to the round start). |
+| `ReplayMouseSource` | `input` | Plays a log back at its recorded offsets and exposes the recorded shots (`consumeShots()`); with the recorded seed the trainer reproduces the round. |
+| `--record <dir>` | `app` | Writes every finished real round as a log, so real sessions become fixtures (`RoundProcessor(exportDir)`). |
+| `:app:screenshots` | `app` | Renders every screen with sample data into `app/build/screenshots/` (hidden window, in-memory settings) for comparison with `docs/design/`. |
+
+Tests: `core/.../sim/HeadlessRoundTest` (aimer behaviour), `core/.../harness/PipelineConvergenceTest` (rounds -> segmentation -> metrics -> score -> estimator vs ground truth, with a convergence report in `core/build/reports/harness/`), `app/.../harness/TrainerHarnessTest` (the trainer with `SimulatedMouseSource` records exactly what `HeadlessRound` records; a saved log replays to the same round), `app/.../harness/RecordedFixtureTest` (every log in `app/src/test/resources/fixtures` replays to its recorded target events and keeps its pinned metrics).
+
+Adding a real fixture: run the app with `--record <dir>`, play a round, copy the log into `app/src/test/resources/fixtures/` and pin its metrics in `RecordedFixtureTest`.
+
+Not covered yet: the Bayesian optimizer (M5), more scenarios (M6) and accel fitting (M7) do not exist, so the end-to-end test uses a baseline `SensitivityEstimator` (fixed grid, parabola through the best mean score). The optimizer plugs into the same interface, and the accel work will use `SimulatedPlayer.gainPreference`.
+
 ## Extension points
 
 - `GameProfile`: add a JSON file in `games/` (see CONTRIBUTING.md).
