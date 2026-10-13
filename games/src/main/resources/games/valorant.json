@@ -1,0 +1,12 @@
+{
+  "id": "valorant",
+  "name": "Valorant",
+  "yaw": 0.07,
+  "fov": { "degrees": 103.0, "type": "horizontal", "aspect": { "width": 16, "height": 9 }, "scaling": "hor_plus" },
+  "sensitivity": { "decimals": 3 },
+  "sources": [
+    "https://csdb.gg/sensitivity-converter/valorant-to-cs2/",
+    "https://fovcalculatorpro.com/games/valorant-fov/"
+  ],
+  "notes": "Yaw is fixed at 0.07. FOV is 103 horizontal at 16:9 (about 70.5 vertical) with the vertical angle kept for other aspect ratios; these FOV values come from community sources, not Riot documentation."
+}
