@@ -30,7 +30,7 @@ SQLite in `%APPDATA%\AimTune\aimtune.db` (override with `AIMTUNE_DATA_DIR`; Linu
 
 - `session(id, started_at_ms, game_id, dpi, kind)`: kind is `sensitivity` or `accel_ab`.
 - `round(id, session_id, scenario, seed, cm360, dpi, blind, started_at_ms, start_nanos, duration_nanos, mouse_event_count, mouse_events BLOB, metrics_version)`: the raw mouse reports of a round are one blob (format version byte + deflated zigzag-varint stream of time delta, dx, dy; see `MouseEventCodec`), about 5 bytes per report before compression.
-- `target_event(round_id, seq, type, time_offset_nanos, target_id, x, y, z, radius)`: `spawned`, `hit`, `miss`, times relative to the round start.
+- `target_event(round_id, seq, type, time_offset_nanos, target_id, x, y, z, radius)`: `spawned`, `hit`, `miss`, `waypoint` (moving targets; x, y, z = position), times relative to the round start.
 - `metric(round_id, name, value)`: values derived when the round was saved (names in `toNamedValues()`); `metrics_version` says which definitions produced them. Metrics are always recomputable from the raw data. Scores are not stored: they are relative to all rounds and recomputed (see ALGORITHMS.md).
 
 Rounds are analysed and saved by `RoundProcessor` on a background thread. If the database cannot be opened the trainer still runs and reports "not saved".
@@ -47,10 +47,18 @@ Rounds are analysed and saved by `RoundProcessor` on a background thread. If the
 
 ## Optimizer and blind test (M5)
 
-- `core/optimizer`: `GaussianProcess` (Matern 5/2, session offset covariance, hand-written `Cholesky`), `SensitivityOptimizer` (`suggestNext(history)` and `analyze(history)`, both pure functions of the observations and a seed) with `OptimizationResult` (optimum, 80 % interval, confidence, regret, recommendation). Maths in ALGORITHMS.md.
+- `core/optimizer`: `GaussianProcess` (Matern 5/2, session and scenario offset covariance, hand-written `Cholesky`), `SensitivityOptimizer` (`suggestNext(history)` and `analyze(history)`, both pure functions of the observations and a seed) with `OptimizationResult` (optimum, 80 % interval, confidence, regret, recommendation). Maths in ALGORITHMS.md.
 - `app/blind`: `BlindTest` holds one run: earlier rounds (`PastRound`), the rounds played now, and a background single-thread job that re-scores all rounds and runs the optimizer after every round (`step()`, `nextCm360()` wait for it only if called early). `BlindRun` adds the stored-session key and the config of the next round. `SampleBlindRun` feeds the screenshot tour.
 - Flow: pre-test notice -> `AppContext.startBlindTest()` (search range from aim style and pad width, earlier rounds from `RoundProcessor.pastBlindRounds`) -> `TrainerScreen` with a `BlindRun` (one round at the optimizer's hidden cm/360, HUD "Round n / N", no debug overlay) -> `BetweenRoundsScreen` -> next round or `stopBlindTest` -> `ResultsScreen`. The menu's Results item analyses the stored rounds with `BlindTest.analyzeStored`.
-- Storage: rounds are saved with `blind = true` and a `runKey`, so every run is one session row; `RoundRepository.blindFlickRounds(game, dpi)` collects the rounds of all sessions for merging.
+- Storage: rounds are saved with `blind = true` and a `runKey`, so every run is one session row; `RoundRepository.blindRounds(game, dpi)` collects the rounds of all sessions and scenarios for merging.
+
+## Scenarios (M6)
+
+- `core/scenario`: `Scenario` (`kind`, `targets`, `events`, `start`, `update`, `fire`), `ScenarioKind` (flick, micro, tracking, switching; `create(duration, seed)`; `usesClicks`), the scenarios `FlickScenario`, `MicroScenario`, `SwitchingScenario`, `TrackingScenario`, `TargetPath` (position of moving targets over time, rebuilt from `Spawned` + `Waypoint` events) and `ScenarioSchedule` (which scenario each blind round plays). `Scenario.update(now)` advances moving targets and is called by the trainer every frame before targets are read or a shot is fired; events carry their scheduled time, so the log does not depend on the frame rate.
+- `core/metrics/TrackingMetrics`: time on target and mean distance, sampled every 10 ms from the recording and the target path.
+- `core/score/ScoreCalculator.scoreRounds(rounds, scenarios)` gives every scenario its own baselines.
+- App: `Trainer` creates the scenario of its `TrainerConfig`; `TrainerScene` draws all visible targets at their own radius; `BlindRun` asks the `ScenarioSchedule` for the scenario of each round; `AppSettings.scenarios` (toggles in the settings screen) and the metric weights feed the schedule.
+- Tests: `core/.../scenario/ScenariosTest`, `ScenarioScheduleTest`, `core/.../harness/ScenarioSweepTest` (report `scenario-sweeps.txt`), `MixedScenarioConvergenceTest` (report `mixed-scenarios.txt`), `app/.../harness/TrainerHarnessTest` (every scenario through the real trainer equals the headless runner).
 
 ## Verification harness
 
@@ -71,10 +79,10 @@ Tests: `core/.../sim/HeadlessRoundTest` (aimer behaviour), `core/.../harness/Pip
 
 Adding a real fixture: run the app with `--record <dir>`, play a round, copy the log into `app/src/test/resources/fixtures/` and pin its metrics in `RecordedFixtureTest`.
 
-Not covered yet: the Bayesian optimizer (M5), more scenarios (M6) and accel fitting (M7) do not exist, so the end-to-end test uses a baseline `SensitivityEstimator` (fixed grid, parabola through the best mean score). The optimizer plugs into the same interface, and the accel work will use `SimulatedPlayer.gainPreference`.
+Not covered yet: accel fitting (M7). The end-to-end test uses a baseline `SensitivityEstimator` (fixed grid, parabola through the best mean score) and the optimizer plugs into the same interface; the accel work will use `SimulatedPlayer.gainPreference`.
 
 ## Extension points
 
 - `GameProfile`: add a JSON file in `games/` (see CONTRIBUTING.md).
-- `Scenario`: implement the interface, register it; seeded RNG is supplied.
+- `Scenario`: implement the interface, add a `ScenarioKind` entry with its factory (take the seed in the constructor), say which score metrics it produces in `producedMetrics`, and teach the simulated aimer to play it.
 - `RawMouseSource`: implement `start()`, `stop()`, event callback/queue; focus gating is the caller's concern.

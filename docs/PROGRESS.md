@@ -4,8 +4,8 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Current
 
-- **Milestone:** M4 Game profiles, converters, onboarding, settings
-- **Task:** implemented and committed locally (not pushed); waiting for the user's hands-on test (see Next steps). M2 and M3 hands-on tests passed and are pushed.
+- **Milestone:** M6 More scenarios and score combination
+- **Task:** implemented and committed locally (not pushed); waiting for the user's hands-on test (see Next steps). M1-M5 are pushed.
 
 ## Checklist
 
@@ -61,11 +61,16 @@ Single source of truth for project status. Update at the end of every task and b
 - [x] Blind test flow in the app: hidden sensitivity, "Round n / N" HUD, between-rounds screen with confidence, "Stop for today"
 - [x] Multi-session merge: every run is its own stored session; earlier blind rounds of the same game and DPI enter the model
 - [x] Minimal results screen (recommended sensitivity, cm/360 with range, confidence, copy to clipboard); chart comes in M8
-- [ ] Hands-on test by the user: play a short blind test, check that the sensitivity is never shown, the confidence and results make sense
+- [x] Hands-on test by the user: works, the sensitivity switches and feels more right after a few rounds; after 5 rounds in 2 sessions 44 % confidence and "about 13 more rounds"; the recommendation was almost exactly the user's current Valorant sensitivity (the first value entered had been a bit lower)
 
 ### M6 More scenarios
-- [ ] Micro-adjust, tracking, target switching
-- [ ] Score combination with configurable weights
+- [x] `Scenario.update`, `ScenarioKind`, waypoint events and `TargetPath` for moving targets
+- [x] Micro-adjust, tracking (time on target, no clicks), target switching (three targets) with tests
+- [x] Reach and time-to-hit windows for several targets, tracking metric, `scoreInputs` with tracking
+- [x] Per-scenario score baselines; score combination: weights decide the score and the share of rounds each scenario gets (`ScenarioSchedule`)
+- [x] Simulated player plays all four scenarios; trainer, HUD, between-rounds and settings screens (scenario toggles) know them; storage keeps waypoints and tracking metrics
+- [x] Mixed-scenario convergence test and report; optimizer: scenario offsets, edge-of-range flag with capped confidence
+- [ ] Hands-on test by the user: all four scenarios feel right and are playable, tracking needs no clicking, settings toggles work, the recommendation still makes sense with the mix
 
 ### M7 Accel
 - [ ] Verify Raw Accel modes, units, settings.json schema
@@ -82,6 +87,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Last session
 
+- M6: micro-adjust, tracking and target switching (`core/scenario`), tracking metric, per-scenario baselines, `ScenarioSchedule` (weights decide how often each scenario is played), simulated aimer for all four, scenario toggles in settings, trainer/HUD/between-rounds support, storage for waypoints and tracking metrics. 213 tests pass. Findings on the simulated player: scenarios have different best sensitivities (flick about 49, switching about 59, tracking 55-85, micro the edge of the range), so the mix finds a weighted compromise; mixed tests are less certain than flick-only ones for the same number of rounds (69 % within x1.3 of the blend after 30 rounds vs 88 % for flick only). The new screens are only checked through screenshots and tests, not with a real mouse.
 - M5: `core/optimizer` (GP, expected improvement, interval, confidence), `BlindTest`/`BlindRun` in `app/blind`, blind trainer HUD, between-rounds and results screens, menu "Results" item, stored-round merging. 181 tests pass. The blind flow as a whole (real mouse, clicking through the screens) is untested by me; the optimizer and `BlindTest` are tested with the simulated player and the screens by screenshots.
 - Verification harness (see checklist): simulated player, headless runner, simulated and replay mouse sources, round log files, `--record`, fixture regression test, `:app:screenshots`. 161 tests pass. Model parameters were tuned by hand so the optimum is interior and flat-topped; convergence numbers are documented in ALGORITHMS.md. The accel and optimizer parts of the requested end-to-end test cannot exist yet.
 
@@ -91,9 +97,9 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Next steps
 
-1. User tests M5: `gradlew.bat :app:run` (use `AIMTUNE_DATA_DIR` for a scratch data folder, `--record <dir>` saves every round as a log). Start test, play 10-12 rounds: the sensitivity should differ between rounds without being shown anywhere (also not with F3), the between-rounds screen shows hits/accuracy/time and a confidence, "Stop for today" shows the result. Then restart the app and use Results (R) on the menu: the stored rounds should give the same recommendation; a second test run should merge with the first (session count 2).
-2. Please report: does the recommended sensitivity feel right, are the rounds too similar or too jumpy, and is the confidence plausible.
-3. Then ask whether to push M5, and continue with M6 (more scenarios, score combination).
+1. User tests M6: `gradlew.bat :app:run` (use `AIMTUNE_DATA_DIR` for a scratch data folder, `--record <dir>` saves every round as a log). In Settings the four scenario toggles and the weights decide what a blind test plays (all on: tracking about every fifth round, the others in turn). Start a test and play 10-12 rounds: flick and micro-adjust as before with smaller targets close together, target switching shows three targets at once, tracking asks you to keep the crosshair on a moving target without clicking, and its between-rounds card shows the time on target. Try switching scenarios off in Settings and check that only the enabled ones are played.
+2. Please report: do the scenarios feel right (target sizes, speeds, three targets), is tracking playable and not too fast or slow, is the mix of rounds too long before the confidence moves (each scenario gets only some of the rounds), and does the result still match your sensitivity. If you want a faster test, switch scenarios off.
+3. Then ask whether to push M6, and continue with M7 (accel).
 
 ## Known bugs
 
@@ -109,6 +115,10 @@ Single source of truth for project status. Update at the end of every task and b
 - Decided: "Consistency" is the spread (sample SD) of the signed first-movement error, lower is better (see ALGORITHMS.md). Chosen because it uses the same over/undershoot quantity as the optimizer and accel analysis and does not double-count time to hit. Revisit if sideways error turns out to matter.
 - Rounds per test: 10 is a suggested length ("Round 4 / 10", afterwards just "Round 12"), "Stop for today" is always available. "Continue session" is not built: a new run merges with the stored rounds automatically, which covers the use. The mockup menu entry is skipped.
 - The confidence definition (chance that the estimate loses at most 0.2 x the score spread against the true best) and the 85 % target are my choice; revisit with real data. The scores of real humans may be flatter or noisier than the simulated player, then confidence will stay lower.
+- Scenario geometry (target sizes, distances, tracking speeds 12-40 degrees per second, three targets for switching) is my first guess, not taken from a game; revisit after real play.
+- Tracking has no click or hold: the on-target time is measured from the crosshair alone. Real tracking drills usually need the fire button held; this was left out to keep the input simple.
+- Default is all four scenarios on, with the weights deciding their share. Rounds are spread over four kinds, so confidence rises more slowly than with flick only; the user can switch scenarios off. Decide the default after the M6 hands-on test.
+- In the simulation micro-adjust prefers the lowest sensitivity of the range; if real players show the same, a mixed result can end at the edge of the range (the app then says so and caps the confidence).
 - Blind rounds are only comparable per game and DPI; changing the game profile (FOV) starts a separate data set.
 - Export Raw Accel settings needs a save location: LibGDX has no file dialog (options: native dialog via LWJGL tinyfd, or fixed folder). Decide at M7.
 - Apex, Overwatch 2 and Fortnite tiles are omitted until yaw/FOV are verified (Valorant, CS2 and a custom yaw/FOV tile ship).

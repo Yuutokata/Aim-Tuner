@@ -86,6 +86,8 @@ LibGDX `I18NBundle`: `assets/i18n/messages.properties` (English default) and `me
 | Results (1j): score chart with uncertainty band, "46 rounds · 5 sessions" | Numbers only (recommended sens, cm/360 with range, confidence, rounds and sessions, copy button); no chart, no Acceleration tab | Charts come with the results milestone (M8) |
 | Menu: "Continue session", History | Results item only (stored rounds, key R) | A new run merges with stored rounds, so there is nothing to continue; history comes in M8 |
 | In-test HUD (1h) with progress bar below the timer and "Esc · pause" | Timer, scenario name, "Round n / N", "Esc aborts the round"; no bar, no pause | Aborting discards the round, a pause would taint it |
+| Settings (1n) has metric weights only | A "Scenarios" block under the weights: four toggles for what a blind test plays; the weights decide how often | M6 scenarios need a way to be switched off |
+| Between rounds (1i): hits, accuracy, time to hit | A caption with the scenario name; tracking shows "Time on target" instead of hits | Tracking has no hits |
 | Pad presets include Desk mat | Adopted (small / medium / large / desk mat / custom) | Extends the spec's three presets |
 
 ## Open design questions
