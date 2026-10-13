@@ -28,3 +28,9 @@ Games are JSON profiles and need no code changes. Bundled profiles live in `game
 - `sensitivity.decimals`: how many decimals the game accepts.
 
 Verify yaw and FOV against a current, reliable source and cite it in `sources` and the PR. Never guess values.
+
+## How to add a language
+
+1. Copy `app/src/main/resources/assets/i18n/messages.properties` to `messages_<code>.properties` and translate the values (UTF-8, keep the `{0}` placeholders, no leading or trailing spaces).
+2. Add the language to `Language` in `app/i18n/I18n.kt` (code, name, locale). `BundlesTest` fails until every key is translated.
+3. Check the screens with `./gradlew :app:screenshots` after pointing `--language` at the new code.

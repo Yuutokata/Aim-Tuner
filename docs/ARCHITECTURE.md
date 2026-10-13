@@ -69,6 +69,12 @@ Rounds are analysed and saved by `RoundProcessor` on a background thread. If the
 - `app/accel`: `AccelRun` is the state machine without UI (calibration, analysis, test, done; nothing in it reveals the condition of a test round), `AccelSession` plugs it into the trainer screen through `RoundSession` (shared with `BlindSession`), `SampleAccelRun` feeds the screenshot tour. Screens: `AccelIntroScreen` (starting sensitivity from the stored blind rounds, Raw Accel check), `AccelBetweenScreen`, `AccelAnalysisScreen`, `AccelResultScreen`. Acceleration rounds are stored as sessions of kind `accel_ab`, so the optimizer never sees them.
 - Tests: `AccelCurveTest` (formulas, processor, spec), `AccelFitTest`, `core/.../harness/AccelPipelineTest` (analysis -> fit -> A/B against the simulated players, false-positive calibration, power), `RawAccelExportTest`, `AccelRunTest`, `RoundRepositoryTest` (stored curve, migration from version 1).
 
+## Results, history and i18n (M8)
+
+- `app/ui/ChartActor` draws a `ChartSpec` (grid, bands, dashed lines, dots, markers) with sprite-batch rectangles; `ResultCharts` builds the specs for the score chart and the wanted-gain chart as pure functions.
+- `app/history/buildHistory` refits the optimizer on the rounds of each game and DPI up to each stored session; `HistoryScreen` loads it in the background.
+- `app/i18n`: `I18n` wraps a LibGDX `I18NBundle` (`assets/i18n/messages.properties` English base, `messages_de.properties`), `Language` maps the stored code (`AppSettings.language`), `UiText` is a key with arguments for texts built outside screens (HUD labels). `UiScreen.t(key, args)` is the shortcut. Diagnostics (startup problems, exception messages, `AccelFitResult.reason`) stay English; `AccelFitResult.reasonCode` carries the translated reason. `BundlesTest` keeps both bundles in step and checks that every key in the code exists.
+
 ## Verification harness
 
 Everything below runs without a human or a window (except the screenshots, which need a GPU context but a hidden window).

@@ -15,6 +15,8 @@ import de.yuuto.aimtune.app.screens.AccelBetweenScreen
 import de.yuuto.aimtune.app.screens.AccelIntroScreen
 import de.yuuto.aimtune.app.screens.AccelResultScreen
 import de.yuuto.aimtune.app.history.HistoryEntry
+import de.yuuto.aimtune.app.i18n.I18n
+import de.yuuto.aimtune.app.i18n.Language
 import de.yuuto.aimtune.app.history.buildHistory
 import de.yuuto.aimtune.app.screens.BetweenRoundsScreen
 import de.yuuto.aimtune.app.screens.HistoryScreen
@@ -61,6 +63,15 @@ class AppContext(
     val exportDir: Path? = null,
 ) {
     private var nextSeed = options.seed ?: System.nanoTime()
+    private var loadedI18n: I18n? = null
+    private var languageOverride: Language? = null
+
+    /** The texts in the language of the settings; reloaded when the language changes. */
+    val i18n: I18n
+        get() {
+            val language = languageOverride ?: Language.fromCode(settings.current.language)
+            return loadedI18n?.takeIf { it.language == language } ?: I18n.load(language).also { loadedI18n = it }
+        }
 
     /** The user's confirmation, for this run, that Raw Accel is off or linear (it cannot be detected). */
     var rawAccelConfirmed = false
@@ -71,7 +82,15 @@ class AppContext(
     /** Config for a trainer session at the current sensitivity, or null until setup is complete. */
     fun trainerConfig(): TrainerConfig? = trainerConfigFor(settings.current, profiles, nextSeed.also { nextSeed++ })
 
-    fun showMenu() = switchTo(MainMenuScreen(this))
+    /** Shows the UI in [language] before it is saved (the settings screen); cleared when the menu or settings open again. */
+    fun previewLanguage(language: Language) {
+        languageOverride = language
+    }
+
+    fun showMenu() {
+        languageOverride = null
+        switchTo(MainMenuScreen(this))
+    }
 
     /** Start test: onboarding on first use, then the pre-test notice. */
     fun showStart() = if (isSetUp) showPreTest() else showOnboarding(afterFinish = ::showPreTest)
@@ -81,7 +100,10 @@ class AppContext(
 
     fun showPreTest() = switchTo(PreTestScreen(this))
 
-    fun showSettings() = if (isSetUp) switchTo(SettingsScreen(this)) else showOnboarding(afterFinish = ::showMenu)
+    fun showSettings() {
+        languageOverride = null
+        if (isSetUp) switchTo(SettingsScreen(this)) else showOnboarding(afterFinish = ::showMenu)
+    }
 
     /** Starts a new blind test run, merging the stored rounds of this game and DPI; onboarding first if needed. */
     fun startBlindTest() {

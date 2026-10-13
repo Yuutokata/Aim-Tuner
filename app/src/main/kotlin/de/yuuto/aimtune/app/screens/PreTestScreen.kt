@@ -33,18 +33,18 @@ class PreTestScreen(ctx: AppContext) : UiScreen(ctx) {
 
     override fun build(): Actor {
         val content = Table()
-        content.add(ui.label("Before you start", Styles.HEADING)).left().padBottom(24f).row()
+        content.add(ui.label(t("pretest.title"), Styles.HEADING)).left().padBottom(24f).row()
         content.add(
-            ui.label("Pointer acceleration changes sensitivity with hand speed and would distort the result. Turn it off for the test.", Styles.BODY_MUTED, wrap = true),
+            ui.label(t("pretest.description"), Styles.BODY_MUTED, wrap = true),
         ).left().width(DESCRIPTION_WIDTH).padBottom(48f).row()
         val rows = PreTestChecks.rows(acceleration, ctx.rawAccelConfirmed, ctx.source.name, ctx.source is WindowsRawInputSource)
         rows.forEach { content.add(checkRow(it)).left().width(ROW_WIDTH).padBottom(ROW_GAP).row() }
 
         val footer = Table()
-        footer.add(ui.button("Back", Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
+        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
-        footer.addButton(ui.button("Re-check", Styles.SECONDARY) { recheck() }, minWidth = 180f).padRight(16f)
-        footer.addButton(ui.button("Start test", Styles.PRIMARY) { ctx.startBlindTest() }, minWidth = 220f)
+        footer.addButton(ui.button(t("pretest.recheck"), Styles.SECONDARY) { recheck() }, minWidth = 180f).padRight(16f)
+        footer.addButton(ui.button(t("pretest.start"), Styles.PRIMARY) { ctx.startBlindTest() }, minWidth = 220f)
         return ui.frame(null, content, footer)
     }
 
@@ -63,8 +63,8 @@ class PreTestScreen(ctx: AppContext) : UiScreen(ctx) {
         table.background(ui.skin.getDrawable(if (attention) Styles.CARD_CAUTION else Styles.CARD))
         table.pad(ROW_PADDING)
         val text = Table()
-        text.add(ui.label(row.title, Styles.BODY_LG)).left().row()
-        text.add(ui.label(row.detail, Styles.CAPTION_MUTED, wrap = true)).left().width(DETAIL_WIDTH).padTop(4f).row()
+        text.add(ui.label(t(row.title), Styles.BODY_LG)).left().row()
+        text.add(ui.label(if (row.detailArg == null) t(row.detail) else t(row.detail, row.detailArg), Styles.CAPTION_MUTED, wrap = true)).left().width(DETAIL_WIDTH).padTop(4f).row()
         if (row.id == PreTestChecks.RAW_ACCEL) text.add(rawAccelCheckBox()).left().padTop(12f)
         table.add(text).left().expandX()
         val stateStyle = when (row.level) {
@@ -72,12 +72,12 @@ class PreTestScreen(ctx: AppContext) : UiScreen(ctx) {
             CheckLevel.ATTENTION -> Styles.CAUTION
             CheckLevel.UNKNOWN -> Styles.MONO_MUTED
         }
-        table.add(ui.label(row.state, stateStyle)).right().top()
+        table.add(ui.label(t(row.state), stateStyle)).right().top()
         return table
     }
 
     private fun rawAccelCheckBox(): CheckBox {
-        val box = CheckBox("  I checked: Raw Accel is off or linear", ui.skin)
+        val box = CheckBox("  " + t("pretest.raw_accel_checked"), ui.skin)
         box.isChecked = ctx.rawAccelConfirmed
         box.onChange {
             ctx.rawAccelConfirmed = box.isChecked

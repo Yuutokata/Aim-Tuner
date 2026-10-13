@@ -13,16 +13,16 @@ private const val MAX_FOV_DEGREES = 179.0
 
 enum class SetupStep { DPI, GAME, STYLE, PAD }
 
-/** What is wrong with the current input of a step; texts become i18n keys with the i18n work in M8. */
-enum class SetupIssue(val message: String) {
-    DPI_INVALID("Enter your mouse DPI, for example 800."),
-    GAME_MISSING("Choose a game."),
-    SENSITIVITY_INVALID("Enter your in-game sensitivity."),
-    CUSTOM_YAW_INVALID("Enter the game's yaw (degrees per count at sensitivity 1)."),
-    CUSTOM_FOV_INVALID("Enter the game's horizontal FOV in degrees, between 1 and 179."),
-    STYLE_MISSING("Choose how you aim."),
-    PAD_MISSING("Choose your mousepad size."),
-    PAD_SIZE_INVALID("Enter the pad's width and height in cm."),
+/** What is wrong with the current input of a step; [key] is the text in the i18n bundles. */
+enum class SetupIssue(val key: String) {
+    DPI_INVALID("setup.issue.dpi"),
+    GAME_MISSING("setup.issue.game"),
+    SENSITIVITY_INVALID("setup.issue.sensitivity"),
+    CUSTOM_YAW_INVALID("setup.issue.custom_yaw"),
+    CUSTOM_FOV_INVALID("setup.issue.custom_fov"),
+    STYLE_MISSING("setup.issue.style"),
+    PAD_MISSING("setup.issue.pad"),
+    PAD_SIZE_INVALID("setup.issue.pad_size"),
 }
 
 /** Mousepad sizes of the onboarding step (approximate outer sizes in cm); [CUSTOM] takes typed values. */

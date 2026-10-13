@@ -48,7 +48,7 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
 
     override fun build(): Actor {
         val content = Table()
-        content.add(ui.label("Results", Styles.HEADING)).left().padBottom(24f).row()
+        content.add(ui.label(t("results.title"), Styles.HEADING)).left().padBottom(24f).row()
         val result = data.result
         if (result == null || recommendedSensitivity == null) {
             content.add(ui.label(emptyText(), Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH * 2)
@@ -67,26 +67,29 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
     override fun onEnter() = ctx.showStart()
 
     private fun emptyText() =
-        if (data.rounds == 0) "No blind rounds yet. Start a test to get a recommendation." else "${data.rounds} rounds are not enough for an estimate yet. Play a few more."
+        if (data.rounds == 0) t("results.none") else t("results.too_few", data.rounds)
 
     private fun recommendation(result: OptimizationResult, sensitivity: String): Table {
         val block = Table()
-        block.add(ui.caps("Recommended sensitivity")).left().padBottom(16f).row()
+        block.add(ui.caps(t("results.recommended"))).left().padBottom(16f).row()
         block.add(ui.label(sensitivity, Styles.NUMBER_XL)).left().row()
-        block.add(ui.label("in-game sensitivity · ${data.profile.name} at ${formatDpi()} DPI", Styles.CAPTION_MUTED)).left().padBottom(32f).row()
+        block.add(ui.label(t("results.in_game", data.profile.name, formatDpi()), Styles.CAPTION_MUTED)).left().padBottom(32f).row()
         val cm = Table()
         cm.add(ui.label("%.1f".format(Locale.ROOT, result.optimumCm360), Styles.NUMBER_LG)).bottom()
         cm.add(ui.label("cm/360°", Styles.NUMBER_MD).also { it.setAlignment(Align.left) }).bottom().padLeft(UNIT_GAP).padBottom(UNIT_BASELINE_LIFT / 2)
         block.add(cm).left().padBottom(8f).row()
         val change = ((result.optimumCm360 / data.currentCm360 - 1.0) * 100.0).roundToInt()
-        val range = "Range %.1f–%.1f · now %.1f (%+d %%)".format(Locale.ROOT, result.intervalLowCm360, result.intervalHighCm360, data.currentCm360, change)
+        val range = t(
+            "results.range", "%.1f".format(Locale.ROOT, result.intervalLowCm360), "%.1f".format(Locale.ROOT, result.intervalHighCm360),
+            "%.1f".format(Locale.ROOT, data.currentCm360), "%+d".format(Locale.ROOT, change),
+        )
         block.add(ui.label(range, Styles.MONO_MUTED)).left()
         return block
     }
 
     private fun chartBlock(result: OptimizationResult): Table {
         val block = Table()
-        block.add(ui.caps("Score by cm/360° · line, 95 % band, rounds")).left().padBottom(12f).row()
+        block.add(ui.caps(t("results.chart"))).left().padBottom(12f).row()
         block.add(ChartActor(ui, sensitivityChart(ui.tokens, result, data.scored))).grow().minHeight(CHART_MIN_HEIGHT)
         return block
     }
@@ -95,14 +98,14 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
         val card = Table()
         card.background(ui.skin.getDrawable(Styles.CARD))
         card.pad(CARD_PADDING)
-        card.add(ui.caps("Confidence")).left().row()
+        card.add(ui.caps(t("results.confidence"))).left().row()
         card.add(ui.label("${result.confidencePercent} %", Styles.NUMBER_LG)).left().padTop(8f).row()
-        card.add(ui.label("${data.rounds} rounds · ${data.sessions} ${if (data.sessions == 1) "session" else "sessions"}", Styles.CAPTION_MUTED)).left().padTop(4f).row()
+        card.add(ui.label(if (data.sessions == 1) t("results.rounds_one", data.rounds) else t("results.rounds_many", data.rounds, data.sessions), Styles.CAPTION_MUTED)).left().padTop(4f).row()
         val advice = when {
-            result.atRangeEdge -> "The best value is at the edge of the range that was tested, so a better one may lie outside it."
+            result.atRangeEdge -> t("results.advice_edge")
             result.recommendMoreRounds ->
-                "More rounds would make this more certain: about ${result.roundsToTarget} more ${if (result.roundsToTarget == 1) "round" else "rounds"}."
-            else -> "More rounds are unlikely to change this noticeably."
+                if (result.roundsToTarget == 1) t("results.advice_more_one") else t("results.advice_more_many", result.roundsToTarget)
+            else -> t("results.advice_done")
         }
         card.add(ui.label(advice, Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(16f)
         return card
@@ -110,12 +113,12 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
 
     private fun footer(sensitivity: String?): Table {
         val footer = Table()
-        footer.add(ui.button("Back", Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
+        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
         if (sensitivity != null) {
-            footer.addButton(ui.button("Copy $sensitivity", Styles.SECONDARY) { Gdx.app.clipboard.contents = sensitivity }, minWidth = 220f).padRight(16f)
+            footer.addButton(ui.button(t("results.copy", sensitivity), Styles.SECONDARY) { Gdx.app.clipboard.contents = sensitivity }, minWidth = 220f).padRight(16f)
         }
-        footer.addButton(ui.button("Continue testing", Styles.PRIMARY) { ctx.showStart() }, minWidth = 260f)
+        footer.addButton(ui.button(t("results.continue"), Styles.PRIMARY) { ctx.showStart() }, minWidth = 260f)
         return footer
     }
 

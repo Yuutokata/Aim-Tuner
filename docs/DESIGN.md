@@ -90,6 +90,7 @@ LibGDX `I18NBundle`: `assets/i18n/messages.properties` (English default) and `me
 | Settings (1n) has metric weights only | A "Scenarios" block under the weights: four toggles for what a blind test plays; the weights decide how often | M6 scenarios need a way to be switched off |
 | Between rounds (1i): hits, accuracy, time to hit | A caption with the scenario name; tracking shows "Time on target" instead of hits | Tracking has no hits |
 | Acceleration is only a tab on the results view (1j) | Its own menu item "Acceleration" with an intro, calibration and test round screens, an analysis screen with a chart of the wanted gain per hand speed (dots, 95 % band) and the fitted curve, and a verdict screen with export and copy | The acceleration steps need rounds of their own and a decision before an export, so a tab on the results view would have nothing to show most of the time |
+| Language selector in Settings (1n) | A select box under Round length; the language applies at once as a preview and is stored on Save | English and German as in the mockup |
 | Pad presets include Desk mat | Adopted (small / medium / large / desk mat / custom) | Extends the spec's three presets |
 
 ## Open design questions

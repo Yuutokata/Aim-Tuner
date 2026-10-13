@@ -31,22 +31,17 @@ class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
 
     override fun build(): Actor {
         val content = Table()
-        content.add(ui.label("Acceleration", Styles.HEADING)).left().padBottom(24f).row()
+        content.add(ui.label(t("accel.title"), Styles.HEADING)).left().padBottom(24f).row()
         content.add(
-            ui.label(
-                "Some players aim better when the sensitivity depends on hand speed. AimTune looks for such a curve in " +
-                    "${AccelRun.DEFAULT_CALIBRATION_ROUNDS} calibration rounds, then lets you test it blind against your plain sensitivity. " +
-                    "The curve is only simulated here; if it is clearly better you can export a settings file for Raw Accel.",
-                Styles.BODY_MUTED, wrap = true,
-            ),
+            ui.label(t("accel.intro", AccelRun.DEFAULT_CALIBRATION_ROUNDS), Styles.BODY_MUTED, wrap = true),
         ).left().width(TEXT_WIDTH).padBottom(40f).row()
         content.add(baselineCard()).left().width(CARD_WIDTH).padBottom(24f).row()
         content.add(rawAccelCheck()).left()
 
         val footer = Table()
-        footer.add(ui.button("Back", Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
+        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
-        val start = ui.button("Start calibration", Styles.PRIMARY) { if (canStart()) ctx.startAccelRun() }
+        val start = ui.button(t("accel.start_calibration"), Styles.PRIMARY) { if (canStart()) ctx.startAccelRun() }
         start.isDisabled = !canStart()
         footer.addButton(start, minWidth = 280f)
         return ui.frame(null, content, footer)
@@ -64,14 +59,14 @@ class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
         val card = Table()
         card.background(ui.skin.getDrawable(if (baseline == null) Styles.CARD_CAUTION else Styles.CARD))
         card.pad(CARD_PADDING)
-        card.add(ui.caps("Starting point")).left().row()
+        card.add(ui.caps(t("accel.baseline_title"))).left().row()
         if (baseline == null) {
-            card.add(ui.label("No sensitivity yet", Styles.TITLE)).left().padTop(8f).row()
-            card.add(ui.label("Play a blind test first, so there is a sensitivity to start from.", Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(4f)
+            card.add(ui.label(t("accel.baseline_none"), Styles.TITLE)).left().padTop(8f).row()
+            card.add(ui.label(t("accel.baseline_none_help"), Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(4f)
         } else {
             card.add(ui.label("%.1f cm/360°".format(Locale.ROOT, baseline.cm360), Styles.NUMBER_MD)).left().padTop(8f).row()
-            val note = "Result of ${baseline.rounds} blind rounds, confidence ${baseline.confidencePercent} %." +
-                if (baseline.confidencePercent < LOW_CONFIDENCE) " That is low: a longer sensitivity test first gives a better start." else ""
+            val note = t("accel.baseline_note", baseline.rounds, baseline.confidencePercent) +
+                if (baseline.confidencePercent < LOW_CONFIDENCE) " " + t("accel.baseline_low") else ""
             card.add(ui.label(note, Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(4f)
         }
         return card
@@ -79,14 +74,14 @@ class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
 
     private fun rawAccelCheck(): Table {
         val block = Table()
-        val box = CheckBox("  I checked: Raw Accel is off or linear", ui.skin)
+        val box = CheckBox("  " + t("pretest.raw_accel_checked"), ui.skin)
         box.isChecked = ctx.rawAccelConfirmed
         box.onChange {
             ctx.rawAccelConfirmed = box.isChecked
             rebuild()
         }
         block.add(box).left().row()
-        val windows = if (pointerAcceleration?.enabled == true) "Windows pointer acceleration is on; turn it off, it would distort the calibration." else ""
+        val windows = if (pointerAcceleration?.enabled == true) t("accel.windows_on") else ""
         if (windows.isNotEmpty()) block.add(ui.label(windows, Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padTop(8f)
         return block
     }

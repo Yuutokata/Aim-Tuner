@@ -8,6 +8,9 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.utils.Align
 import com.badlogic.gdx.utils.Disposable
+import de.yuuto.aimtune.app.i18n.I18n
+import de.yuuto.aimtune.app.i18n.scenarioName
+import de.yuuto.aimtune.app.i18n.scenarioRound
 import de.yuuto.aimtune.app.ui.Tokens
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.input.RawMouseSource
@@ -19,7 +22,7 @@ import java.util.Locale
  * The debug overlay exists to verify raw input. With a [roundLabel] the HUD is the blind one:
  * it shows "Round 4 / 10" and never the sensitivity (no debug overlay either, it prints deg/count).
  */
-class Hud(private val config: TrainerConfig, private val tokens: Tokens, private val roundLabel: String? = null) : Disposable {
+class Hud(private val config: TrainerConfig, private val tokens: Tokens, private val i18n: I18n, private val roundLabel: String? = null) : Disposable {
     private val batch = SpriteBatch()
     private val shapes = ShapeRenderer()
     private val camera = OrthographicCamera()
@@ -69,58 +72,58 @@ class Hud(private val config: TrainerConfig, private val tokens: Tokens, private
             drawBlindReady(roundLabel, fonts)
             return
         }
-        draw(fonts.title, "${config.profile.name}  ·  ${config.roundSeconds} s ${config.scenario.displayName.lowercase()} round", width / 2, height * 0.62f, highlight, Align.center)
-        draw(fonts.bodyLg, "Click to start", width / 2, height * 0.54f, text, Align.center)
-        draw(
-            fonts.mono,
-            "%.1f cm/360°  ·  %.0f DPI  ·  FOV %.0f° %s".format(Locale.ROOT, config.cm360, config.dpi, config.profile.fov.degrees, config.profile.fov.type.name.lowercase()),
-            width / 2, height * 0.49f, muted, Align.center,
+        draw(fonts.title, i18n.t("hud.ready_title", config.profile.name, config.roundSeconds, i18n.scenarioRound(config.scenario)), width / 2, height * 0.62f, highlight, Align.center)
+        draw(fonts.bodyLg, i18n.t("hud.click_to_start"), width / 2, height * 0.54f, text, Align.center)
+        val info = i18n.t(
+            "hud.free_info", "%.1f".format(Locale.ROOT, config.cm360), "%.0f".format(Locale.ROOT, config.dpi),
+            "%.0f".format(Locale.ROOT, config.profile.fov.degrees), config.profile.fov.type.name.lowercase(),
         )
-        draw(fonts.body, "Esc back to the menu  ·  F3 toggles debug", width / 2, height * 0.44f, muted, Align.center)
+        draw(fonts.mono, info, width / 2, height * 0.49f, muted, Align.center)
+        draw(fonts.body, i18n.t("hud.free_keys"), width / 2, height * 0.44f, muted, Align.center)
     }
 
     private fun drawBlindReady(label: String, fonts: Fonts) {
         draw(fonts.title, label, width / 2, height * 0.62f, highlight, Align.center)
-        draw(fonts.bodyLg, "Click to start", width / 2, height * 0.54f, text, Align.center)
-        draw(fonts.body, "${config.roundSeconds} s ${config.scenario.displayName.lowercase()} round  ·  your sensitivity stays hidden until the test ends", width / 2, height * 0.49f, muted, Align.center)
+        draw(fonts.bodyLg, i18n.t("hud.click_to_start"), width / 2, height * 0.54f, text, Align.center)
+        draw(fonts.body, i18n.t("hud.blind_info", config.roundSeconds, i18n.scenarioRound(config.scenario)), width / 2, height * 0.49f, muted, Align.center)
         draw(fonts.body, instruction(), width / 2, height * 0.44f, muted, Align.center)
-        draw(fonts.body, "Esc stops the test", width / 2, height * 0.40f, muted, Align.center)
+        draw(fonts.body, i18n.t("hud.blind_stop"), width / 2, height * 0.40f, muted, Align.center)
     }
 
     private fun instruction(): String = when (config.scenario) {
-        ScenarioKind.FLICK -> "Hit each target as it appears."
-        ScenarioKind.MICRO -> "Small targets appear close to each other. Click precisely."
-        ScenarioKind.TRACKING -> "Keep the crosshair on the moving target. No clicking needed."
-        ScenarioKind.SWITCHING -> "Several targets are visible. Hit them one after another."
+        ScenarioKind.FLICK -> i18n.t("hud.instruction.flick")
+        ScenarioKind.MICRO -> i18n.t("hud.instruction.micro")
+        ScenarioKind.TRACKING -> i18n.t("hud.instruction.tracking")
+        ScenarioKind.SWITCHING -> i18n.t("hud.instruction.switching")
     }
 
     private fun drawRunning(trainer: Trainer, fonts: Fonts) {
         val seconds = (trainer.timeLeftNanos() / 1_000_000_000L).toInt()
         draw(fonts.numberMd, "%d:%02d".format(Locale.ROOT, seconds / 60, seconds % 60), width / 2, height - MARGIN, text, Align.center)
-        draw(fonts.label, config.scenario.displayName.uppercase(), MARGIN, height - MARGIN, muted, Align.left)
-        val shots = if (config.scenario.usesClicks) "Hits ${trainer.hits}   Misses ${trainer.misses}" else ""
+        draw(fonts.label, i18n.scenarioName(config.scenario).uppercase(), MARGIN, height - MARGIN, muted, Align.left)
+        val shots = if (config.scenario.usesClicks) i18n.t("hud.hits_misses", trainer.hits, trainer.misses) else ""
         val right = roundLabel ?: shots
         draw(fonts.mono, right, width - MARGIN, height - MARGIN, text, Align.right)
-        draw(fonts.body, "Esc aborts the round", MARGIN, MARGIN + fonts.body.lineHeight, muted, Align.left)
+        draw(fonts.body, i18n.t("hud.abort"), MARGIN, MARGIN + fonts.body.lineHeight, muted, Align.left)
     }
 
     private fun drawFinished(trainer: Trainer, report: RoundReport?, fonts: Fonts) {
         val s = trainer.summary ?: return
-        draw(fonts.title, "Round complete", width / 2, height * 0.66f, highlight, Align.center)
+        draw(fonts.title, i18n.t("hud.round_complete"), width / 2, height * 0.66f, highlight, Align.center)
         if (config.scenario.usesClicks) {
             val ttk = s.meanTimeToHitNanos?.let { "%.0f ms".format(Locale.ROOT, it / 1e6) } ?: "-"
-            draw(fonts.mono, "Hits ${s.hits} / ${s.shots}   Accuracy %.0f %%".format(Locale.ROOT, s.accuracy * 100), width / 2, height * 0.58f, text, Align.center)
-            draw(fonts.mono, "Avg time to hit $ttk", width / 2, height * 0.54f, text, Align.center)
+            draw(fonts.mono, i18n.t("hud.hits_accuracy", s.hits, s.shots, "%.0f".format(Locale.ROOT, s.accuracy * 100)), width / 2, height * 0.58f, text, Align.center)
+            draw(fonts.mono, i18n.t("hud.time_to_hit", ttk), width / 2, height * 0.54f, text, Align.center)
         }
         drawReport(report, height * 0.48f, fonts)
-        draw(fonts.body, "Click for the next round  ·  Esc back to the menu", width / 2, height * 0.30f, muted, Align.center)
+        draw(fonts.body, i18n.t("hud.next"), width / 2, height * 0.30f, muted, Align.center)
     }
 
     /** Analysis lines under the round summary: first-movement error, corrections, path efficiency, save state. */
     private fun drawReport(report: RoundReport?, top: Float, fonts: Fonts) {
         val lines = when (report) {
-            null, RoundReport.Pending -> listOf("Analysing round …" to muted)
-            is RoundReport.Failed -> listOf("Analysis failed: ${report.message}" to tokens.caution)
+            null, RoundReport.Pending -> listOf(i18n.t("hud.analysing") to muted)
+            is RoundReport.Failed -> listOf(i18n.t("hud.analysis_failed", report.message) to tokens.caution)
             is RoundReport.Done -> reportLines(report)
         }
         var y = top
@@ -133,15 +136,15 @@ class Hud(private val config: TrainerConfig, private val tokens: Tokens, private
     private fun reportLines(report: RoundReport.Done): List<Pair<String, Color>> {
         val m = report.metrics
         val error = m.meanFirstError?.let {
-            "First move %+.0f %% (%s)".format(Locale.ROOT, it * 100, if (it >= 0) "overshoot" else "undershoot")
+            i18n.t(if (it >= 0) "hud.first_move_over" else "hud.first_move_under", "%+.0f".format(Locale.ROOT, it * 100))
         }
         return listOfNotNull(
-            m.trackingOnTargetRatio?.let { "On target %.0f %%".format(Locale.ROOT, it * 100) to text },
-            m.trackingMeanDistanceDegrees?.let { "Mean distance %.2f°".format(Locale.ROOT, it) to text },
+            m.trackingOnTargetRatio?.let { i18n.t("hud.on_target", "%.0f".format(Locale.ROOT, it * 100)) to text },
+            m.trackingMeanDistanceDegrees?.let { i18n.t("hud.mean_distance", "%.2f".format(Locale.ROOT, it)) to text },
             error?.let { it to text },
-            m.meanCorrectiveSubmovements?.let { "Corrections %.1f per target".format(Locale.ROOT, it) to text },
-            m.meanPathEfficiency?.let { "Path efficiency %.0f %%".format(Locale.ROOT, it * 100) to text },
-            (if (report.saveError == null) "Saved" else "Not saved: ${report.saveError}") to
+            m.meanCorrectiveSubmovements?.let { i18n.t("hud.corrections", "%.1f".format(Locale.ROOT, it)) to text },
+            m.meanPathEfficiency?.let { i18n.t("hud.path_efficiency", "%.0f".format(Locale.ROOT, it * 100)) to text },
+            (if (report.saveError == null) i18n.t("hud.saved") else i18n.t("hud.not_saved", report.saveError)) to
                 (if (report.saveError == null) muted else tokens.caution),
         )
     }

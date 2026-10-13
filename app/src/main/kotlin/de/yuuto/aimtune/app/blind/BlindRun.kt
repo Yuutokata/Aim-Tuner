@@ -1,6 +1,7 @@
 package de.yuuto.aimtune.app.blind
 
 import de.yuuto.aimtune.app.TrainerConfig
+import de.yuuto.aimtune.app.i18n.UiText
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.ScenarioSchedule
 import de.yuuto.aimtune.core.score.MetricWeights
@@ -30,13 +31,10 @@ class BlindRun(
         baseConfig.copy(cm360 = test.nextCm360(), seed = nextSeed++, scenario = schedule.kindFor(test.roundsPlayed))
 
     /** "Round 4 / 10", or just "Round 12" once the planned rounds are used up. */
-    fun nextRoundLabel(): String {
-        val number = test.roundsPlayed + 1
-        return if (number <= test.plannedRounds) "Round $number / ${test.plannedRounds}" else "Round $number"
-    }
+    fun nextRoundLabel(): UiText = roundLabel(test.roundsPlayed + 1)
 
-    fun completedRoundLabel(): String {
-        val number = test.roundsPlayed
-        return if (number <= test.plannedRounds) "Round $number / ${test.plannedRounds}" else "Round $number"
-    }
+    fun completedRoundLabel(): UiText = roundLabel(test.roundsPlayed)
+
+    private fun roundLabel(number: Int): UiText =
+        if (number <= test.plannedRounds) UiText("round.label", number, test.plannedRounds) else UiText("round.label_open", number)
 }

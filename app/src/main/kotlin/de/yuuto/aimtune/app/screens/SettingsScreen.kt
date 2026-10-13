@@ -8,6 +8,8 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton
 import com.badlogic.gdx.scenes.scene2d.ui.TextField
 import de.yuuto.aimtune.app.AppContext
+import de.yuuto.aimtune.app.i18n.Language
+import de.yuuto.aimtune.app.i18n.scenarioName
 import de.yuuto.aimtune.app.setup.GAME_CUSTOM
 import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.setup.SetupStep
@@ -37,17 +39,18 @@ private const val SCENARIOS_GAP = 40f
 private const val FOOTER_BUTTON_HEIGHT = 64f
 private val ROUND_LENGTHS = listOf(30, 45, 60, 90)
 
-private val METRIC_NAMES = mapOf(
-    ScoreMetric.ACCURACY to "Accuracy",
-    ScoreMetric.TIME_TO_HIT to "Time to hit",
-    ScoreMetric.TRACKING to "Tracking",
-    ScoreMetric.CONSISTENCY to "Consistency",
+private val METRIC_KEYS = mapOf(
+    ScoreMetric.ACCURACY to "metric.accuracy",
+    ScoreMetric.TIME_TO_HIT to "metric.time_to_hit",
+    ScoreMetric.TRACKING to "metric.tracking",
+    ScoreMetric.CONSISTENCY to "metric.consistency",
 )
 
 /** Edit game, DPI, sensitivity, round length and score weights; aim style and pad via "Run setup again". */
 class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
     private var draft = SetupDraft.fromSettings(ctx.settings.current)
     private var roundSeconds = ctx.settings.current.roundSeconds
+    private var language = Language.fromCode(ctx.settings.current.language)
     private val weights = ctx.settings.current.metricWeights.toMutableMap()
     private val scenarios = ctx.settings.current.scenarios.toMutableSet()
     private var message: Pair<String, Boolean>? = null
@@ -56,15 +59,16 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
 
     override fun build(): Actor {
         val left = Table()
-        left.add(ui.label("Settings", Styles.HEADING)).left().padBottom(ROW_GAP + 8f).colspan(2).row()
-        addRow(left, "Game profile", gameSelect())
-        if (draft.gameId == GAME_CUSTOM) addRow(left, "Game yaw", textField(draft.customYawText) { draft = draft.copy(customYawText = it) })
-        if (draft.gameId == GAME_CUSTOM) addRow(left, "Horizontal FOV", textField(draft.customFovText) { draft = draft.copy(customFovText = it) })
-        addRow(left, "Mouse DPI", textField(draft.dpiText) { draft = draft.copy(dpiText = it) })
-        addRow(left, "In-game sensitivity", sensitivityControl())
-        addRow(left, "Round length", roundLengthButtons())
-        val runSetup = ui.button("Run setup again", Styles.SECONDARY) { ctx.showOnboarding(SetupStep.DPI, afterFinish = ctx::showSettings) }
-        addRow(left, "Aim style and mousepad", Table().also { it.add(runSetup).height(CONTROL_HEIGHT) })
+        left.add(ui.label(t("settings.title"), Styles.HEADING)).left().padBottom(ROW_GAP + 8f).colspan(2).row()
+        addRow(left, t("settings.game"), gameSelect())
+        if (draft.gameId == GAME_CUSTOM) addRow(left, t("settings.yaw"), textField(draft.customYawText) { draft = draft.copy(customYawText = it) })
+        if (draft.gameId == GAME_CUSTOM) addRow(left, t("settings.fov"), textField(draft.customFovText) { draft = draft.copy(customFovText = it) })
+        addRow(left, t("settings.dpi"), textField(draft.dpiText) { draft = draft.copy(dpiText = it) })
+        addRow(left, t("settings.sensitivity"), sensitivityControl())
+        addRow(left, t("settings.round_length"), roundLengthButtons())
+        addRow(left, t("settings.language"), languageSelect())
+        val runSetup = ui.button(t("settings.run_setup"), Styles.SECONDARY) { ctx.showOnboarding(SetupStep.DPI, afterFinish = ctx::showSettings) }
+        addRow(left, t("settings.style_pad"), Table().also { it.add(runSetup).height(CONTROL_HEIGHT) })
 
         val right = Table()
         right.add(weightsBlock()).left().row()
@@ -79,11 +83,11 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
 
     private fun footer(): Table {
         val footer = Table()
-        footer.add(ui.button("Back", Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
+        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
         message?.let { (text, ok) -> footer.add(ui.label(text, if (ok) Styles.OK else Styles.CAUTION)).right().padRight(32f) }
-        footer.add(ui.button("Reset to defaults", Styles.TEXT) { reset() }).height(FOOTER_BUTTON_HEIGHT).padRight(16f)
-        footer.addButton(ui.button("Save", Styles.PRIMARY) { save() }, minWidth = 180f)
+        footer.add(ui.button(t("settings.reset"), Styles.TEXT) { reset() }).height(FOOTER_BUTTON_HEIGHT).padRight(16f)
+        footer.addButton(ui.button(t("settings.save"), Styles.PRIMARY) { save() }, minWidth = 180f)
         return footer
     }
 
@@ -110,7 +114,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
 
     private fun gameSelect(): Table {
         val select = SelectBox<String>(ui.skin)
-        val options = ctx.profiles.profiles.map { it.id to it.name } + (GAME_CUSTOM to "Custom yaw…")
+        val options = ctx.profiles.profiles.map { it.id to it.name } + (GAME_CUSTOM to t("onboarding.game.custom"))
         select.setItems(*options.map { it.second }.toTypedArray())
         select.selected = options.firstOrNull { it.first == draft.gameId }?.second
         select.onChange {
@@ -122,7 +126,23 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         val table = Table()
         table.add(select).width(FIELD_WIDTH + 80f).height(CONTROL_HEIGHT)
         val yaw = draft.profile(ctx.profiles)?.yawDegreesPerCount
-        table.add(ui.label(yaw?.let { "yaw ${SetupDraft.formatNumber(it)}" } ?: "", Styles.MONO_MUTED)).padLeft(16f)
+        table.add(ui.label(yaw?.let { t("settings.yaw_hint", SetupDraft.formatNumber(it)) } ?: "", Styles.MONO_MUTED)).padLeft(16f)
+        return table
+    }
+
+    private fun languageSelect(): Table {
+        val select = SelectBox<String>(ui.skin)
+        select.setItems(*Language.entries.map { it.displayName }.toTypedArray())
+        select.selected = language.displayName
+        select.onChange {
+            language = Language.entries.first { it.displayName == select.selected }
+            message = null
+            // The language applies at once; Save keeps it. Leaving without saving restores the stored one.
+            ctx.previewLanguage(language)
+            rebuild()
+        }
+        val table = Table()
+        table.add(select).width(FIELD_WIDTH + 80f).height(CONTROL_HEIGHT)
         return table
     }
 
@@ -133,7 +153,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         return table
     }
 
-    private fun liveText(): String = draft.currentCm360(ctx.profiles)?.let { "= %.1f cm/360°".format(Locale.ROOT, it) } ?: ""
+    private fun liveText(): String = draft.currentCm360(ctx.profiles)?.let { t("settings.live_cm", "%.1f".format(Locale.ROOT, it)) } ?: ""
 
     private fun roundLengthButtons(): Table {
         val table = Table()
@@ -152,9 +172,9 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
 
     private fun weightsBlock(): Table {
         val block = Table()
-        block.add(ui.caps("Metric weights")).left().padBottom(8f).row()
-        block.add(ui.label("How each metric counts toward the round score.", Styles.CAPTION_MUTED)).left().padBottom(32f).row()
-        METRIC_NAMES.forEach { (metric, name) -> block.add(weightRow(metric, name)).left().width(WEIGHTS_WIDTH).padBottom(SLIDER_ROW_GAP).row() }
+        block.add(ui.caps(t("settings.weights"))).left().padBottom(8f).row()
+        block.add(ui.label(t("settings.weights_help"), Styles.CAPTION_MUTED)).left().padBottom(32f).row()
+        METRIC_KEYS.forEach { (metric, key) -> block.add(weightRow(metric, t(key))).left().width(WEIGHTS_WIDTH).padBottom(SLIDER_ROW_GAP).row() }
         totalLabel = ui.label(totalText(), Styles.MONO_MUTED).also { block.add(it).left() }
         return block
     }
@@ -178,11 +198,11 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
 
     private fun scenariosBlock(): Table {
         val block = Table()
-        block.add(ui.caps("Scenarios")).left().padBottom(8f).row()
-        block.add(ui.label("What a blind test plays. How often follows the weights above.", Styles.CAPTION_MUTED)).left().padBottom(24f).row()
+        block.add(ui.caps(t("settings.scenarios"))).left().padBottom(8f).row()
+        block.add(ui.label(t("settings.scenarios_help"), Styles.CAPTION_MUTED)).left().padBottom(24f).row()
         val grid = Table()
         ScenarioKind.entries.forEachIndexed { index, kind ->
-            val button: TextButton = ui.button(kind.displayName, Styles.TILE) { toggleScenario(kind) }
+            val button: TextButton = ui.button(ctx.i18n.scenarioName(kind), Styles.TILE) { toggleScenario(kind) }
             button.setProgrammaticChangeEvents(false)
             button.isChecked = kind.id in scenarios
             grid.add(button).width(SCENARIO_WIDTH).height(CONTROL_HEIGHT).padRight(SEGMENT_GAP).padBottom(SEGMENT_GAP)
@@ -194,7 +214,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
 
     private fun toggleScenario(kind: ScenarioKind) {
         if (kind.id in scenarios && scenarios.size == 1) {
-            message = "At least one scenario has to stay on." to false
+            message = t("settings.one_scenario") to false
         } else {
             if (!scenarios.remove(kind.id)) scenarios += kind.id
             message = null
@@ -204,17 +224,17 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
 
     private fun percentText(metric: ScoreMetric) = "%.0f %%".format(Locale.ROOT, weights[metric.name] ?: 0.0)
 
-    private fun totalText() = "Total %.0f %%".format(Locale.ROOT, weights.values.sum())
+    private fun totalText() = t("settings.total", "%.0f".format(Locale.ROOT, weights.values.sum()))
 
     private fun save() {
         val problem = listOf(SetupStep.DPI, SetupStep.GAME).firstNotNullOfOrNull { draft.issue(it, ctx.profiles) }
         if (problem != null) {
-            message = problem.message to false
+            message = t(problem.key) to false
             rebuild()
             return
         }
         val enabled = ScenarioKind.entries.map { it.id }.filter { it in scenarios }
-        val base: AppSettings = ctx.settings.current.copy(roundSeconds = roundSeconds, metricWeights = weights.toMap(), scenarios = enabled)
+        val base: AppSettings = ctx.settings.current.copy(roundSeconds = roundSeconds, metricWeights = weights.toMap(), scenarios = enabled, language = language.code)
         val error = ctx.settings.save(draft.toSettings(base, ctx.profiles))
         if (error == null) {
             ctx.showMenu()
@@ -230,7 +250,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         weights.putAll(AppSettings.DEFAULT_WEIGHTS)
         scenarios.clear()
         scenarios.addAll(AppSettings.DEFAULT_SCENARIOS)
-        message = "Round length, weights and scenarios reset. Press Save to keep them." to true
+        message = t("settings.reset_done") to true
         rebuild()
     }
 

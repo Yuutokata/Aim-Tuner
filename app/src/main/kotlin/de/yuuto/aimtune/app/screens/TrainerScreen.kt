@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.GL20
 import de.yuuto.aimtune.app.AppContext
 import de.yuuto.aimtune.app.Hud
 import de.yuuto.aimtune.app.RoundSession
+import de.yuuto.aimtune.app.i18n.t
 import de.yuuto.aimtune.app.Phase
 import de.yuuto.aimtune.app.Trainer
 import de.yuuto.aimtune.app.TrainerConfig
@@ -35,7 +36,7 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
         }
     }
     private val scene = TrainerScene(config.profile.verticalFovDegrees.toFloat())
-    private val hud = Hud(config, ctx.ui.tokens, roundLabel = session?.label)
+    private val hud = Hud(config, ctx.ui.tokens, ctx.i18n, roundLabel = session?.label?.let { ctx.i18n.t(it) })
 
     /** Exposed for the screenshot tour. */
     val roundPhase: Phase get() = trainer.phase

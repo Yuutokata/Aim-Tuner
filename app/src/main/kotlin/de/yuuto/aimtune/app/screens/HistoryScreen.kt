@@ -29,7 +29,6 @@ private const val ROWS_SHOWN = 6
 private const val ROW_GAP = 8f
 private val COLUMN_WIDTHS = floatArrayOf(270f, 280f, 130f, 190f, 190f, 220f)
 private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT)
-private const val ALL_GAMES = "All games"
 
 /**
  * Stored sessions: the recommended cm/360° after each sensitivity session as a chart and a table of
@@ -42,15 +41,15 @@ class HistoryScreen(ctx: AppContext, private val entriesFuture: CompletableFutur
 
     override fun build(): Actor {
         val content = Table()
-        content.add(ui.label("History", Styles.HEADING)).left().padBottom(24f).row()
+        content.add(ui.label(t("history.title"), Styles.HEADING)).left().padBottom(24f).row()
         val all = entries
         when {
-            all == null -> content.add(ui.label("Reading the stored sessions…", Styles.BODY_MUTED)).left()
-            all.isEmpty() -> content.add(ui.label("No sessions yet. Play a test first.", Styles.BODY_MUTED)).left()
+            all == null -> content.add(ui.label(t("history.loading"), Styles.BODY_MUTED)).left()
+            all.isEmpty() -> content.add(ui.label(t("history.empty"), Styles.BODY_MUTED)).left()
             else -> fill(content, all)
         }
         val footer = Table()
-        footer.add(ui.button("Back", Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
+        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
         return ui.frame(null, content, footer)
     }
@@ -70,7 +69,7 @@ class HistoryScreen(ctx: AppContext, private val entriesFuture: CompletableFutur
         val shown = all.filter { gameFilter == null || it.gameId == gameFilter }
         val recommended = shown.filter { it.cm360 != null }
         if (recommended.size >= 2) {
-            content.add(ui.caps("Recommended cm/360° after each sensitivity session")).left().padBottom(8f).row()
+            content.add(ui.caps(t("history.chart"))).left().padBottom(8f).row()
             content.add(ChartActor(ui, trendChart(recommended))).growX().height(CHART_HEIGHT).padBottom(16f).row()
         }
         content.add(table(shown)).left().top()
@@ -80,9 +79,10 @@ class HistoryScreen(ctx: AppContext, private val entriesFuture: CompletableFutur
         val games = all.map { it.gameId }.distinct()
         val row = Table()
         val select = SelectBox<String>(ui.skin)
-        val names = listOf(ALL_GAMES) + games.map(::gameName)
+        val allGames = t("history.all_games")
+        val names = listOf(allGames) + games.map(::gameName)
         select.setItems(*names.toTypedArray())
-        select.selected = if (gameFilter == null) ALL_GAMES else gameName(gameFilter)
+        select.selected = if (gameFilter == null) allGames else gameName(gameFilter)
         select.onChange {
             gameFilter = if (select.selectedIndex == 0) null else games[select.selectedIndex - 1]
             rebuild()
@@ -93,7 +93,7 @@ class HistoryScreen(ctx: AppContext, private val entriesFuture: CompletableFutur
 
     private fun table(shown: List<HistoryEntry>): Table {
         val table = Table()
-        val headers = listOf("Date", "Game", "Rounds", "cm/360°", "Confidence", "Type")
+        val headers = listOf("date", "game", "rounds", "cm", "confidence", "type").map { t("history.col_$it") }
         headers.forEachIndexed { i, text -> table.add(ui.caps(text)).left().width(COLUMN_WIDTHS[i]).padBottom(ROW_GAP) }
         table.row()
         shown.asReversed().take(ROWS_SHOWN).forEach { entry ->
@@ -103,12 +103,12 @@ class HistoryScreen(ctx: AppContext, private val entriesFuture: CompletableFutur
                 entry.rounds.toString(),
                 entry.cm360?.let { "%.1f".format(Locale.ROOT, it) } ?: "–",
                 entry.confidencePercent?.let { "$it %" } ?: "–",
-                if (entry.kind == SessionKind.ACCEL_AB) "Accel A/B" else "Sensitivity",
+                if (entry.kind == SessionKind.ACCEL_AB) t("history.type_accel") else t("history.type_sensitivity"),
             )
             cells.forEachIndexed { i, text -> table.add(ui.label(text, Styles.MONO)).left().width(COLUMN_WIDTHS[i]).padBottom(ROW_GAP) }
             table.row()
         }
-        if (shown.size > ROWS_SHOWN) table.add(ui.label("${shown.size - ROWS_SHOWN} older sessions not shown", Styles.CAPTION_MUTED)).left().colspan(headers.size)
+        if (shown.size > ROWS_SHOWN) table.add(ui.label(t("history.older", shown.size - ROWS_SHOWN), Styles.CAPTION_MUTED)).left().colspan(headers.size)
         return table
     }
 

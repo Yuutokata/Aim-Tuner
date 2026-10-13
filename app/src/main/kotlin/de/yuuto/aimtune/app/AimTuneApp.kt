@@ -41,7 +41,7 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
         val problems = mutableListOf<String>()
 
         val paths = if (sampleMode) null else resolvePaths(problems)
-        val settings = if (sampleMode) SettingsHolder(null, sampleSettings()) else loadSettings(paths, problems)
+        val settings = if (sampleMode) SettingsHolder(null, sampleSettings(options.screenshotLanguage)) else loadSettings(paths, problems)
         val profiles = GameProfiles.load(paths?.dataDir?.resolve("games")).also { problems += it.problems }
         val database = if (paths == null) null else openDatabase(paths, problems)
 
@@ -134,7 +134,7 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
     }
 
     /** Sample setup used only by the screenshot tour; it is never shown as the user's data. */
-    private fun sampleSettings() = AppSettings(
-        dpi = 800.0, gameId = "cs2", inGameSensitivity = 1.2, aimStyle = "MIXED", padWidthCm = 45.0, padHeightCm = 40.0,
+    private fun sampleSettings(language: String?) = AppSettings(
+        language = language, dpi = 800.0, gameId = "cs2", inGameSensitivity = 1.2, aimStyle = "MIXED", padWidthCm = 45.0, padHeightCm = 40.0,
     )
 }

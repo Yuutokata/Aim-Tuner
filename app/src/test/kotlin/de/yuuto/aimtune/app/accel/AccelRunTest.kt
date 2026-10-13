@@ -78,11 +78,11 @@ class AccelRunTest {
     @Test
     fun `the label never says which condition a test round has`() {
         val run = sampleAccelRun(base, AccelPhase.ANALYSIS)
-        assertEquals("Calibration", AccelRun(base, MetricWeights.DEFAULT, 1, 3).label.substringBefore(' '))
+        assertEquals("accel.label.calibration", AccelRun(base, MetricWeights.DEFAULT, 1, 3).label.key)
         run.startTest()
         repeat(3) {
-            assertTrue(run.label.startsWith("Test round"))
-            assertTrue(!run.label.contains("curve", ignoreCase = true) && !run.label.contains("plain", ignoreCase = true))
+            assertEquals("accel.label.test", run.label.key)
+            assertEquals(1, run.label.args.size, "only the number of the round")
             play(run, risingGainPlayer)
         }
     }

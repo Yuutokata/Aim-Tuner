@@ -35,23 +35,23 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
     override fun build(): Actor {
         val content = Table()
         val left = Table()
-        left.add(ui.label("Find the sens\nyou aim best with.", Styles.HEADING)).left().padBottom(HEADING_GAP).row()
-        left.add(menuItem("Start test", startSubtitle(), "Enter") { ctx.showStart() })
+        left.add(ui.label(t("menu.title_1") + "\n" + t("menu.title_2"), Styles.HEADING)).left().padBottom(HEADING_GAP).row()
+        left.add(menuItem(t("menu.start"), startSubtitle(), "Enter") { ctx.showStart() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
-        left.add(menuItem("Results", resultsSubtitle(), "R") { ctx.showStoredResults() })
+        left.add(menuItem(t("menu.results"), resultsSubtitle(), "R") { ctx.showStoredResults() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
-        left.add(menuItem("Acceleration", "optional speed curve for Raw Accel", "A") { ctx.showAccel() })
+        left.add(menuItem(t("menu.acceleration"), t("menu.acceleration_sub"), "A") { ctx.showAccel() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
-        left.add(menuItem("History", "past sessions and how the recommendation moved", "H") { ctx.showHistory() })
+        left.add(menuItem(t("menu.history"), t("menu.history_sub"), "H") { ctx.showHistory() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
-        left.add(menuItem("Settings", "DPI, game, round length and score weights", "S") { ctx.showSettings() })
+        left.add(menuItem(t("menu.settings"), t("menu.settings_sub"), "S") { ctx.showSettings() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).left().row()
         ctx.startupProblems.forEach { left.add(ui.label(it, Styles.CAUTION, wrap = true)).width(MENU_WIDTH).left().padTop(PROBLEM_GAP).row() }
         content.add(left).top().left()
         content.add(currentSettingBlock()).top().left().padLeft(COLUMN_GAP).padTop(RIGHT_BLOCK_TOP)
 
         val footer = Table()
-        footer.add(ui.label("Open source · MIT", Styles.CAPTION_MUTED)).left().bottom().padBottom(ITEM_PADDING)
+        footer.add(ui.label(t("menu.footer"), Styles.CAPTION_MUTED)).left().bottom().padBottom(ITEM_PADDING)
         return ui.frame(null, content, footer)
     }
 
@@ -70,11 +70,11 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
     private val storedRounds by lazy { ctx.storedRoundCount() }
 
     private fun resultsSubtitle(): String =
-        if (storedRounds == 0) "Play a blind test first" else "$storedRounds blind rounds stored"
+        if (storedRounds == 0) t("menu.results_none") else t("menu.results_stored", storedRounds)
 
     private fun startSubtitle(): String {
-        val config = ctx.trainerConfig() ?: return "First, a short setup"
-        return "blind test · ${config.roundSeconds} s flick rounds · ${config.profile.name}"
+        val config = ctx.trainerConfig() ?: return t("menu.start_setup")
+        return t("menu.start_sub", config.roundSeconds, config.profile.name)
     }
 
     private fun menuItem(title: String, subtitle: String, key: String, action: () -> Unit): Button {
@@ -92,14 +92,14 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
 
     private fun currentSettingBlock(): Table {
         val block = Table()
-        block.add(ui.caps("Your current setting")).left().padBottom(16f).row()
+        block.add(ui.caps(t("menu.current"))).left().padBottom(16f).row()
         val card = Table()
         card.background(ui.skin.getDrawable(Styles.CARD))
         card.pad(CARD_PADDING)
         val config = ctx.trainerConfig()
         if (config == null) {
-            card.add(ui.label("Not set up yet", Styles.TITLE)).left().row()
-            card.add(ui.label("Start test begins with a short setup.", Styles.CAPTION_MUTED)).left().padTop(8f)
+            card.add(ui.label(t("menu.not_set_up"), Styles.TITLE)).left().row()
+            card.add(ui.label(t("menu.not_set_up_sub"), Styles.CAPTION_MUTED)).left().padTop(8f)
         } else {
             val draft = SetupDraft.fromSettings(ctx.settings.current)
             val row = Table()
@@ -107,9 +107,9 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
             row.add(ui.label("cm/360°", Styles.NUMBER_MD).also { it.setAlignment(Align.left) }).bottom().padLeft(UNIT_GAP).padBottom(UNIT_BASELINE_LIFT)
             card.add(row).left().row()
             val stats = Table()
-            stats.add(stat("Game", config.profile.name)).left().padRight(STAT_GAP)
-            stats.add(stat("In-game sens", draft.sensitivity?.let(config.profile::formatSensitivity) ?: "-")).left().padRight(STAT_GAP)
-            stats.add(stat("DPI", SetupDraft.formatNumber(config.dpi))).left()
+            stats.add(stat(t("menu.stat_game"), config.profile.name)).left().padRight(STAT_GAP)
+            stats.add(stat(t("menu.stat_sens"), draft.sensitivity?.let(config.profile::formatSensitivity) ?: "-")).left().padRight(STAT_GAP)
+            stats.add(stat(t("menu.stat_dpi"), SetupDraft.formatNumber(config.dpi))).left()
             card.add(stats).left().padTop(UNIT_GAP)
         }
         block.add(card).width(CARD_WIDTH).left()

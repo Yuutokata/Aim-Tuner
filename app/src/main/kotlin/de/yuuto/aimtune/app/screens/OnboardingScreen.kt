@@ -139,7 +139,7 @@ class OnboardingScreen(
         continueButton?.isDisabled = issue != null
         liveCm?.setText(draft.currentCm360(ctx.profiles)?.let { "%.1f".format(Locale.ROOT, it) } ?: "-")
         sensitivityHint?.setText(sensitivityHintText())
-        issueLabel?.setText(if (issue != null && edited) issue.message else saveError.orEmpty())
+        issueLabel?.setText(if (issue != null && edited) t(issue.key) else saveError.orEmpty())
         presetButtons.forEachIndexed { i, button ->
             button.setProgrammaticChangeEvents(false)
             button.isChecked = draft.dpi == DPI_PRESETS[i].toDouble()
@@ -150,7 +150,7 @@ class OnboardingScreen(
 
     private fun stepIndicator(): Table {
         val table = Table()
-        table.add(ui.label("Step ${step.ordinal + 1} / ${SetupStep.entries.size}", Styles.MONO_MUTED)).padRight(16f)
+        table.add(ui.label(t("onboarding.step", step.ordinal + 1, SetupStep.entries.size), Styles.MONO_MUTED)).padRight(16f)
         SetupStep.entries.forEach { s ->
             val segment = Image(if (s.ordinal <= step.ordinal) ui.stepOn else ui.stepOff)
             table.add(segment).width(STEP_BAR_WIDTH).height(STEP_BAR_HEIGHT).padLeft(STEP_BAR_GAP)
@@ -160,10 +160,10 @@ class OnboardingScreen(
 
     private fun footer(): Table {
         val footer = Table()
-        footer.add(ui.button("Back", Styles.TEXT) { back() }).left().height(PRESET_HEIGHT).padLeft(8f)
+        footer.add(ui.button(t("common.back"), Styles.TEXT) { back() }).left().height(PRESET_HEIGHT).padLeft(8f)
         footer.add().expandX()
         issueLabel = ui.label("", Styles.CAUTION).also { footer.add(it).right().padRight(32f) }
-        val continueButton = ui.button(if (step == SetupStep.entries.last()) "Finish setup" else "Continue", Styles.PRIMARY) { next() }
+        val continueButton = ui.button(if (step == SetupStep.entries.last()) t("onboarding.finish") else t("common.continue"), Styles.PRIMARY) { next() }
         this.continueButton = continueButton
         footer.addButton(continueButton, minWidth = 220f)
         return footer
@@ -201,8 +201,8 @@ class OnboardingScreen(
 
     private fun dpiStep(): Table {
         val left = Table()
-        left.add(title("What is your mouse DPI?")).left().width(DESCRIPTION_WIDTH).padBottom(TITLE_GAP).row()
-        left.add(ui.label("Use the value set in your mouse software, not an in-game multiplier. It converts sensitivity to physical distance.", Styles.BODY_MUTED, wrap = true))
+        left.add(title(t("onboarding.dpi.title"))).left().width(DESCRIPTION_WIDTH).padBottom(TITLE_GAP).row()
+        left.add(ui.label(t("onboarding.dpi.description"), Styles.BODY_MUTED, wrap = true))
             .left().width(DESCRIPTION_WIDTH).padBottom(SECTION_GAP).row()
         left.add(ui.caps("DPI")).left().padBottom(CAPTION_GAP).row()
         val field = numberField(draft.dpiText, Styles.INPUT_LG) { draft = draft.copy(dpiText = it) }
@@ -224,8 +224,8 @@ class OnboardingScreen(
         val info = Table()
         info.background(ui.skin.getDrawable(Styles.CARD))
         info.pad(INFO_CARD_PADDING)
-        info.add(ui.label("Not sure?", Styles.BODY_LG)).left().padBottom(TILE_GAP).row()
-        info.add(ui.label("Check your mouse vendor app (G Hub, Synapse, Armoury Crate). If it shows \"DPI\", \"CPI\" or \"Sensitivity stages\", use the active stage.", Styles.BODY_MUTED, wrap = true))
+        info.add(ui.label(t("onboarding.dpi.help_title"), Styles.BODY_LG)).left().padBottom(TILE_GAP).row()
+        info.add(ui.label(t("onboarding.dpi.help_text"), Styles.BODY_MUTED, wrap = true))
             .width(INFO_CARD_WIDTH - 2 * INFO_CARD_PADDING).left()
 
         val content = Table()
@@ -238,11 +238,11 @@ class OnboardingScreen(
 
     private fun gameStep(): Table {
         val left = Table()
-        left.add(title("Game and current sensitivity", wrapWidth = 640f)).left().width(640f).padBottom(SECTION_GAP).row()
-        left.add(ui.caps("Game")).left().padBottom(CAPTION_GAP).row()
+        left.add(title(t("onboarding.game.title"), wrapWidth = 640f)).left().width(640f).padBottom(SECTION_GAP).row()
+        left.add(ui.caps(t("onboarding.game.game"))).left().padBottom(CAPTION_GAP).row()
         left.add(gameTiles()).left().padBottom(SECTION_GAP).row()
         if (draft.gameId == GAME_CUSTOM) left.add(customFields()).left().padBottom(SECTION_GAP).row()
-        left.add(ui.caps("In-game sensitivity")).left().padBottom(CAPTION_GAP).row()
+        left.add(ui.caps(t("onboarding.game.sensitivity"))).left().padBottom(CAPTION_GAP).row()
         val field = numberField(draft.sensitivityText, Styles.INPUT_LG) { draft = draft.copy(sensitivityText = it) }
         left.add(field).left().width(340f).height(FIELD_HEIGHT_LG).padBottom(CAPTION_GAP).row()
         sensitivityHint = ui.label("", Styles.MONO_MUTED).also { left.add(it).left() }
@@ -250,10 +250,10 @@ class OnboardingScreen(
         val right = Table()
         right.add(Image(ui.whiteSolid).also { it.color = ui.tokens.accent(700) }).width(ACCENT_RULE_WIDTH).height(CURRENT_SETTING_HEIGHT).top().padRight(RIGHT_BLOCK_PADDING)
         val block = Table()
-        block.add(ui.caps("Your current setting")).left().padBottom(CAPTION_GAP).row()
+        block.add(ui.caps(t("onboarding.game.current"))).left().padBottom(CAPTION_GAP).row()
         liveCm = ui.label("-", Styles.NUMBER_XL).also { block.add(it).left().row() }
         block.add(ui.label("cm / 360°", Styles.NUMBER_MD)).left().padBottom(TILE_GAP).row()
-        block.add(ui.label("Distance your mouse travels for one full turn. Updates as you type.", Styles.BODY_MUTED, wrap = true)).left().width(560f).padBottom(8f).row()
+        block.add(ui.label(t("onboarding.game.current_help"), Styles.BODY_MUTED, wrap = true)).left().width(560f).padBottom(8f).row()
         block.add(ui.label(FORMULA, Styles.MONO_MUTED)).left()
         right.add(block).top().left()
 
@@ -266,7 +266,7 @@ class OnboardingScreen(
 
     private fun gameTiles(): Table {
         val grid = Table()
-        val options = ctx.profiles.profiles.map { it.id to it.name } + (GAME_CUSTOM to "Custom yaw…")
+        val options = ctx.profiles.profiles.map { it.id to it.name } + (GAME_CUSTOM to t("onboarding.game.custom"))
         options.forEachIndexed { index, (id, name) ->
             val tile = tile(name, draft.gameId == id) {
                 draft = draft.copy(gameId = id)
@@ -280,8 +280,8 @@ class OnboardingScreen(
 
     private fun customFields(): Table {
         val table = Table()
-        table.add(ui.caps("Yaw (degrees per count at sensitivity 1)")).left().padBottom(CAPTION_GAP).padRight(TILE_GAP * 2)
-        table.add(ui.caps("Horizontal FOV (degrees)")).left().padBottom(CAPTION_GAP).row()
+        table.add(ui.caps(t("onboarding.game.custom_yaw"))).left().padBottom(CAPTION_GAP).padRight(TILE_GAP * 2)
+        table.add(ui.caps(t("onboarding.game.custom_fov"))).left().padBottom(CAPTION_GAP).row()
         table.add(numberField(draft.customYawText, Styles.INPUT) { draft = draft.copy(customYawText = it) }).left().width(SMALL_FIELD_WIDTH).height(SMALL_FIELD_HEIGHT).padRight(TILE_GAP * 2)
         table.add(numberField(draft.customFovText, Styles.INPUT) { draft = draft.copy(customFovText = it) }).left().width(SMALL_FIELD_WIDTH).height(SMALL_FIELD_HEIGHT)
         return table
@@ -289,8 +289,8 @@ class OnboardingScreen(
 
     private fun sensitivityHintText(): String {
         val profile = draft.profile(ctx.profiles)
-        val yaw = profile?.let { "Yaw ${SetupDraft.formatNumber(it.yawDegreesPerCount)}" } ?: "Yaw -"
-        val dpi = draft.dpi?.let { " · DPI ${SetupDraft.formatNumber(it)} (from step 1)" }.orEmpty()
+        val yaw = profile?.let { t("onboarding.game.hint_yaw", SetupDraft.formatNumber(it.yawDegreesPerCount)) } ?: t("onboarding.game.hint_yaw", "-")
+        val dpi = draft.dpi?.let { " " + t("onboarding.game.hint_dpi", SetupDraft.formatNumber(it)) }.orEmpty()
         return yaw + dpi
     }
 
@@ -298,11 +298,11 @@ class OnboardingScreen(
 
     private fun styleStep(): Table {
         val content = Table()
-        content.add(title("How do you aim?")).left().width(DESCRIPTION_WIDTH).padBottom(TITLE_GAP).row()
-        content.add(ui.label("Pick the joint that does most of the movement during a flick. This sets the range of sensitivities that are tested.", Styles.BODY_MUTED, wrap = true))
+        content.add(title(t("onboarding.style.title"))).left().width(DESCRIPTION_WIDTH).padBottom(TITLE_GAP).row()
+        content.add(ui.label(t("onboarding.style.description"), Styles.BODY_MUTED, wrap = true))
             .left().width(DESCRIPTION_WIDTH).padBottom(SECTION_GAP).row()
         val cards = Table()
-        listOf(AimStyle.WRIST to "Wrist", AimStyle.MIXED to "Mixed", AimStyle.ARM to "Arm").forEach { (style, name) ->
+        listOf(AimStyle.WRIST to t("onboarding.style.wrist"), AimStyle.MIXED to t("onboarding.style.mixed"), AimStyle.ARM to t("onboarding.style.arm")).forEach { (style, name) ->
             cards.add(styleCard(style, name)).width(STYLE_CARD_WIDTH).height(STYLE_CARD_HEIGHT).padRight(TILE_GAP * 2).top()
         }
         content.add(cards).left()
@@ -312,10 +312,10 @@ class OnboardingScreen(
     private fun styleCard(style: AimStyle, name: String): Button {
         val (low, high) = SearchRangeTable.DEFAULT.ranges.getValue(style)
         val description = when (style) {
-            AimStyle.WRIST -> "Forearm rests, hand pivots."
-            AimStyle.MIXED -> "Wrist for small moves, forearm for large."
-            AimStyle.ARM -> "Whole arm sweeps from the elbow or shoulder."
-        } + " Typically ${low.toInt()}–${high.toInt()} cm/360°."
+            AimStyle.WRIST -> t("onboarding.style.wrist_desc")
+            AimStyle.MIXED -> t("onboarding.style.mixed_desc")
+            AimStyle.ARM -> t("onboarding.style.arm_desc")
+        } + " " + t("onboarding.style.typical", low.toInt(), high.toInt())
         val card = Button(ui.skin, Styles.CARD_BUTTON)
         card.pad(STYLE_CARD_PADDING)
         card.align(Align.topLeft)
@@ -335,8 +335,8 @@ class OnboardingScreen(
 
     private fun padStep(): Table {
         val left = Table()
-        left.add(title("Mousepad size")).left().width(DESCRIPTION_WIDTH).padBottom(TITLE_GAP).row()
-        left.add(ui.label("Limits the largest sensitivity range that is physically comfortable.", Styles.BODY_MUTED, wrap = true))
+        left.add(title(t("onboarding.pad.title"))).left().width(DESCRIPTION_WIDTH).padBottom(TITLE_GAP).row()
+        left.add(ui.label(t("onboarding.pad.description"), Styles.BODY_MUTED, wrap = true))
             .left().width(DESCRIPTION_WIDTH).padBottom(SECTION_GAP).row()
         PadPreset.entries.forEach { preset ->
             left.add(padRow(preset)).left().width(PAD_ROW_WIDTH).height(PAD_ROW_HEIGHT).padBottom(TILE_GAP / 2).row()
@@ -344,7 +344,7 @@ class OnboardingScreen(
         }
 
         val right = Table()
-        right.add(ui.caps("Fit check")).left().padBottom(CAPTION_GAP).row()
+        right.add(ui.caps(t("onboarding.pad.fit_check"))).left().padBottom(CAPTION_GAP).row()
         val holder = Table()
         fitHolder = holder
         right.add(holder).left().width(FIT_PANEL_WIDTH).height(FIT_PANEL_HEIGHT)
@@ -359,16 +359,16 @@ class OnboardingScreen(
     private fun padRow(preset: PadPreset): Button {
         val row = Button(ui.skin, Styles.CARD_BUTTON)
         val name = when (preset) {
-            PadPreset.SMALL -> "Small"
-            PadPreset.MEDIUM -> "Medium"
-            PadPreset.LARGE -> "Large"
-            PadPreset.DESK_MAT -> "Desk mat"
-            PadPreset.CUSTOM -> "Custom"
+            PadPreset.SMALL -> t("onboarding.pad.small")
+            PadPreset.MEDIUM -> t("onboarding.pad.medium")
+            PadPreset.LARGE -> t("onboarding.pad.large")
+            PadPreset.DESK_MAT -> t("onboarding.pad.desk_mat")
+            PadPreset.CUSTOM -> t("onboarding.pad.custom")
         }
         val dims = if (preset.widthCm != null) {
             "≈ ${SetupDraft.formatNumber(preset.widthCm)} × ${SetupDraft.formatNumber(checkNotNull(preset.heightCm))} cm"
         } else {
-            "width × height"
+            t("onboarding.pad.dimensions")
         }
         row.add(ui.label(name, Styles.BODY_LG)).left().padLeft(PAD_ROW_PADDING).expandX()
         row.add(ui.label(dims, Styles.MONO_MUTED)).right().padRight(PAD_ROW_PADDING)
@@ -399,15 +399,15 @@ class OnboardingScreen(
         val cm360 = draft.currentCm360(ctx.profiles)
         val pad = draft.padSizeCm()
         if (cm360 == null || pad == null) {
-            holder.add(ui.label("Choose a pad size to see whether a full turn fits.", Styles.BODY_MUTED, wrap = true)).width(FIT_PANEL_WIDTH).top().left()
+            holder.add(ui.label(t("onboarding.pad.choose"), Styles.BODY_MUTED, wrap = true)).width(FIT_PANEL_WIDTH).top().left()
             return
         }
         val panel = FitCheckPanel(ui, cm360, pad.first)
         holder.add(panel).growX().height(FIT_PANEL_HEIGHT - 80f).row()
         val message = if (panel.fits) {
-            ui.label("Your current setting fits this pad.", Styles.OK)
+            ui.label(t("onboarding.pad.fits"), Styles.OK)
         } else {
-            ui.label("A full turn takes more than the pad is wide. You can still test; lift and reposition the mouse for big turns.", Styles.CAUTION, wrap = true)
+            ui.label(t("onboarding.pad.too_small"), Styles.CAUTION, wrap = true)
         }
         holder.add(message).left().width(FIT_PANEL_WIDTH).padTop(TILE_GAP)
     }

@@ -29,6 +29,14 @@ tasks.register<JavaExec>("screenshots") {
     args("--screenshots", layout.buildDirectory.dir("screenshots").get().asFile.path)
 }
 
+tasks.register<JavaExec>("screenshotsDe") {
+    group = "verification"
+    description = "Saves a PNG of every UI screen in German to build/screenshots-de."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set(application.mainClass)
+    args("--screenshots", layout.buildDirectory.dir("screenshots-de").get().asFile.path, "--language", "de")
+}
+
 // The UI tokens live once in docs/design and are bundled into the app from there.
 tasks.processResources {
     from(rootProject.file("docs/design/tokens.json")) { into("assets/ui") }

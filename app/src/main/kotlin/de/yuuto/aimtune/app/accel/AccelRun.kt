@@ -1,6 +1,7 @@
 package de.yuuto.aimtune.app.accel
 
 import de.yuuto.aimtune.app.TrainerConfig
+import de.yuuto.aimtune.app.i18n.UiText
 import de.yuuto.aimtune.core.accel.AbCondition
 import de.yuuto.aimtune.core.accel.AbOutcome
 import de.yuuto.aimtune.core.accel.AbStatus
@@ -75,11 +76,11 @@ class AccelRun(
     val maxTestRounds: Int get() = 2 * plan.maxPairs
 
     /** HUD label: where the user is, without the condition of a test round. */
-    val label: String
+    val label: UiText
         get() = when (phase) {
-            AccelPhase.CALIBRATION -> "Calibration ${calibration.size + 1} / $calibrationRounds"
-            AccelPhase.TEST -> "Test round ${outcomes.size + 1}"
-            else -> ""
+            AccelPhase.CALIBRATION -> UiText("accel.label.calibration", calibration.size + 1, calibrationRounds)
+            AccelPhase.TEST -> UiText("accel.label.test", outcomes.size + 1)
+            else -> UiText("")
         }
 
     /** The config of the next round of the current phase. */

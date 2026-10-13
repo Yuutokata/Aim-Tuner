@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.app
 
+import de.yuuto.aimtune.app.i18n.UiText
 import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.storage.SessionKind
 
@@ -10,7 +11,7 @@ import de.yuuto.aimtune.storage.SessionKind
  */
 interface RoundSession {
     /** Text for the HUD, such as "Round 4 / 10"; never the sensitivity or the condition of a test. */
-    val label: String
+    val label: UiText
 
     /** Rounds of one run are stored together; this is the key that groups them. */
     val runKey: Long

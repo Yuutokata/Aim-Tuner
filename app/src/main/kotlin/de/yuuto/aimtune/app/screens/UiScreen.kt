@@ -24,6 +24,9 @@ abstract class UiScreen(protected val ctx: AppContext) : Screen {
     protected val stage = Stage(ScreenViewport())
     protected val ui: UiSkin get() = ctx.ui.skin
 
+    /** A text of the UI in the language of the settings. */
+    protected fun t(key: String, vararg args: Any?): String = ctx.i18n.t(key, *args)
+
     /** Creates the screen's widget tree (normally via [de.yuuto.aimtune.app.ui.frame]). */
     protected abstract fun build(): Actor
 

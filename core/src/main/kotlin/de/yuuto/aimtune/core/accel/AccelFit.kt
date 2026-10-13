@@ -27,12 +27,18 @@ data class AccelFit(
 }
 
 /** What the fitting found: every family's fit, and the best one if it clears the bar. */
+/** Why the analysis ended as it did; the app turns it into a translated text, [AccelFitResult.reason] is the English one. */
+enum class AccelReason { NOT_ENOUGH_MOVEMENTS, NARROW_SPEED_RANGE, NO_FIT, NOT_BETTER_THAN_NONE, SMALL_CHANGE, FITS }
+
 data class AccelFitResult(
     val points: List<GainPoint>,
     val fits: List<AccelFit>,
     /** The curve to try, or null when there is too little data or no curve is clearly better than none. */
     val recommended: AccelFit?,
     val reason: String,
+    val reasonCode: AccelReason,
+    /** Number the reason's text mentions: movements needed, or the smallest worthwhile change in percent; 0 otherwise. */
+    val reasonValue: Int = 0,
 )
 
 /**
@@ -44,10 +50,11 @@ data class AccelFitResult(
 fun fitAccel(analysis: AccelAnalysis, minBicGain: Double = 10.0, minGainRange: Double = 1.08): AccelFitResult {
     val points = analysis.points
     if (points.size < AccelAnalysis.MIN_BINS) {
-        return AccelFitResult(points, emptyList(), null, "Not enough movements yet: about ${AccelAnalysis.MIN_BINS * AccelAnalysis.MIN_PER_BIN} are needed.")
+        val needed = AccelAnalysis.MIN_BINS * AccelAnalysis.MIN_PER_BIN
+        return AccelFitResult(points, emptyList(), null, "Not enough movements yet: about $needed are needed.", AccelReason.NOT_ENOUGH_MOVEMENTS, needed)
     }
     if (analysis.speedRange < MIN_SPEED_RANGE) {
-        return AccelFitResult(points, emptyList(), null, "The movements were all at about the same speed, so no curve can be judged.")
+        return AccelFitResult(points, emptyList(), null, "The movements were all at about the same speed, so no curve can be judged.", AccelReason.NARROW_SPEED_RANGE)
     }
     val weights = points.map { 1.0 / (it.standardError * it.standardError + FLOOR * FLOOR) }
     val ys = points.map { it.logGain }
@@ -73,10 +80,13 @@ fun fitAccel(analysis: AccelAnalysis, minBicGain: Double = 10.0, minGainRange: D
     }
     val best = fits.maxByOrNull { it.bicGain }
     return when {
-        best == null -> AccelFitResult(points, fits, null, "No curve could be fitted.")
-        best.bicGain < minBicGain -> AccelFitResult(points, fits, null, "No curve fits clearly better than no acceleration.")
-        best.gainRange < minGainRange -> AccelFitResult(points, fits, null, "The best curve would change the gain by less than ${((minGainRange - 1) * 100).toInt()} %.")
-        else -> AccelFitResult(points, fits, best, "The ${best.family} curve fits clearly better than no acceleration.")
+        best == null -> AccelFitResult(points, fits, null, "No curve could be fitted.", AccelReason.NO_FIT)
+        best.bicGain < minBicGain -> AccelFitResult(points, fits, null, "No curve fits clearly better than no acceleration.", AccelReason.NOT_BETTER_THAN_NONE)
+        best.gainRange < minGainRange -> {
+            val percent = ((minGainRange - 1) * 100).toInt()
+            AccelFitResult(points, fits, null, "The best curve would change the gain by less than $percent %.", AccelReason.SMALL_CHANGE, percent)
+        }
+        else -> AccelFitResult(points, fits, best, "The ${best.family} curve fits clearly better than no acceleration.", AccelReason.FITS)
     }
 }
 

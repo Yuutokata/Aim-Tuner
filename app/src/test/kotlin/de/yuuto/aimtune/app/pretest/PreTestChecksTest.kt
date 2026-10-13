@@ -17,11 +17,11 @@ class PreTestChecksTest {
     @Test
     fun `pointer acceleration off is fine and on needs attention`() {
         assertEquals(CheckLevel.OK, rows(PointerAcceleration(0)).getValue("pointer").level)
-        assertEquals("OFF", rows(PointerAcceleration(0)).getValue("pointer").state)
+        assertEquals("pretest.state.off", rows(PointerAcceleration(0)).getValue("pointer").state)
         val on = rows(PointerAcceleration(1)).getValue("pointer")
         assertEquals(CheckLevel.ATTENTION, on.level)
-        assertEquals("ON", on.state)
-        assertTrue("Enhance pointer precision" in on.detail)
+        assertEquals("pretest.state.on", on.state)
+        assertEquals("pretest.pointer.on", on.detail)
     }
 
     @Test
@@ -33,15 +33,15 @@ class PreTestChecksTest {
     fun `raw accel needs a manual confirmation and says why`() {
         val open = rows(PointerAcceleration(0)).getValue("rawaccel")
         assertEquals(CheckLevel.ATTENTION, open.level)
-        assertTrue("Cannot be detected" in open.detail)
+        assertEquals("pretest.rawaccel.unknown", open.detail)
         assertEquals(CheckLevel.OK, rows(PointerAcceleration(0), confirmed = true).getValue("rawaccel").level)
     }
 
     @Test
     fun `the fallback input source is flagged`() {
-        assertEquals("RAW", rows(PointerAcceleration(0)).getValue("input").state)
+        assertEquals("pretest.state.raw", rows(PointerAcceleration(0)).getValue("input").state)
         val fallback = rows(PointerAcceleration(0), raw = false).getValue("input")
         assertEquals(CheckLevel.ATTENTION, fallback.level)
-        assertTrue("GLFW" in fallback.detail)
+        assertEquals("GLFW raw motion (fallback)", fallback.detailArg)
     }
 }
