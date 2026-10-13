@@ -4,8 +4,8 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Current
 
-- **Milestone:** M6 More scenarios and score combination
-- **Task:** implemented and committed locally (not pushed); waiting for the user's hands-on test (see Next steps). M1-M5 are pushed.
+- **Milestone:** M7 Accel
+- **Task:** implemented and committed locally (not pushed); waiting for the user's hands-on test (see Next steps). M1-M6 are pushed.
 
 ## Checklist
 
@@ -72,7 +72,7 @@ Single source of truth for project status. Update at the end of every task and b
 - [x] Mixed-scenario convergence test and report; optimizer: scenario offsets, edge-of-range flag with capped confidence
 - [x] Hands-on test by the user (first try): the result still matched their sensitivity; tracking was too fast and changed direction too often; confidence stayed at 19 % after 9 rounds in 3 sessions (about 39 more rounds estimated) with all four scenarios on
 - [x] Fixes: tracking slowed down (6-22 degrees per second, segments 1.2-2.8 s, radius 0.5 m); default is now flick only, other scenarios are opt-in toggles in Settings
-- [ ] Second hands-on test: tracking playable now, flick-only confidence rises as in M5, mixed scenarios opt-in
+- [x] Second hands-on test: not reported separately; M6 was pushed on the user's request after the fixes
 
 ### M7 Accel
 - [x] Verify Raw Accel modes, units, settings.json schema (read from a1xd/rawaccel v1.7.1 source; findings in ALGORITHMS.md "Acceleration")
@@ -94,6 +94,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Last session
 
+- M7: `core/accel` (Raw Accel curve models and per-report processor from the verified 1.7.1 source, analysis of error against speed, fits of classic/natural/power with BIC selection against no acceleration, blind A/B with a per-look corrected t test), accel in the round pipeline (recordings, view, trainer, storage schema 2, round logs), the simulated player expecting a speed-dependent gain, the Raw Accel `settings.json` export, the Acceleration menu with calibration, analysis, blind test and verdict screens, `RoundSession` shared with the blind test. 252 tests pass. On the simulated players the flow offers a curve to every rising-gain player, none of the flat ones, confirms it in 92 % of runs (median 5 pairs) and calls a harmful curve worse every time; a first version of the A/B test called a non-existent difference better in 40 % of runs because it looked after every pair without correcting for it, fixed with a per-look level and calibrated (1 of 30). The screens are only checked through screenshots and tests, not with a real mouse, and the exported file was not loaded into Raw Accel.
 - M6: micro-adjust, tracking and target switching (`core/scenario`), tracking metric, per-scenario baselines, `ScenarioSchedule` (weights decide how often each scenario is played), simulated aimer for all four, scenario toggles in settings, trainer/HUD/between-rounds support, storage for waypoints and tracking metrics. 213 tests pass. Findings on the simulated player: scenarios have different best sensitivities (flick about 49, switching about 59, tracking 55-85, micro the edge of the range), so the mix finds a weighted compromise; mixed tests are less certain than flick-only ones for the same number of rounds (69 % within x1.3 of the blend after 30 rounds vs 88 % for flick only). The new screens are only checked through screenshots and tests, not with a real mouse.
 - M5: `core/optimizer` (GP, expected improvement, interval, confidence), `BlindTest`/`BlindRun` in `app/blind`, blind trainer HUD, between-rounds and results screens, menu "Results" item, stored-round merging. 181 tests pass. The blind flow as a whole (real mouse, clicking through the screens) is untested by me; the optimizer and `BlindTest` are tested with the simulated player and the screens by screenshots.
 - Verification harness (see checklist): simulated player, headless runner, simulated and replay mouse sources, round log files, `--record`, fixture regression test, `:app:screenshots`. 161 tests pass. Model parameters were tuned by hand so the optimum is interior and flat-topped; convergence numbers are documented in ALGORITHMS.md. The accel and optimizer parts of the requested end-to-end test cannot exist yet.
@@ -104,9 +105,9 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Next steps
 
-1. User tests M6: `gradlew.bat :app:run` (use `AIMTUNE_DATA_DIR` for a scratch data folder, `--record <dir>` saves every round as a log). In Settings the four scenario toggles and the weights decide what a blind test plays (all on: tracking about every fifth round, the others in turn). Start a test and play 10-12 rounds: flick and micro-adjust as before with smaller targets close together, target switching shows three targets at once, tracking asks you to keep the crosshair on a moving target without clicking, and its between-rounds card shows the time on target. Try switching scenarios off in Settings and check that only the enabled ones are played.
-2. Please report: do the scenarios feel right (target sizes, speeds, three targets), is tracking playable and not too fast or slow, is the mix of rounds too long before the confidence moves (each scenario gets only some of the rounds), and does the result still match your sensitivity. If you want a faster test, switch scenarios off.
-3. Then ask whether to push M6, and continue with M7 (accel).
+1. User tests M7: `gradlew.bat :app:run` (use `AIMTUNE_DATA_DIR` for a scratch data folder). Needs a sensitivity first: play a blind test (flick only is fine) until Results (R) shows a result. Then menu "Acceleration" (A): tick "Raw Accel is off or linear" (Raw Accel really has to be off or linear during the calibration), Start calibration, play the 15 calibration rounds (flick, target switching, micro-adjust in turn, at the recommended sensitivity, which is shown on the intro screen). The analysis screen then either says no curve is clearly better (a normal outcome) or shows a curve; "Test it blind" plays pairs of plain and curve rounds (4 to 10 pairs, you are not told which is which) and the verdict screen offers "Export for Raw Accel" only if the curve was clearly better. The file goes to `%APPDATA%\AimTune\exportsawaccel\settings.json` (or `AIMTUNE_DATA_DIR`), "Copy settings.json" puts the text on the clipboard.
+2. Please report: does the calibration feel like normal aiming, are the round screens clear, does the analysis offer a curve or not, does the curve feel different in the test, and, if you export, does Raw Accel accept the file (open it in Raw Accel's GUI or put it next to rawaccel.exe) and does it show the same curve as AimTune. A Raw Accel error message would tell us what to fix in the export.
+3. Then ask whether to push M7, and continue with M8 (results view and charts, history, i18n en/de, jpackage, README screenshots).
 
 ## Known bugs
 
@@ -130,4 +131,8 @@ Single source of truth for project status. Update at the end of every task and b
 - Export Raw Accel settings needs a save location: LibGDX has no file dialog (options: native dialog via LWJGL tinyfd, or fixed folder). Decide at M7.
 - Apex, Overwatch 2 and Fortnite tiles are omitted until yaw/FOV are verified (Valorant, CS2 and a custom yaw/FOV tile ship).
 - The simulated player is a model I made up (reaction, Fitts, noise terms); it checks that the pipeline recovers a known optimum, not that real humans behave this way. Revisit its parameters with real recordings (`--record`).
+- Raw Accel export: the file follows the 1.7.1 layout and validation rules read from the source but has not been loaded into Raw Accel; the user's test is the first real check. Export location is a fixed folder in the data directory plus a clipboard button, because LibGDX has no file dialog (decided at M7).
+- The acceleration analysis assumes real players show a systematic under- or overshoot that depends on hand speed. The simulated player is built that way; real data may be flatter, in which case the app will say "no curve is clearly better", which is the intended outcome. Thresholds (20 movements per bin, BIC gain 10, 8 % gain change, factor-2 speed range, 2 % per-look level of the A/B test) are my choices, tuned on the simulation.
+- The curve acts per mouse report while a player plans at the peak speed, so even a perfect fit removes only part of the error; the A/B test measures what is left. A refit with the curve switched on (second iteration) is not built.
+- A short A/B test cannot capture a player getting used to a new curve over days; the counterbalanced order only spreads the effect over both conditions.
 - Segmentation thresholds and the score's 0-100 mapping are starting values; revisit with real recordings and the simulated player (M5/M7).

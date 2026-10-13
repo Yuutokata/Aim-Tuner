@@ -29,7 +29,7 @@ raw input (counts + QPC timestamps) → `MouseEvent` stream → round recorder (
 SQLite in `%APPDATA%\AimTune\aimtune.db` (override with `AIMTUNE_DATA_DIR`; Linux/macOS fall back to `$XDG_DATA_HOME/aimtune` or `~/.local/share/aimtune`), plus `settings.json` next to it. Schema versions are tracked with `PRAGMA user_version` and an ordered migration list in `Database.kt`; a database from a newer version is refused.
 
 - `session(id, started_at_ms, game_id, dpi, kind)`: kind is `sensitivity` or `accel_ab`.
-- `round(id, session_id, scenario, seed, cm360, dpi, blind, started_at_ms, start_nanos, duration_nanos, mouse_event_count, mouse_events BLOB, metrics_version)`: the raw mouse reports of a round are one blob (format version byte + deflated zigzag-varint stream of time delta, dx, dy; see `MouseEventCodec`), about 5 bytes per report before compression.
+- `round(id, session_id, scenario, seed, cm360, dpi, blind, started_at_ms, start_nanos, duration_nanos, mouse_event_count, mouse_events BLOB, metrics_version, accel)`: the raw mouse reports of a round are one blob (format version byte + deflated zigzag-varint stream of time delta, dx, dy; see `MouseEventCodec`), about 5 bytes per report before compression.
 - `target_event(round_id, seq, type, time_offset_nanos, target_id, x, y, z, radius)`: `spawned`, `hit`, `miss`, `waypoint` (moving targets; x, y, z = position), times relative to the round start.
 - `metric(round_id, name, value)`: values derived when the round was saved (names in `toNamedValues()`); `metrics_version` says which definitions produced them. Metrics are always recomputable from the raw data. Scores are not stored: they are relative to all rounds and recomputed (see ALGORITHMS.md).
 
@@ -60,6 +60,15 @@ Rounds are analysed and saved by `RoundProcessor` on a background thread. If the
 - App: `Trainer` creates the scenario of its `TrainerConfig`; `TrainerScene` draws all visible targets at their own radius; `BlindRun` asks the `ScenarioSchedule` for the scenario of each round; `AppSettings.scenarios` (toggles in the settings screen) and the metric weights feed the schedule.
 - Tests: `core/.../scenario/ScenariosTest`, `ScenarioScheduleTest`, `core/.../harness/ScenarioSweepTest` (report `scenario-sweeps.txt`), `MixedScenarioConvergenceTest` (report `mixed-scenarios.txt`), `app/.../harness/TrainerHarnessTest` (every scenario through the real trainer equals the headless runner).
 
+## Acceleration (M7)
+
+- `core/accel`: `AccelCurve` (`NoAccel`, `ClassicCurve`, `NaturalCurve`, `PowerCurve`, Raw Accel's Velocity formulas), `AccelProcessor` (per-report speed in in/s and the driver's time clamp), `AccelSpec` (one-line text form for storage), `AccelAnalysis` (movements -> wanted gain per speed bin), `fitAccel` with `NelderMead` (families, factor, BIC selection), `AccelAbPlan` and `evaluateAb` (blind A/B).
+- `RoundRecording.accel` is the curve a round was played with. `ViewTrack` rebuilds the view through it (and exposes the per-report scales that the metrics' angular path uses), `Trainer` and `HeadlessRound` apply it per report, the database (schema version 2, column `round.accel`) and round logs keep it. Raw counts stay raw: the segmentation and the analysis always work on the hand's movement.
+- `SimulatedAimer` plans with `SimulatedPlayer.gainPreference`, sees the view that results from the counts and the active curve, and so produces the errors the analysis looks for.
+- `storage/RawAccelExport`: `settings.json` in the Raw Accel 1.7.1 layout, written to `<data dir>/exports/rawaccel/settings.json`, also copyable to the clipboard.
+- `app/accel`: `AccelRun` is the state machine without UI (calibration, analysis, test, done; nothing in it reveals the condition of a test round), `AccelSession` plugs it into the trainer screen through `RoundSession` (shared with `BlindSession`), `SampleAccelRun` feeds the screenshot tour. Screens: `AccelIntroScreen` (starting sensitivity from the stored blind rounds, Raw Accel check), `AccelBetweenScreen`, `AccelAnalysisScreen`, `AccelResultScreen`. Acceleration rounds are stored as sessions of kind `accel_ab`, so the optimizer never sees them.
+- Tests: `AccelCurveTest` (formulas, processor, spec), `AccelFitTest`, `core/.../harness/AccelPipelineTest` (analysis -> fit -> A/B against the simulated players, false-positive calibration, power), `RawAccelExportTest`, `AccelRunTest`, `RoundRepositoryTest` (stored curve, migration from version 1).
+
 ## Verification harness
 
 Everything below runs without a human or a window (except the screenshots, which need a GPU context but a hidden window).
@@ -79,7 +88,7 @@ Tests: `core/.../sim/HeadlessRoundTest` (aimer behaviour), `core/.../harness/Pip
 
 Adding a real fixture: run the app with `--record <dir>`, play a round, copy the log into `app/src/test/resources/fixtures/` and pin its metrics in `RecordedFixtureTest`.
 
-Not covered yet: accel fitting (M7). The end-to-end test uses a baseline `SensitivityEstimator` (fixed grid, parabola through the best mean score) and the optimizer plugs into the same interface; the accel work will use `SimulatedPlayer.gainPreference`.
+The end-to-end sensitivity test uses a baseline `SensitivityEstimator` (fixed grid, parabola through the best mean score) and the optimizer plugs into the same interface; the acceleration flow is tested end to end by `AccelPipelineTest` through `SimulatedPlayer.gainPreference`.
 
 ## Extension points
 

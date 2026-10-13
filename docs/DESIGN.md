@@ -88,6 +88,7 @@ LibGDX `I18NBundle`: `assets/i18n/messages.properties` (English default) and `me
 | In-test HUD (1h) with progress bar below the timer and "Esc · pause" | Timer, scenario name, "Round n / N", "Esc aborts the round"; no bar, no pause | Aborting discards the round, a pause would taint it |
 | Settings (1n) has metric weights only | A "Scenarios" block under the weights: four toggles for what a blind test plays; the weights decide how often | M6 scenarios need a way to be switched off |
 | Between rounds (1i): hits, accuracy, time to hit | A caption with the scenario name; tracking shows "Time on target" instead of hits | Tracking has no hits |
+| Acceleration is only a tab on the results view (1j) | Its own menu item "Acceleration" with an intro, calibration and test round screens, an analysis screen (numbers, no chart) and a verdict screen with export and copy | The acceleration steps need rounds of their own and a decision before an export; the chart and the tab come with M8 |
 | Pad presets include Desk mat | Adopted (small / medium / large / desk mat / custom) | Extends the spec's three presets |
 
 ## Open design questions
