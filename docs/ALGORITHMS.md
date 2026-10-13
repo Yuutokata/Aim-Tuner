@@ -6,9 +6,9 @@ Formulas and parameter reasoning. Sections marked *(draft)* are finalised in the
 
 `cm360 = (360 × 2.54) / (DPI × sens × yaw)`; inverse `sens = (360 × 2.54) / (DPI × yaw × cm360)`. Example: 800 DPI, sens 0.249, yaw 0.07 → 914.4 / 13.944 ≈ 65.58 cm/360°. Sensitivity is rounded per the profile's format only on output.
 
-## Search range *(draft)*
+## Search range (M4, implemented)
 
-Table keyed by aim style giving a window around typical cm/360° values (initial defaults from the onboarding mockup: wrist 20-35, mixed 30-50, arm 45-80; to be tuned), capped above by pad width (a 360° turn must fit on the pad with margin). The current cm/360° is always included by widening the window if needed. Table lives in config, not code.
+`SearchRangeTable.DEFAULT` gives a window per aim style (wrist 20-35, mixed 30-50, arm 45-80 cm/360°, from the onboarding mockup; to be tuned). `searchRange()` then: (1) caps the upper bound by the pad width (a 360° turn must fit), (2) keeps the hi/lo ratio at least 1.3, (3) widens the window so the current cm/360° lies inside with a 1.1 margin. The current value is therefore always searchable. The table is a plain data class so it can move into config later.
 
 ## Submovement segmentation (M3, implemented)
 

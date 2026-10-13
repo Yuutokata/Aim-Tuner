@@ -35,6 +35,16 @@ SQLite in `%APPDATA%\AimTune\aimtune.db` (override with `AIMTUNE_DATA_DIR`; Linu
 
 Rounds are analysed and saved by `RoundProcessor` on a background thread. If the database cannot be opened the trainer still runs and reports "not saved".
 
+## App structure (M4)
+
+- `AimTuneApp` (libGDX `Game`) wires services into an `AppContext`, which owns navigation (`showMenu/showStart/showOnboarding/showPreTest/showSettings/showTrainer`). Start shows onboarding when no complete setup exists, otherwise the pre-test notice.
+- Screens extend `UiScreen` (Scene2D stage in design units, shared `UiHolder` skin and fonts); `TrainerScreen` hosts the 3D trainer.
+- `SettingsHolder` holds the current `AppSettings` and saves through `SettingsStore`. `SetupDraft` is the editable, validated form model for onboarding and settings.
+- `MouseGate` is the only path to mouse data: the raw source listens only while the window is focused and the active screen allows it (only the trainer).
+- UI skin: `ui/Tokens` reads `docs/design/tokens.json` (copied into resources at build time), `ui/Drawables` renders rounded rects with an SDF shader, `ui/UiSkin` + `ui/Widgets` build styles and common layouts.
+- Games: `games` loads `GameProfile` JSON (bundled + user files); `core.SearchRange` derives the optimizer range from aim style and pad width.
+- `ScreenshotTour` (`--screenshots <dir>`) renders every screen with in-memory sample settings, for design review.
+
 ## Extension points
 
 - `GameProfile`: add a JSON file in `games/` (see CONTRIBUTING.md).

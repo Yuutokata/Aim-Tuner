@@ -9,13 +9,22 @@
 
 ## How to add a new game
 
-*(Final format is documented once the `GameProfile` loader exists, in M4.)*
+Games are JSON profiles and need no code changes. Bundled profiles live in `games/src/main/resources/games/` and are listed in `index.json`; users can drop their own files in `<data dir>/games/*.json` (picked up on start).
 
-Games are JSON profiles in `games/` and need no core code changes. A profile provides:
+```json
+{
+  "id": "cs2",
+  "name": "Counter-Strike 2",
+  "yaw": 0.022,
+  "fov": { "degrees": 90.0, "type": "horizontal", "aspect": { "width": 4, "height": 3 }, "scaling": "hor_plus" },
+  "sensitivity": { "decimals": 3 },
+  "sources": ["https://..."],
+  "notes": "Anything a reviewer should know."
+}
+```
 
-- `name`
-- `yaw`: degrees per count at sensitivity 1
-- `fov`: value and type (`horizontal` or `vertical`), and how it adapts to aspect ratio
-- `sensitivity`: format and rounding (decimals)
+- `yaw`: degrees per count at sensitivity 1.
+- `fov`: the value the game shows, whether it is `horizontal` or `vertical`, and the aspect ratio it refers to. `scaling` is `hor_plus` (vertical angle kept when the window gets wider).
+- `sensitivity.decimals`: how many decimals the game accepts.
 
-Verify yaw and FOV against a current, reliable source and cite it in the PR.
+Verify yaw and FOV against a current, reliable source and cite it in `sources` and the PR. Never guess values.

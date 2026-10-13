@@ -12,10 +12,10 @@ AimTune never touches game processes, never reads input outside its own focused 
 
 ```
 ./gradlew build
-./gradlew :app:run --args="--dpi 800 --cm360 40 --fov 103"
+./gradlew :app:run
 ```
 
-Until onboarding exists (milestone 4), the trainer takes your DPI, sensitivity in cm/360° and the game's FOV as arguments; see `LaunchOptions.USAGE` in `app` for all options. Click starts a round, Esc aborts it, F3 toggles the debug overlay.
+On first launch a four-step setup asks for your mouse DPI, game and current sensitivity, aim style and mousepad size; everything is stored in `%APPDATA%\AimTune\settings.json` and can be changed in Settings. Click starts a round, Esc aborts it, F3 toggles the debug overlay. Developer options (`--seed`, `--source`, `--no-vsync`, `--screenshots <dir>`) are listed in `LaunchOptions.USAGE`.
 
 Finished rounds are analysed (first-movement error, corrections, path efficiency) and stored in a local SQLite database in `%APPDATA%\AimTune` (set `AIMTUNE_DATA_DIR` to use another folder).
 

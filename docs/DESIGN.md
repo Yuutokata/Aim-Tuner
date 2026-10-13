@@ -76,6 +76,12 @@ LibGDX `I18NBundle`: `assets/i18n/messages.properties` (English default) and `me
 | Icons (play, history, gear, hand …) | Line icons rendered into a texture atlas | Scene2D has no SVG; icon set and license to be confirmed |
 | CSS hover/focus effects | Explicit hover, pressed, focus and disabled drawables (not shown in the mockups) | Scene2D needs them defined; designed to match the outlined style |
 | Game tiles show CS2, Apex, Overwatch 2, Fortnite | Valorant ships first; other profiles are added only after yaw/FOV are verified | Spec: Valorant first, never guess values |
+| Raw Accel row in the pre-test notice has an "Open Raw Accel" button | Manual checkbox "I checked: Raw Accel is off or linear" | Raw Accel exposes no query API and stores no readable state, so it cannot be detected; the Windows pointer acceleration setting is auto-detected |
+| Language selector in onboarding | Omitted until i18n (M8) | No translations yet |
+| Main menu lists Continue, Results, History | Only Start test and Settings | The other features arrive in M5-M8 |
+| Logo and icons | Simple ring-and-dot logo drawn from shapes, no line icons yet | No icon set chosen |
+| Label letter-spacing | Dropped | `BitmapFont` has no tracking |
+| Fonts sized in pixels | Fonts are generated per framebuffer height in design units (`Fonts.kt`), shared by HUD and UI | Consistent size at any window size |
 | Pad presets include Desk mat | Adopted (small / medium / large / desk mat / custom) | Extends the spec's three presets |
 
 ## Open design questions
