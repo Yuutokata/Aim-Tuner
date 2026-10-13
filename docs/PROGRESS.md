@@ -78,7 +78,7 @@ Single source of truth for project status. Update at the end of every task and b
 - [x] Verify Raw Accel modes, units, settings.json schema (read from a1xd/rawaccel v1.7.1 source; findings in ALGORITHMS.md "Acceleration")
 - [x] `core/accel`: `ClassicCurve`, `NaturalCurve`, `PowerCurve` (Velocity form, Raw Accel formulas) and `AccelProcessor` (per-report speed in in/s with the driver's time clamp); tests against values computed from the C++ formulas
 - [x] Accel in the pipeline: `RoundRecording.accel`, view rebuilt with the curve, trainer and headless runner apply it, storage (schema version 2) and round logs keep it
-- [ ] Simulated player wants a speed-dependent gain (plans with it, gets what the curve gives) so the analysis has something to find
+- [x] Simulated player wants a speed-dependent gain (`gainPreference`, in in/s; it plans with it and gets what the curve gives, sees its true view) so the analysis has something to find
 - [ ] Error-vs-speed analysis, desired gain curve
 - [ ] Curve fitting (classic, natural, power) + model selection against "no accel"
 - [ ] In-app simulation + blind A/B with a measurable-gain decision

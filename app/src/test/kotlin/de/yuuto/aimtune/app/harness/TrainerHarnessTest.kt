@@ -36,11 +36,16 @@ class TrainerHarnessTest {
         dpi = dpi, cm360 = cm360, profile = checkNotNull(GameProfiles.load().find("valorant")), roundSeconds = ROUND_SECONDS, seed = seed,
     )
 
+    /** With a curve the player expects a rising gain, so the true view differs from the planned one. */
+    private fun playerFor(accel: AccelCurve?) = if (accel == null) player else wantsRisingGain
+
+    private val wantsRisingGain = SimulatedPlayer(gainPreference = { v -> 1.0 + 0.5 * (1.0 - kotlin.math.exp(-v / 6.0)) })
+
     private fun playWithSimulatedSource(seed: Long, kind: ScenarioKind = ScenarioKind.FLICK, accel: AccelCurve? = null): RoundRecording {
         val clock = ManualClock(CLOCK_ORIGIN)
         var finished: RoundRecording? = null
         lateinit var trainer: Trainer
-        val source = SimulatedMouseSource(player, dpi, cm360, seed, clock, kind) { trainer.activeTargets }
+        val source = SimulatedMouseSource(playerFor(accel), dpi, cm360, seed, clock, kind, accel) { trainer.activeTargets }
         trainer = Trainer(config(seed).copy(scenario = kind, accel = accel), source) { finished = it }
         source.start()
         source.beginRound()
@@ -87,7 +92,7 @@ class TrainerHarnessTest {
     @Test
     fun `a round with simulated acceleration is recorded alike by the trainer and the headless runner`() {
         val curve = NaturalCurve(0.2, 1.5)
-        val headless = HeadlessRound.flick(player, dpi, cm360, 6, ROUND_SECONDS, accel = curve)
+        val headless = HeadlessRound.flick(wantsRisingGain, dpi, cm360, 6, ROUND_SECONDS, accel = curve)
         assertEquals(headless, playWithSimulatedSource(6, accel = curve))
         assertEquals(curve, headless.accel)
     }

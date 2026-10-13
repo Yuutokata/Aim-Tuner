@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.input
 
+import de.yuuto.aimtune.core.accel.AccelCurve
 import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.Target
@@ -23,9 +24,10 @@ class SimulatedMouseSource(
     seed: Long,
     override val clock: ManualClock,
     kind: ScenarioKind = ScenarioKind.FLICK,
+    accel: AccelCurve? = null,
     private val activeTargets: () -> List<Target>,
 ) : RawMouseSource {
-    private val aimer = SimulatedAimer(player, dpi, cm360, seed xor AIMER_SEED_MIX, kind)
+    private val aimer = SimulatedAimer(player, dpi, cm360, seed xor AIMER_SEED_MIX, kind, accel)
     private val queue = ArrayDeque<MouseEvent>()
     private var focused = true
     private var started = false

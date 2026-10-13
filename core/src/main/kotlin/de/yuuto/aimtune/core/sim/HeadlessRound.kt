@@ -55,7 +55,7 @@ object HeadlessRound {
         scenario: Scenario,
         accel: AccelCurve? = null,
     ): RoundRecording {
-        val aimer = SimulatedAimer(player, dpi, cm360, seed xor AIMER_SEED_MIX, scenario.kind)
+        val aimer = SimulatedAimer(player, dpi, cm360, seed xor AIMER_SEED_MIX, scenario.kind, accel)
         val start = CLOCK_ORIGIN_NANOS
         val end = start + roundSeconds * NANOS_PER_SECOND
         val degPerCount = degreesPerCount(dpi, cm360)

@@ -1,5 +1,8 @@
 package de.yuuto.aimtune.core.sim
 
+import de.yuuto.aimtune.core.accel.AccelCurve
+import de.yuuto.aimtune.core.accel.AccelProcessor
+import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.Target
@@ -38,8 +41,20 @@ class SimulatedAimer(
     private val cm360: Double,
     seed: Long,
     private val kind: ScenarioKind = ScenarioKind.FLICK,
+    accel: AccelCurve? = null,
 ) {
-    private class Reach(val startNanos: Long, val durationNanos: Long, val dYaw: Double, val dPitch: Double) {
+    /**
+     * A planned movement: [dYaw]/[dPitch] degrees the player intends, delivered by a hand movement
+     * that is [handScale] times the hand movement a linear mouse would need. The player plans with
+     * the gain it expects, so [handScale] is 1 divided by that expected gain.
+     */
+    private class Reach(
+        val startNanos: Long,
+        val durationNanos: Long,
+        val dYaw: Double,
+        val dPitch: Double,
+        val handScale: Double = 1.0,
+    ) {
         val endNanos: Long get() = startNanos + durationNanos
     }
 
@@ -51,9 +66,18 @@ class SimulatedAimer(
 
     private val random = Random(seed)
     private val degPerCount = degreesPerCount(dpi, cm360)
+    private val dpiValue = dpi
+    private val accelCurve = accel
+    private val accelProcessor = accel?.let { AccelProcessor(it, dpi) }
     private val reaches = ArrayList<Reach>()
     private var baseYaw = 0.0
     private var basePitch = 0.0
+    private var baseHandYaw = 0.0
+    private var baseHandPitch = 0.0
+
+    /** What the player sees: the emitted counts run through the acceleration into a view, like the trainer does. */
+    private var trueYaw = 0.0
+    private var truePitch = 0.0
     private var emittedX = 0L
     private var emittedY = 0L
     private var mode = Mode.NO_TARGET
@@ -71,6 +95,11 @@ class SimulatedAimer(
         reaches.clear()
         baseYaw = 0.0
         basePitch = 0.0
+        baseHandYaw = 0.0
+        baseHandPitch = 0.0
+        trueYaw = 0.0
+        truePitch = 0.0
+        accelProcessor?.reset()
         emittedX = 0
         emittedY = 0
         mode = Mode.NO_TARGET
@@ -128,7 +157,7 @@ class SimulatedAimer(
         val predictedYaw = if (seconds > 0.0) seen.first + (seen.first - before.first) / seconds * lead else seen.first
         val predictedPitch = if (seconds > 0.0) seen.second + (seen.second - before.second) / seconds * lead else seen.second
 
-        val (yaw, pitch) = committedAngles()
+        val (yaw, pitch) = believedAngles(nowNanos)
         val errorX = (predictedYaw - yaw) * cos(Math.toRadians(predictedPitch))
         val errorY = predictedPitch - pitch
         var moveX = errorX * player.trackingGain
@@ -136,8 +165,8 @@ class SimulatedAimer(
         var amplitude = hypot(moveX, moveY)
 
         val stepSeconds = TRACK_STEP_MS / MS_PER_S
-        val nominalCmPerS = amplitude * cm360 / FULL_TURN / stepSeconds
-        val effectiveCm360 = cm360 / (player.optimumScale * player.gainPreference(nominalCmPerS))
+        val (expected, delivered) = gains(amplitude, stepSeconds, peak = false)
+        val effectiveCm360 = cm360 / (player.optimumScale * delivered)
         val reachLimit = player.trackingMaxHandSpeedCmPerS * stepSeconds * FULL_TURN / effectiveCm360
         if (amplitude > reachLimit) {
             moveX *= reachLimit / amplitude
@@ -149,16 +178,43 @@ class SimulatedAimer(
         moveX += sigma * gaussian()
         moveY += sigma * gaussian()
         foldFinished(nowNanos)
-        reaches += Reach(nowNanos, ms(TRACK_REACH_MS), moveX / cos(Math.toRadians(pitch + moveY / 2.0)), moveY)
+        reaches += Reach(nowNanos, ms(TRACK_REACH_MS), moveX / cos(Math.toRadians(pitch + moveY / 2.0)), moveY, 1.0 / expected)
+    }
+
+    /**
+     * The gain the player expects and the gain the mouse delivers for a movement of [amplitude]
+     * degrees in [seconds]: both depend on the hand speed, which in turn depends on the hand
+     * movement the player plans with its expected gain, so the speed is found by iteration. The
+     * speed is the peak speed of a minimum-jerk movement when [peak] is set, else the average.
+     */
+    private fun gains(amplitude: Double, seconds: Double, peak: Boolean): Pair<Double, Double> {
+        var expected = 1.0
+        var delivered = accelCurve?.multiplier(0.0) ?: 1.0
+        repeat(GAIN_ITERATIONS) {
+            val handInches = amplitude / (degPerCount * expected) / dpiValue
+            val speed = (if (peak) PEAK_TO_MEAN_SPEED else 1.0) * handInches / seconds
+            expected = player.gainPreference(speed)
+            delivered = accelCurve?.multiplier(speed) ?: 1.0
+        }
+        return expected to delivered
+    }
+
+    /** Where the aim will be once every reach under way has finished, as the player believes. */
+    private fun believedAngles(nowNanos: Long): Pair<Double, Double> {
+        var yaw = trueYaw
+        var pitch = truePitch
+        for (r in reaches) {
+            val remaining = 1.0 - minimumJerk((nowNanos - r.startNanos).toDouble() / r.durationNanos)
+            yaw += r.dYaw * remaining
+            pitch += r.dPitch * remaining
+        }
+        return yaw to pitch
     }
 
     private fun observationAt(timeNanos: Long): Observation? = observations.lastOrNull { it.timeNanos <= timeNanos }
 
     private fun anglesOf(center: Vec3): Pair<Double, Double> =
         Math.toDegrees(atan2(center.x, -center.z)) to Math.toDegrees(asin(center.y / center.length))
-
-    /** Where the aim ends up once every reach under way has finished. */
-    private fun committedAngles(): Pair<Double, Double> = (baseYaw + reaches.sumOf { it.dYaw }) to (basePitch + reaches.sumOf { it.dPitch })
 
     private fun clickStep(nowNanos: Long, target: Target?, seenBefore: Boolean): AimerStep {
         if (target == null) {
@@ -214,21 +270,29 @@ class SimulatedAimer(
         val amplitude = hypot(error.x, error.y)
         val width = max(2.0 * angularRadius(target), MIN_WIDTH_DEGREES)
         val fatigue = fatigue(nowNanos)
-        val scale = player.optimumScale * player.gainPreference(nominalSpeedCmPerS(amplitude, width))
-        val effectiveCm360 = cm360 / scale
-        val handCm = amplitude * effectiveCm360 / FULL_TURN
+        val fitts = (player.fittsInterceptMs + player.fittsSlopeMs * log2(1.0 + amplitude / width)) *
+            (if (primary) 1.0 else CORRECTION_SPEEDUP)
+        // Time, noise and gain depend on each other through the hand speed; three rounds settle them.
+        var expected = 1.0
+        var delivered = accelCurve?.multiplier(0.0) ?: 1.0
+        var effectiveCm360 = cm360 / (player.optimumScale * delivered)
+        var durationMs = MIN_REACH_MS
+        repeat(GAIN_ITERATIONS) {
+            effectiveCm360 = cm360 / (player.optimumScale * delivered)
+            val handCm = amplitude * effectiveCm360 / FULL_TURN
+            durationMs = max(MIN_REACH_MS, fitts + handCm / player.maxHandSpeedCmPerS * MS_PER_S) * fatigue
+            val gains = gains(amplitude, durationMs / MS_PER_S, peak = true)
+            expected = gains.first
+            delivered = gains.second
+        }
         val sigma = player.noiseLevel * fatigue *
             sqrt(sq(player.signalNoise * amplitude) + sq(player.handNoiseCm * FULL_TURN / effectiveCm360))
         val gain = if (primary) 1.0 - player.undershootBias else 1.0
         val moveX = error.x * gain + sigma * gaussian()
         val moveY = error.y * gain + sigma * gaussian()
-        val fitts = (player.fittsInterceptMs + player.fittsSlopeMs * log2(1.0 + amplitude / width)) *
-            (if (primary) 1.0 else CORRECTION_SPEEDUP)
-        val travelMs = handCm / player.maxHandSpeedCmPerS * MS_PER_S
-        val durationMs = max(MIN_REACH_MS, fitts + travelMs) * fatigue
         // Screen-plane x is yaw scaled by cos(pitch); convert back to a yaw change.
-        val pitchMid = currentAngles(nowNanos).second + moveY / 2.0
-        reaches += Reach(nowNanos, ms(durationMs), moveX / cos(Math.toRadians(pitchMid)), moveY)
+        val pitchMid = truePitch + moveY / 2.0
+        reaches += Reach(nowNanos, ms(durationMs), moveX / cos(Math.toRadians(pitchMid)), moveY, 1.0 / expected)
         mode = Mode.MOVING
     }
 
@@ -240,20 +304,15 @@ class SimulatedAimer(
         reaches += Reach(nowNanos, ms(TWITCH_MS), sigma * gaussian(), sigma * gaussian())
     }
 
-    private fun nominalSpeedCmPerS(amplitude: Double, width: Double): Double {
-        val handCm = amplitude * cm360 / FULL_TURN
-        val ms = player.fittsInterceptMs + player.fittsSlopeMs * log2(1.0 + amplitude / width)
-        return handCm / ms * MS_PER_S
-    }
-
     private fun fatigue(nowNanos: Long): Double {
         val minutes = (sessionOffsetNanos + nowNanos - roundStartNanos) / NANOS_PER_MINUTE
         return 1.0 + player.fatiguePerMinute * minutes
     }
 
-    /** Remaining offset to the target on the screen plane in degrees, from the aimer's own continuous orientation. */
+    /** Remaining offset to the target on the screen plane in degrees, from the view the player sees. */
     private fun errorTo(nowNanos: Long, target: Target): Offset {
-        val (yaw, pitch) = currentAngles(nowNanos)
+        val yaw = trueYaw
+        val pitch = truePitch
         val c = target.center
         val targetYaw = Math.toDegrees(atan2(c.x, -c.z))
         val targetPitch = Math.toDegrees(asin(c.y / c.length))
@@ -262,13 +321,14 @@ class SimulatedAimer(
 
     private fun angularRadius(target: Target): Double = Math.toDegrees(atan(target.radius / target.center.length))
 
-    private fun currentAngles(nowNanos: Long): Pair<Double, Double> {
-        var yaw = baseYaw
-        var pitch = basePitch
+    /** The hand position at [nowNanos] in degrees a linear mouse would have turned, summed over the reaches. */
+    private fun handPosition(nowNanos: Long): Pair<Double, Double> {
+        var yaw = baseHandYaw
+        var pitch = baseHandPitch
         for (r in reaches) {
             val s = minimumJerk((nowNanos - r.startNanos).toDouble() / r.durationNanos)
-            yaw += r.dYaw * s
-            pitch += r.dPitch * s
+            yaw += r.dYaw * r.handScale * s
+            pitch += r.dPitch * r.handScale * s
         }
         return yaw to pitch
     }
@@ -278,6 +338,8 @@ class SimulatedAimer(
         for (r in done) {
             baseYaw += r.dYaw
             basePitch += r.dPitch
+            baseHandYaw += r.dYaw * r.handScale
+            baseHandPitch += r.dPitch * r.handScale
         }
         reaches.removeAll(done.toSet())
     }
@@ -285,13 +347,18 @@ class SimulatedAimer(
     private fun lastEnd(): Long = reaches.maxOfOrNull { it.endNanos } ?: 0L
 
     private fun emitCounts(nowNanos: Long, click: Boolean): AimerStep {
-        val (yaw, pitch) = currentAngles(nowNanos)
+        val (yaw, pitch) = handPosition(nowNanos)
         val x = (yaw / degPerCount).roundToLong()
         val y = (pitch / degPerCount).roundToLong()
         val dx = (x - emittedX).toInt()
         val dy = -(y - emittedY).toInt() // mouse down (positive dy) looks down
         emittedX = x
         emittedY = y
+        if (dx != 0 || dy != 0) {
+            val scale = accelProcessor?.scaleFor(MouseEvent(nowNanos, dx, dy)) ?: 1.0
+            trueYaw += dx * scale * degPerCount
+            truePitch -= dy * scale * degPerCount
+        }
         return if (dx == 0 && dy == 0 && !click) AimerStep.IDLE else AimerStep(dx, dy, click)
     }
 
@@ -325,6 +392,10 @@ class SimulatedAimer(
         const val TRACK_REACH_MS = 80.0
         const val TRACK_HISTORY_MS = 600.0
         const val VELOCITY_WINDOW_MS = 100.0
+        const val GAIN_ITERATIONS = 3
+
+        /** Peak speed of a minimum-jerk movement relative to its average speed. */
+        const val PEAK_TO_MEAN_SPEED = 1.875
         const val MIN_REACH_MS = 60.0
         const val MIN_WIDTH_DEGREES = 0.3
         const val CORRECTION_SPEEDUP = 0.6

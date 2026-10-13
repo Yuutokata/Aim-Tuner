@@ -1,10 +1,14 @@
 package de.yuuto.aimtune.core.sim
 
+import de.yuuto.aimtune.core.accel.AccelCurve
+import de.yuuto.aimtune.core.accel.NaturalCurve
+import de.yuuto.aimtune.core.metrics.RoundMetrics
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.TargetEvent
 import de.yuuto.aimtune.core.score.ScoreMetric
 import de.yuuto.aimtune.core.score.scoreInputs
+import kotlin.math.exp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -105,10 +109,34 @@ class HeadlessRoundTest {
         assertTrue(still < 0.3, "standing still $still")
     }
 
+    /** Expects a gain that rises from 1 toward 1.5 with the hand speed; Raw Accel's natural mode can deliver exactly that. */
+    private val wantsRisingGain = SimulatedPlayer(gainPreference = { v -> 1.0 + 0.5 * (1.0 - exp(-v / 6.0)) })
+    private val matchingCurve = NaturalCurve(decayRate = 0.5 / 6.0, limit = 1.5)
+
+    private fun round(player: SimulatedPlayer, accel: AccelCurve?, seed: Long) =
+        computeRoundMetrics(HeadlessRound.flick(player, 800.0, 55.0, seed, 45, accel = accel))
+
     @Test
-    fun `a gain preference of two makes a doubled sensitivity setting feel right`() {
-        // At 100 cm/360 a plain player (optimum 50) is too slow; one that prefers gain 2 acts as if it were at 50.
-        val preferring = SimulatedPlayer(gainPreference = { 2.0 })
-        assertTrue(hits(preferring, 100.0, 5) > hits(SimulatedPlayer(), 100.0, 5))
+    fun `a player who expects more gain than the mouse gives undershoots and the matching curve takes most of it back`() {
+        val seeds = 1L..5L
+        fun mean(player: SimulatedPlayer, accel: AccelCurve?, value: (RoundMetrics) -> Double) = seeds.map { value(round(player, accel, 40 + it)) }.average()
+
+        val flatError = mean(SimulatedPlayer(), null) { it.meanFirstError!! }
+        val plainError = mean(wantsRisingGain, null) { it.meanFirstError!! }
+        val matchedError = mean(wantsRisingGain, matchingCurve) { it.meanFirstError!! }
+        assertTrue(plainError < flatError - 0.12, "undershoot without the curve $plainError vs flat $flatError")
+        assertTrue(matchedError > plainError + 0.1, "with the curve $matchedError")
+
+        val plainHits = mean(wantsRisingGain, null) { it.hits.toDouble() }
+        val matchedHits = mean(wantsRisingGain, matchingCurve) { it.hits.toDouble() }
+        assertTrue(matchedHits > plainHits + 3, "hits $plainHits -> $matchedHits")
+    }
+
+    @Test
+    fun `a player without a speed dependent expectation is not helped by a curve`() {
+        val seeds = 1L..5L
+        val hitsPlain = seeds.map { round(SimulatedPlayer(), null, 70 + it).hits }.average()
+        val hitsWithCurve = seeds.map { round(SimulatedPlayer(), matchingCurve, 70 + it).hits }.average()
+        assertTrue(hitsWithCurve < hitsPlain + 1, "hits $hitsPlain -> $hitsWithCurve")
     }
 }

@@ -30,9 +30,12 @@ data class SimulatedPlayer(
     /** Moves the optimum: the player behaves as if cm/360 were divided by this. 1.0 is the base model. */
     val optimumScale: Double = 1.0,
     /**
-     * The player's preferred gain as a function of the nominal hand speed in cm/s (1.0 = none).
-     * A value above 1 makes the player act as if the sensitivity were lower for that movement.
-     * Hook for the acceleration work (M7); the default has no speed dependence.
+     * The gain the player expects from the mouse as a function of the hand speed in inches per
+     * second (peak speed of a movement; 1.0 = what the plain sensitivity gives). The player plans
+     * its hand movements with it: where it expects more gain than it gets it undershoots, where it
+     * expects less it overshoots, and an acceleration curve that delivers the expected gain removes
+     * the error. This is what the acceleration analysis has to find. Keep it 1.0 at low speeds, as
+     * the Raw Accel curves do.
      */
     val gainPreference: (Double) -> Double = { 1.0 },
     val maxCorrections: Int = 8,
