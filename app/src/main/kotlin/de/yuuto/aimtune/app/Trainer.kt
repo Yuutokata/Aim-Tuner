@@ -23,17 +23,17 @@ enum class Phase { READY, RUNNING, FINISHED }
  * [onRoundFinished] as a [RoundRecording].
  */
 class Trainer(
-    private val options: LaunchOptions,
+    private val config: TrainerConfig,
     private val source: RawMouseSource,
     private val onRoundFinished: (RoundRecording) -> Unit = {},
 ) {
     private val log = System.getLogger("aimtune.trainer")
-    private val degreesPerCount = degreesPerCount(options.dpi, options.cm360)
+    private val degreesPerCount = degreesPerCount(config.dpi, config.cm360)
     private val clock = source.clock
-    private val roundNanos = options.roundSeconds * 1_000_000_000L
+    private val roundNanos = config.roundSeconds * 1_000_000_000L
     private var roundStartNanos = 0L
     private var roundSeed = 0L
-    private var nextSeed = options.seed
+    private var nextSeed = config.seed
     private var scenario: Scenario? = null
     private val recordedMouse = ArrayList<MouseEvent>()
 
@@ -102,8 +102,8 @@ class Trainer(
             RoundRecording(
                 scenarioId = s.id,
                 seed = roundSeed,
-                dpi = options.dpi,
-                cm360 = options.cm360,
+                dpi = config.dpi,
+                cm360 = config.cm360,
                 startNanos = roundStartNanos,
                 endNanos = end,
                 // Reports that arrived after the round's end belong to no round.

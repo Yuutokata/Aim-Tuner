@@ -1,0 +1,73 @@
+package de.yuuto.aimtune.app
+
+import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.graphics.Pixmap
+import com.badlogic.gdx.graphics.PixmapIO
+import com.badlogic.gdx.utils.BufferUtils
+import com.badlogic.gdx.utils.ScreenUtils
+import de.yuuto.aimtune.app.setup.SetupStep
+import java.nio.file.Files
+import java.nio.file.Path
+
+private const val FRAMES_BEFORE_CAPTURE = 4
+private const val OPAQUE = 255.toByte()
+private const val BYTES_PER_PIXEL = 4
+
+/**
+ * Developer tool (`--screenshots <dir>`): shows every screen with sample data, saves a PNG of
+ * each and exits. It runs on in-memory settings and never touches the user's data. Used to check
+ * layouts without a person clicking through the app, and later for the README screenshots.
+ */
+class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private val exit: () -> Unit) {
+    private class Step(val name: String, val show: () -> Unit)
+
+    private val log = System.getLogger("aimtune.screenshots")
+    private val steps = listOf(
+        Step("menu") { ctx.showMenu() },
+        Step("onboarding-1-dpi") { ctx.showOnboarding(SetupStep.DPI) },
+        Step("onboarding-2-game") { ctx.showOnboarding(SetupStep.GAME) },
+        Step("onboarding-3-style") { ctx.showOnboarding(SetupStep.STYLE) },
+        Step("onboarding-4-pad") { ctx.showOnboarding(SetupStep.PAD) },
+        Step("pretest") { ctx.showPreTest() },
+        Step("settings") { ctx.showSettings() },
+        Step("trainer-ready") { ctx.showTrainer() },
+    )
+    private var index = -1
+    private var frames = 0
+
+    /** Call after every rendered frame. */
+    fun afterRender() {
+        if (index < 0) {
+            Files.createDirectories(dir)
+            advance()
+            return
+        }
+        if (++frames < FRAMES_BEFORE_CAPTURE) return
+        capture(steps[index].name)
+        advance()
+    }
+
+    private fun advance() {
+        index++
+        frames = 0
+        if (index >= steps.size) {
+            log.log(System.Logger.Level.INFO, "screenshots saved to $dir")
+            exit()
+            return
+        }
+        steps[index].show()
+    }
+
+    private fun capture(name: String) {
+        val width = Gdx.graphics.backBufferWidth
+        val height = Gdx.graphics.backBufferHeight
+        val pixels = ScreenUtils.getFrameBufferPixels(0, 0, width, height, true)
+        // The frame buffer's alpha is not meaningful; make the whole image opaque, as shown on screen.
+        for (i in BYTES_PER_PIXEL - 1 until pixels.size step BYTES_PER_PIXEL) pixels[i] = OPAQUE
+        val pixmap = Pixmap(width, height, Pixmap.Format.RGBA8888)
+        BufferUtils.copy(pixels, 0, pixmap.pixels, pixels.size)
+        PixmapIO.writePNG(Gdx.files.absolute(dir.resolve("$name.png").toAbsolutePath().toString()), pixmap)
+        pixmap.dispose()
+        log.log(System.Logger.Level.INFO, "saved $name.png (${width}x$height)")
+    }
+}

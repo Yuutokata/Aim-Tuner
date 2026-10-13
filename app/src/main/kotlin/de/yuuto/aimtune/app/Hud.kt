@@ -8,109 +8,99 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.utils.Align
 import com.badlogic.gdx.utils.Disposable
+import de.yuuto.aimtune.app.ui.Tokens
 import de.yuuto.aimtune.input.RawMouseSource
 import java.util.Locale
-import kotlin.math.roundToInt
 
 /**
- * Minimal HUD in the design's type (Inter / JetBrains Mono) and colors; the Scene2D skin replaces
- * it in M4. All layout is in framebuffer pixels (not window units) so it stays sharp on scaled
- * displays. The debug overlay exists to verify raw input during M2.
+ * The trainer's on-screen text: round timer, hits, crosshair and the round summary. Drawn in
+ * design units (1080 high, like the Scene2D screens) with the shared [Fonts] and token colors.
+ * The debug overlay exists to verify raw input.
  */
-class Hud(private val options: LaunchOptions) : Disposable {
+class Hud(private val config: TrainerConfig, private val tokens: Tokens) : Disposable {
     private val batch = SpriteBatch()
     private val shapes = ShapeRenderer()
     private val camera = OrthographicCamera()
-    private var fonts = Fonts(Gdx.graphics.backBufferHeight)
-    private var fontsHeight = Gdx.graphics.backBufferHeight
     private var width = 0f
-    private var height = 0f
-    private var scale = 1f
+    private var height = tokens.screenHeight
     var showDebug = true
 
+    private val text = tokens.text
+    private val muted = tokens.neutral(500)
+    private val highlight = tokens.accent(400)
+
     fun resize() {
-        width = Gdx.graphics.backBufferWidth.toFloat()
-        height = Gdx.graphics.backBufferHeight.toFloat()
-        scale = height / REFERENCE_HEIGHT
+        height = tokens.screenHeight
+        width = height * Gdx.graphics.width / Gdx.graphics.height
         camera.setToOrtho(false, width, height)
-        // Rebuild the fonts only when the size changed noticeably; resizing a window fires many events.
-        if (kotlin.math.abs(height - fontsHeight) / fontsHeight > FONT_REBUILD_THRESHOLD) {
-            fonts.dispose()
-            fonts = Fonts(height.roundToInt())
-            fontsHeight = height.roundToInt()
-        }
     }
 
-    fun render(trainer: Trainer, source: RawMouseSource, report: RoundReport?, fps: Int) {
+    fun render(trainer: Trainer, source: RawMouseSource, report: RoundReport?, fps: Int, fonts: Fonts) {
         camera.update()
         if (trainer.phase == Phase.RUNNING) drawCrosshair()
         batch.projectionMatrix = camera.combined
         batch.begin()
         when (trainer.phase) {
-            Phase.READY -> drawReady()
-            Phase.RUNNING -> drawRunning(trainer)
-            Phase.FINISHED -> drawFinished(trainer, report)
+            Phase.READY -> drawReady(fonts)
+            Phase.RUNNING -> drawRunning(trainer, fonts)
+            Phase.FINISHED -> drawFinished(trainer, report, fonts)
         }
-        if (showDebug) drawDebug(trainer, source, fps)
+        if (showDebug) drawDebug(trainer, source, fps, fonts)
         batch.end()
     }
 
     private fun drawCrosshair() {
         val cx = width / 2
         val cy = height / 2
-        val gap = CROSSHAIR_GAP * scale
-        val len = CROSSHAIR_LENGTH * scale
-        val t = (CROSSHAIR_THICKNESS * scale).coerceAtLeast(1f)
         shapes.projectionMatrix = camera.combined
         shapes.begin(ShapeRenderer.ShapeType.Filled)
-        shapes.color = Theme.text
-        shapes.rect(cx - gap - len, cy - t / 2, len, t)
-        shapes.rect(cx + gap, cy - t / 2, len, t)
-        shapes.rect(cx - t / 2, cy - gap - len, t, len)
-        shapes.rect(cx - t / 2, cy + gap, t, len)
+        shapes.color = text
+        shapes.rect(cx - CROSSHAIR_GAP - CROSSHAIR_LENGTH, cy - CROSSHAIR_THICKNESS / 2, CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS)
+        shapes.rect(cx + CROSSHAIR_GAP, cy - CROSSHAIR_THICKNESS / 2, CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS)
+        shapes.rect(cx - CROSSHAIR_THICKNESS / 2, cy - CROSSHAIR_GAP - CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS, CROSSHAIR_LENGTH)
+        shapes.rect(cx - CROSSHAIR_THICKNESS / 2, cy + CROSSHAIR_GAP, CROSSHAIR_THICKNESS, CROSSHAIR_LENGTH)
         shapes.end()
     }
 
-    private fun drawReady() {
-        text(fonts.title, "AimTune", width / 2, height * 0.62f, Theme.accentSoft, Align.center)
-        text(fonts.body, "Click to start a ${options.roundSeconds} s flick round", width / 2, height * 0.54f, Theme.text, Align.center)
-        text(
+    private fun drawReady(fonts: Fonts) {
+        draw(fonts.title, "${config.profile.name}  ·  ${config.roundSeconds} s flick round", width / 2, height * 0.62f, highlight, Align.center)
+        draw(fonts.bodyLg, "Click to start", width / 2, height * 0.54f, text, Align.center)
+        draw(
             fonts.mono,
-            "%.1f cm/360°  ·  %.0f DPI  ·  FOV %.0f° %s".format(Locale.ROOT, options.cm360, options.dpi, options.fov.degrees, options.fov.type.name.lowercase()),
-            width / 2, height * 0.49f, Theme.textMuted, Align.center,
+            "%.1f cm/360°  ·  %.0f DPI  ·  FOV %.0f° %s".format(Locale.ROOT, config.cm360, config.dpi, config.profile.fov.degrees, config.profile.fov.type.name.lowercase()),
+            width / 2, height * 0.49f, muted, Align.center,
         )
-        text(fonts.body, "Esc quits  ·  F3 toggles debug", width / 2, height * 0.44f, Theme.textMuted, Align.center)
+        draw(fonts.body, "Esc back to the menu  ·  F3 toggles debug", width / 2, height * 0.44f, muted, Align.center)
     }
 
-    private fun drawRunning(trainer: Trainer) {
-        val margin = MARGIN * scale
+    private fun drawRunning(trainer: Trainer, fonts: Fonts) {
         val seconds = (trainer.timeLeftNanos() / 1_000_000_000L).toInt()
-        text(fonts.monoLarge, "%d:%02d".format(Locale.ROOT, seconds / 60, seconds % 60), width / 2, height - margin, Theme.text, Align.center)
-        text(fonts.label, "FLICK", margin, height - margin, Theme.textMuted, Align.left)
-        text(fonts.mono, "Hits ${trainer.hits}   Misses ${trainer.misses}", width - margin, height - margin, Theme.text, Align.right)
-        text(fonts.body, "Esc aborts the round", margin, margin + fonts.body.lineHeight, Theme.textMuted, Align.left)
+        draw(fonts.numberMd, "%d:%02d".format(Locale.ROOT, seconds / 60, seconds % 60), width / 2, height - MARGIN, text, Align.center)
+        draw(fonts.label, "FLICK", MARGIN, height - MARGIN, muted, Align.left)
+        draw(fonts.mono, "Hits ${trainer.hits}   Misses ${trainer.misses}", width - MARGIN, height - MARGIN, text, Align.right)
+        draw(fonts.body, "Esc aborts the round", MARGIN, MARGIN + fonts.body.lineHeight, muted, Align.left)
     }
 
-    private fun drawFinished(trainer: Trainer, report: RoundReport?) {
+    private fun drawFinished(trainer: Trainer, report: RoundReport?, fonts: Fonts) {
         val s = trainer.summary ?: return
         val ttk = s.meanTimeToHitNanos?.let { "%.0f ms".format(Locale.ROOT, it / 1e6) } ?: "-"
-        text(fonts.title, "Round complete", width / 2, height * 0.62f, Theme.accentSoft, Align.center)
-        text(fonts.mono, "Hits ${s.hits} / ${s.shots}   Accuracy %.0f %%".format(Locale.ROOT, s.accuracy * 100), width / 2, height * 0.54f, Theme.text, Align.center)
-        text(fonts.mono, "Avg time to hit $ttk", width / 2, height * 0.49f, Theme.text, Align.center)
-        drawReport(report, height * 0.44f)
-        text(fonts.body, "Click for the next round  ·  Esc quits", width / 2, height * 0.30f, Theme.textMuted, Align.center)
+        draw(fonts.title, "Round complete", width / 2, height * 0.66f, highlight, Align.center)
+        draw(fonts.mono, "Hits ${s.hits} / ${s.shots}   Accuracy %.0f %%".format(Locale.ROOT, s.accuracy * 100), width / 2, height * 0.58f, text, Align.center)
+        draw(fonts.mono, "Avg time to hit $ttk", width / 2, height * 0.54f, text, Align.center)
+        drawReport(report, height * 0.48f, fonts)
+        draw(fonts.body, "Click for the next round  ·  Esc back to the menu", width / 2, height * 0.30f, muted, Align.center)
     }
 
     /** Analysis lines under the round summary: first-movement error, corrections, path efficiency, save state. */
-    private fun drawReport(report: RoundReport?, top: Float) {
+    private fun drawReport(report: RoundReport?, top: Float, fonts: Fonts) {
         val lines = when (report) {
-            null, RoundReport.Pending -> listOf("Analysing round …" to Theme.textMuted)
-            is RoundReport.Failed -> listOf("Analysis failed: ${report.message}" to Theme.caution)
+            null, RoundReport.Pending -> listOf("Analysing round …" to muted)
+            is RoundReport.Failed -> listOf("Analysis failed: ${report.message}" to tokens.caution)
             is RoundReport.Done -> reportLines(report)
         }
         var y = top
         lines.forEach { (line, color) ->
-            text(fonts.mono, line, width / 2, y, color, Align.center)
+            draw(fonts.mono, line, width / 2, y, color, Align.center)
             y -= fonts.mono.lineHeight
         }
     }
@@ -121,33 +111,32 @@ class Hud(private val options: LaunchOptions) : Disposable {
             "First move %+.0f %% (%s)".format(Locale.ROOT, it * 100, if (it >= 0) "overshoot" else "undershoot")
         }
         return listOfNotNull(
-            error?.let { it to Theme.text },
-            m.meanCorrectiveSubmovements?.let { "Corrections %.1f per target".format(Locale.ROOT, it) to Theme.text },
-            m.meanPathEfficiency?.let { "Path efficiency %.0f %%".format(Locale.ROOT, it * 100) to Theme.text },
+            error?.let { it to text },
+            m.meanCorrectiveSubmovements?.let { "Corrections %.1f per target".format(Locale.ROOT, it) to text },
+            m.meanPathEfficiency?.let { "Path efficiency %.0f %%".format(Locale.ROOT, it * 100) to text },
             (if (report.saveError == null) "Saved" else "Not saved: ${report.saveError}") to
-                (if (report.saveError == null) Theme.textMuted else Theme.caution),
+                (if (report.saveError == null) muted else tokens.caution),
         )
     }
 
-    private fun drawDebug(trainer: Trainer, source: RawMouseSource, fps: Int) {
+    private fun drawDebug(trainer: Trainer, source: RawMouseSource, fps: Int, fonts: Fonts) {
         val last = trainer.lastEvent
         val lines = listOf(
             "source: ${source.name}",
             "events: ${source.eventsReceived}  rate: %.0f/s".format(Locale.ROOT, trainer.rate.ratePerSecond(trainer.nowNanos())),
             "last: ${last?.let { "dx=${it.dx} dy=${it.dy}" } ?: "-"}",
             "yaw %.2f  pitch %.2f".format(Locale.ROOT, trainer.view.yawDegrees, trainer.view.pitchDegrees),
-            "deg/count %.5f  seed ${options.seed}  fps $fps".format(Locale.ROOT, trainer.degreesPerCountValue),
+            "deg/count %.5f  seed ${config.seed}  fps $fps".format(Locale.ROOT, trainer.degreesPerCountValue),
         )
-        val margin = MARGIN * scale
-        var y = height - margin - fonts.monoLarge.lineHeight
+        var y = height - MARGIN - fonts.numberMd.lineHeight
         lines.forEach {
-            text(fonts.mono, it, margin, y, Theme.textMuted, Align.left)
+            draw(fonts.mono, it, MARGIN, y, muted, Align.left)
             y -= fonts.mono.lineHeight
         }
     }
 
     /** With a target width of 0, [align] is relative to [x] itself (centered or right-aligned at x). */
-    private fun text(font: BitmapFont, s: String, x: Float, y: Float, color: Color, align: Int) {
+    private fun draw(font: BitmapFont, s: String, x: Float, y: Float, color: Color, align: Int) {
         font.color = color
         font.draw(batch, s, x, y, 0f, align, false)
     }
@@ -155,12 +144,9 @@ class Hud(private val options: LaunchOptions) : Disposable {
     override fun dispose() {
         batch.dispose()
         shapes.dispose()
-        fonts.dispose()
     }
 
     private companion object {
-        const val REFERENCE_HEIGHT = 1080f
-        const val FONT_REBUILD_THRESHOLD = 0.08f
         const val MARGIN = 72f
         const val CROSSHAIR_GAP = 6f
         const val CROSSHAIR_LENGTH = 12f

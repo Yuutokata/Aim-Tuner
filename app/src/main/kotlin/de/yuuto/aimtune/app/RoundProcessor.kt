@@ -21,27 +21,28 @@ sealed interface RoundReport {
 
 /**
  * Computes metrics and stores finished rounds on a background thread so the render thread never
- * waits for segmentation or disk. One session is created per app run, on the first finished round.
- * Without a [database] rounds are still analysed but not stored.
+ * waits for segmentation or disk. A session is created on the first finished round and a new one
+ * whenever DPI or game change. Without a [database] rounds are still analysed but not stored.
  */
-class RoundProcessor(private val database: Database?, private val dpi: Double) : AutoCloseable {
+class RoundProcessor(private val database: Database?) : AutoCloseable {
     private val log = System.getLogger("aimtune.rounds")
     private val executor = Executors.newSingleThreadExecutor { Thread(it, "aimtune-round-processor").apply { isDaemon = true } }
     private val repository = database?.let(::RoundRepository)
 
     // Only touched on the executor thread.
     private var sessionId: Long? = null
+    private var sessionKey: Pair<Double, String?>? = null
 
     @Volatile
     var report: RoundReport? = null
         private set
 
-    fun submit(recording: RoundRecording, startedAtMs: Long, blind: Boolean) {
+    fun submit(recording: RoundRecording, startedAtMs: Long, blind: Boolean, gameId: String?) {
         report = RoundReport.Pending
         executor.execute {
             report = try {
                 val metrics = computeRoundMetrics(recording)
-                RoundReport.Done(metrics, store(recording, metrics, startedAtMs, blind))
+                RoundReport.Done(metrics, store(recording, metrics, startedAtMs, blind, gameId))
             } catch (e: Exception) {
                 log.log(System.Logger.Level.ERROR, "round analysis failed", e)
                 RoundReport.Failed(e.message ?: e.javaClass.simpleName)
@@ -50,10 +51,15 @@ class RoundProcessor(private val database: Database?, private val dpi: Double) :
     }
 
     /** Returns null on success or a short reason; storage problems must not lose the analysis. */
-    private fun store(recording: RoundRecording, metrics: RoundMetrics, startedAtMs: Long, blind: Boolean): String? {
+    private fun store(recording: RoundRecording, metrics: RoundMetrics, startedAtMs: Long, blind: Boolean, gameId: String?): String? {
         val repo = repository ?: return "storage unavailable"
         return try {
-            val session = sessionId ?: repo.createSession(startedAtMs, gameId = null, dpi = dpi, kind = SessionKind.SENSITIVITY).also { sessionId = it }
+            val key = recording.dpi to gameId
+            val session = sessionId.takeIf { sessionKey == key }
+                ?: repo.createSession(startedAtMs, gameId, recording.dpi, SessionKind.SENSITIVITY).also {
+                    sessionId = it
+                    sessionKey = key
+                }
             repo.saveRound(session, recording, startedAtMs, blind, metrics)
             null
         } catch (e: Exception) {

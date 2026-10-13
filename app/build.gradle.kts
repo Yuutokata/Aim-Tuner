@@ -19,3 +19,8 @@ dependencies {
 application {
     mainClass.set("de.yuuto.aimtune.app.MainKt")
 }
+
+// The UI tokens live once in docs/design and are bundled into the app from there.
+tasks.processResources {
+    from(rootProject.file("docs/design/tokens.json")) { into("assets/ui") }
+}

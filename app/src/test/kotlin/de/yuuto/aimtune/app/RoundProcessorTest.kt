@@ -28,11 +28,12 @@ class RoundProcessorTest {
     )
 
     @Test
-    fun `rounds are analysed and stored in one session`() {
+    fun `rounds are analysed and stored, with a new session when the game changes`() {
         val file = dir.resolve("a.db")
-        val processor = RoundProcessor(Database.open(file), dpi = 800.0)
-        processor.submit(recording(1), startedAtMs = 10, blind = false)
-        processor.submit(recording(2), startedAtMs = 20, blind = false)
+        val processor = RoundProcessor(Database.open(file))
+        processor.submit(recording(1), startedAtMs = 10, blind = false, gameId = "valorant")
+        processor.submit(recording(2), startedAtMs = 20, blind = false, gameId = "valorant")
+        processor.submit(recording(3), startedAtMs = 30, blind = false, gameId = "cs2")
         processor.close()
 
         val report = assertIs<RoundReport.Done>(processor.report)
@@ -41,15 +42,15 @@ class RoundProcessorTest {
 
         Database.open(file).use { db ->
             val repo = RoundRepository(db)
-            assertEquals(1, repo.sessions().size)
-            assertEquals(listOf(1L, 2L), repo.rounds().map { it.seed })
+            assertEquals(listOf("valorant", "cs2"), repo.sessions().map { it.gameId })
+            assertEquals(listOf(1L, 2L, 3L), repo.rounds().map { it.seed })
         }
     }
 
     @Test
     fun `without a database the round is still analysed`() {
-        val processor = RoundProcessor(database = null, dpi = 800.0)
-        processor.submit(recording(1), startedAtMs = 10, blind = false)
+        val processor = RoundProcessor(database = null)
+        processor.submit(recording(1), startedAtMs = 10, blind = false, gameId = null)
         processor.close()
         val report = assertIs<RoundReport.Done>(processor.report)
         assertTrue(report.saveError != null)

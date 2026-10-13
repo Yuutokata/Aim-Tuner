@@ -4,8 +4,7 @@ import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.input.NanoClock
 import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.core.scenario.TargetEvent
-import de.yuuto.aimtune.core.units.Fov
-import de.yuuto.aimtune.core.units.FovType
+import de.yuuto.aimtune.games.GameProfiles
 import de.yuuto.aimtune.input.RawMouseSource
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.test.Test
@@ -33,9 +32,8 @@ class TrainerTest {
         }
     }
 
-    private val options = LaunchOptions(
-        dpi = 800.0, cm360 = 40.0, fov = Fov(103.0, FovType.HORIZONTAL), fovReferenceAspect = 16.0 / 9.0,
-        roundSeconds = 2, seed = 5, source = SourceKind.AUTO, vsync = true,
+    private val options = TrainerConfig(
+        dpi = 800.0, cm360 = 40.0, profile = checkNotNull(GameProfiles.load().find("valorant")), roundSeconds = 2, seed = 5,
     )
     private val second = 1_000_000_000L
 
