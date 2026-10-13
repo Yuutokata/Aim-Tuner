@@ -162,7 +162,9 @@ class RoundRepositoryTest {
             assertEquals(listOf(30.0, 45.0), rounds.map { it.cm360 })
             assertEquals(listOf(a, b), rounds.map { it.sessionId })
             val inputs = rounds.first().scoreInputs()
-            assertEquals(0.5, inputs.getValue(de.yuuto.aimtune.core.score.ScoreMetric.ACCURACY), 1e-12)
+            // The recording misses once and then hits: one hit in two clicks, but the first shot of the reach missed.
+            assertEquals(0.5, rounds.first().metrics.getValue("accuracy"), 1e-12)
+            assertEquals(0.0, inputs.getValue(de.yuuto.aimtune.core.score.ScoreMetric.ACCURACY), 1e-12)
             assertEquals(m.meanTimeToHitMs, inputs[de.yuuto.aimtune.core.score.ScoreMetric.TIME_TO_HIT])
         }
     }
@@ -204,5 +206,40 @@ class RoundRepositoryTest {
         val linux = AppPaths.default(mapOf("XDG_DATA_HOME" to "/x"), "Linux")
         assertEquals("aimtune", linux.dataDir.fileName.toString())
         assertFailsWith<IllegalStateException> { AppPaths.default(emptyMap(), "Windows 11") }
+    }
+
+    @Test
+    fun `rounds stored with an older metric version are recomputed from their raw events`() {
+        Database.open(dir.resolve("refresh.db")).use { db ->
+            val repo = RoundRepository(db)
+            val session = repo.createSession(1, "valorant", 800.0, SessionKind.SENSITIVITY)
+            val recording = recording()
+            val current = repo.saveRound(session, recording, 1, true, computeRoundMetrics(recording))
+            val old = repo.saveRound(session, recording, 2, true, computeRoundMetrics(recording))
+            db.transaction { c ->
+                c.createStatement().use { it.execute("UPDATE round SET metrics_version = 1 WHERE id = $old") }
+                c.createStatement().use { it.execute("UPDATE metric SET value = -1 WHERE round_id = $old AND name = 'hits'") }
+                c.createStatement().use { it.execute("UPDATE metric SET value = -1 WHERE round_id = $current AND name = 'hits'") }
+            }
+            val refresh = repo.refreshMetrics()
+            assertEquals(MetricsRefresh(updated = 1, failed = 0), refresh)
+            val rows = repo.rounds().associateBy { it.id }
+            assertEquals(1.0, rows.getValue(old).metrics.getValue("hits"))
+            assertEquals(-1.0, rows.getValue(current).metrics.getValue("hits"), "rounds of the current version are left alone")
+            assertEquals(MetricsRefresh(0, 0), repo.refreshMetrics(), "nothing is stale the second time")
+        }
+    }
+
+    @Test
+    fun `a round with unreadable events keeps its old metrics and is reported`() {
+        Database.open(dir.resolve("corrupt.db")).use { db ->
+            val repo = RoundRepository(db)
+            val session = repo.createSession(1, "valorant", 800.0, SessionKind.SENSITIVITY)
+            val id = repo.saveRound(session, recording(), 1, true, computeRoundMetrics(recording()))
+            db.transaction { c ->
+                c.createStatement().use { it.execute("UPDATE round SET metrics_version = 1, mouse_event_count = 99 WHERE id = $id") }
+            }
+            assertEquals(MetricsRefresh(updated = 0, failed = 1), repo.refreshMetrics())
+        }
     }
 }

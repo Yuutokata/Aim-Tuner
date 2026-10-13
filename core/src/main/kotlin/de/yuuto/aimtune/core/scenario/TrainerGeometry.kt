@@ -1,0 +1,98 @@
+package de.yuuto.aimtune.core.scenario
+
+import kotlin.math.exp
+import kotlin.math.ln
+import kotlin.math.sin
+import kotlin.random.Random
+
+/** A closed interval of positive numbers, sampled uniformly or log-uniformly. */
+data class PositiveRange(val min: Double, val max: Double) {
+    init {
+        require(min.isFinite() && max.isFinite() && min > 0.0 && max >= min) { "need 0 < min <= max, was $min..$max" }
+    }
+
+    fun uniform(random: Random): Double = if (max == min) min else random.nextDouble(min, max)
+
+    /** Log-uniform: small and large values are equally likely per factor, like targets at evenly spread ranges. */
+    fun logUniform(random: Random): Double = if (max == min) min else exp(random.nextDouble(ln(min), ln(max)))
+
+    val mid: Double get() = kotlin.math.sqrt(min * max)
+}
+
+/** Targets whose angle to the previous target is at most [maxDegrees] (and above the previous bucket) are drawn with probability [weight]. */
+data class AngleBucket(val maxDegrees: Double, val weight: Double) {
+    init {
+        require(maxDegrees > 0.0 && maxDegrees <= 180.0 && weight >= 0.0 && weight.isFinite()) { "invalid angle bucket" }
+    }
+}
+
+/**
+ * How realistic a game's engagements are, as the trainer needs them. Sizes are angles (degrees at the
+ * game's FOV), never world or pixel sizes: the scene derives the sphere radius from the angle and the
+ * distance, so a change of distance cannot change the difficulty. All values of a profile that were
+ * not checked against the game have [verified] false and say so in the profile's notes.
+ *
+ * The defaults are the Valorant assumptions of docs/REVIEW.md ("Realism"): a head of about 0.2 m seen
+ * from 6-30 m, mostly small corrections near the crosshair with occasional large flicks.
+ */
+data class TrainerGeometry(
+    /** Half-width and half-height of the field targets appear in, in degrees from the starting view. */
+    val fieldYawDegrees: Double = 50.0,
+    val fieldPitchDegrees: Double = 25.0,
+    /** Angular diameter of a click target (a head), drawn log-uniformly. */
+    val clickTargetDiameterDegrees: PositiveRange = PositiveRange(0.4, 1.9),
+    /** Distance the click targets are drawn at; only the depth of the scene, the angular size is what counts. */
+    val clickTargetDistanceMeters: PositiveRange = PositiveRange(6.0, 30.0),
+    /** Angle from the previous target (where the crosshair is after a hit) for flick targets. */
+    val flickAngles: List<AngleBucket> = DEFAULT_FLICK_ANGLES,
+    /** Angle from the previous target for micro-adjust targets. */
+    val microStepDegrees: PositiveRange = PositiveRange(1.5, 8.0),
+    /** Smallest angle between two visible targets (switching) and between a new target and the one just hit. */
+    val switchingSeparationDegrees: Double = 10.0,
+    /** Angular diameter of the tracked target (a body seen from the tracking distance). */
+    val trackingDiameterDegrees: PositiveRange = PositiveRange(2.0, 3.7),
+    val trackingDistanceMeters: Double = 14.0,
+    /** Tangential speed of a strafing player; the angular speed follows from the tracking distance. */
+    val strafeSpeedMetersPerSecond: PositiveRange = PositiveRange(3.0, 6.0),
+    /** Share of tracking segments in which the target stops (a counter-strafe) before the next move. */
+    val stopProbability: Double = 0.25,
+    val verified: Boolean = false,
+) {
+    init {
+        require(fieldYawDegrees in 5.0..90.0 && fieldPitchDegrees in 3.0..60.0) { "field must be 5-90 x 3-60 degrees" }
+        require(flickAngles.isNotEmpty() && flickAngles.sumOf { it.weight } > 0.0) { "flick angles need a positive weight" }
+        require(flickAngles.zipWithNext().all { (a, b) -> a.maxDegrees < b.maxDegrees }) { "flick angle buckets must be increasing" }
+        require(switchingSeparationDegrees > 0.0 && trackingDistanceMeters > 0.0) { "separation and distance must be positive" }
+        require(stopProbability in 0.0..0.9) { "stop probability must be in 0..0.9" }
+        require(clickTargetDiameterDegrees.max < 30.0 && trackingDiameterDegrees.max < 30.0) { "target diameters over 30 degrees are not targets" }
+    }
+
+    /** World radius in meters of a sphere that looks [diameterDegrees] wide from [distance] meters. */
+    fun radiusFor(diameterDegrees: Double, distance: Double): Double = distance * sin(Math.toRadians(diameterDegrees / 2.0))
+
+    /** Angular speed range in degrees per second of the tracked target, from the strafe speed at the tracking distance. */
+    val trackingSpeedDegreesPerSecond: PositiveRange
+        get() = PositiveRange(
+            Math.toDegrees(strafeSpeedMetersPerSecond.min / trackingDistanceMeters),
+            Math.toDegrees(strafeSpeedMetersPerSecond.max / trackingDistanceMeters),
+        )
+
+    /** Draws an angle from the flick mix: a bucket by weight, then uniformly inside it. */
+    fun drawFlickAngle(random: Random): Double {
+        val total = flickAngles.sumOf { it.weight }
+        var pick = random.nextDouble(total)
+        var low = 0.0
+        for (bucket in flickAngles) {
+            if (pick < bucket.weight) return random.nextDouble(maxOf(low, MIN_FLICK_DEGREES), maxOf(bucket.maxDegrees, MIN_FLICK_DEGREES + 0.01))
+            pick -= bucket.weight
+            low = bucket.maxDegrees
+        }
+        return flickAngles.last().maxDegrees
+    }
+
+    companion object {
+        const val MIN_FLICK_DEGREES = 1.0
+        val DEFAULT_FLICK_ANGLES = listOf(AngleBucket(5.0, 0.30), AngleBucket(10.0, 0.30), AngleBucket(20.0, 0.20), AngleBucket(40.0, 0.15), AngleBucket(90.0, 0.05))
+        val DEFAULT = TrainerGeometry()
+    }
+}

@@ -3,6 +3,7 @@ package de.yuuto.aimtune.storage
 import de.yuuto.aimtune.core.accel.AccelSpec
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.metrics.RoundMetrics
+import de.yuuto.aimtune.core.metrics.computeRoundMetrics
 import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.core.score.ScoreMetric
 import de.yuuto.aimtune.core.scenario.Target
@@ -38,8 +39,16 @@ data class RoundRow(
     val accel: String? = null,
 )
 
-/** Version of the metric definitions written with each round; raise it when ALGORITHMS.md changes them. */
-const val METRICS_VERSION = 1
+/**
+ * Version of the metric definitions written with each round; raise it when ALGORITHMS.md changes them.
+ * Rounds with an older version are recomputed from their stored raw events ([RoundRepository.refreshMetrics]).
+ * 2: the first reach of a movement must come after a reaction time and cover a share of the distance (REVIEW.md C2);
+ *    the accuracy the score uses is the first-shot accuracy (REVIEW.md M6).
+ */
+const val METRICS_VERSION = 2
+
+/** How many stored rounds [RoundRepository.refreshMetrics] recomputed, and how many could not be (unreadable events). */
+data class MetricsRefresh(val updated: Int, val failed: Int)
 
 class RoundRepository(private val database: Database) {
 
@@ -105,16 +114,48 @@ class RoundRepository(private val database: Database) {
             .flatMap { rounds(it.id) }
             .filter { it.blind }
 
+    /**
+     * Recomputes the stored metrics of every round written with an older [METRICS_VERSION] from its raw
+     * events, so a changed metric definition applies to the whole history. A round whose events cannot be
+     * read keeps its old values and version and is counted in [MetricsRefresh.failed].
+     */
+    fun refreshMetrics(compute: (RoundRecording) -> RoundMetrics = ::computeRoundMetrics): MetricsRefresh {
+        val stale = database.transaction { c ->
+            c.prepareStatement("SELECT id FROM round WHERE metrics_version < ?").use { s ->
+                s.setInt(1, METRICS_VERSION)
+                s.executeQuery().use { rs -> buildList { while (rs.next()) add(rs.getLong(1)) } }
+            }
+        }
+        var updated = 0
+        var failed = 0
+        for (id in stale) {
+            val metrics = try {
+                compute(loadRecording(id) ?: continue)
+            } catch (e: IllegalArgumentException) {
+                failed++
+                continue
+            }
+            database.transaction { c ->
+                c.prepareStatement("DELETE FROM metric WHERE round_id = ?").use { it.setLong(1, id); it.executeUpdate() }
+                insertMetrics(c, id, metrics.toNamedValues())
+                c.prepareStatement("UPDATE round SET metrics_version = ? WHERE id = ?").use { it.setInt(1, METRICS_VERSION); it.setLong(2, id); it.executeUpdate() }
+            }
+            updated++
+        }
+        return MetricsRefresh(updated, failed)
+    }
+
     /** Rounds of [sessionId], or of all sessions when null, oldest first. */
     fun rounds(sessionId: Long? = null): List<RoundRow> = database.transaction { c ->
         val where = if (sessionId == null) "" else "WHERE session_id = ?"
+        val metrics = loadAllMetrics(c, sessionId)
         c.prepareStatement(
             "SELECT id, session_id, scenario, seed, cm360, blind, started_at_ms, accel FROM round $where ORDER BY started_at_ms, id",
         ).use { s ->
             if (sessionId != null) s.setLong(1, sessionId)
             s.executeQuery().use { rs ->
                 buildList {
-                    while (rs.next()) add(roundRow(rs, loadMetrics(c, rs.getLong(1))))
+                    while (rs.next()) add(roundRow(rs, metrics[rs.getLong(1)].orEmpty()))
                 }
             }
         }
@@ -219,6 +260,19 @@ class RoundRepository(private val database: Database) {
             }
         }
 
+    /** The metrics of all rounds (or of one session's) in one query, keyed by round id. */
+    private fun loadAllMetrics(c: Connection, sessionId: Long?): Map<Long, Map<String, Double>> {
+        val where = if (sessionId == null) "" else "WHERE r.session_id = ?"
+        return c.prepareStatement("SELECT m.round_id, m.name, m.value FROM metric m JOIN round r ON r.id = m.round_id $where").use { s ->
+            if (sessionId != null) s.setLong(1, sessionId)
+            s.executeQuery().use { rs ->
+                val byRound = HashMap<Long, MutableMap<String, Double>>()
+                while (rs.next()) byRound.getOrPut(rs.getLong(1)) { HashMap() }[rs.getString(2)] = rs.getDouble(3)
+                byRound
+            }
+        }
+    }
+
     private fun loadMetrics(c: Connection, roundId: Long): Map<String, Double> =
         c.prepareStatement("SELECT name, value FROM metric WHERE round_id = ?").use { s ->
             s.setLong(1, roundId)
@@ -240,6 +294,7 @@ fun RoundMetrics.toNamedValues(): Map<String, Double> = buildMap {
     put("hits", hits.toDouble())
     put("shots", shots.toDouble())
     put("accuracy", accuracy)
+    firstShotAccuracy?.let { put("first_shot_accuracy", it) }
     meanTimeToHitMs?.let { put("mean_time_to_hit_ms", it) }
     meanFirstError?.let { put("mean_first_error", it) }
     meanAbsFirstError?.let { put("mean_abs_first_error", it) }
@@ -253,7 +308,7 @@ fun RoundMetrics.toNamedValues(): Map<String, Double> = buildMap {
 /** The stored metrics a round's score is computed from, as [de.yuuto.aimtune.core.metrics.RoundMetrics.scoreInputs] would give them. */
 fun RoundRow.scoreInputs(): Map<ScoreMetric, Double> = buildMap {
     val shots = metrics["shots"] ?: 0.0
-    metrics["accuracy"]?.takeIf { shots > 0 }?.let { put(ScoreMetric.ACCURACY, it) }
+    (metrics["first_shot_accuracy"] ?: metrics["accuracy"])?.takeIf { shots > 0 }?.let { put(ScoreMetric.ACCURACY, it) }
     metrics["mean_time_to_hit_ms"]?.let { put(ScoreMetric.TIME_TO_HIT, it) }
     metrics["error_spread"]?.let { put(ScoreMetric.CONSISTENCY, it) }
     metrics["tracking_on_target_ratio"]?.let { put(ScoreMetric.TRACKING, it) }

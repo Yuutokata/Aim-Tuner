@@ -1,5 +1,8 @@
 package de.yuuto.aimtune.games
 
+import de.yuuto.aimtune.core.scenario.AngleBucket
+import de.yuuto.aimtune.core.scenario.PositiveRange
+import de.yuuto.aimtune.core.scenario.TrainerGeometry
 import de.yuuto.aimtune.core.units.Fov
 import de.yuuto.aimtune.core.units.FovType
 import kotlinx.serialization.SerializationException
@@ -17,7 +20,7 @@ class GameProfileException(message: String, cause: Throwable? = null) : Exceptio
 private data class AspectDto(val width: Int, val height: Int)
 
 @Serializable
-private data class FovDto(val degrees: Double, val type: String, val aspect: AspectDto, val scaling: String)
+private data class FovDto(val degrees: Double, val type: String, val aspect: AspectDto, val scaling: String, val trainerAspect: AspectDto? = null)
 
 @Serializable
 private data class SensitivityDto(val decimals: Int)
@@ -31,7 +34,50 @@ private data class GameProfileDto(
     val sensitivity: SensitivityDto,
     val sources: List<String> = emptyList(),
     val notes: String? = null,
+    val trainer: TrainerDto = TrainerDto(),
 )
+
+@Serializable
+private data class RangeDto(val min: Double, val max: Double)
+
+@Serializable
+private data class AngleBucketDto(val maxDegrees: Double, val weight: Double)
+
+/** The `trainer` block of a profile; every field is optional and falls back to [TrainerGeometry.DEFAULT]. */
+@Serializable
+private data class TrainerDto(
+    val fieldYawDegrees: Double? = null,
+    val fieldPitchDegrees: Double? = null,
+    val clickTargetDiameterDegrees: RangeDto? = null,
+    val clickTargetDistanceMeters: RangeDto? = null,
+    val flickAngles: List<AngleBucketDto>? = null,
+    val microStepDegrees: RangeDto? = null,
+    val switchingSeparationDegrees: Double? = null,
+    val trackingDiameterDegrees: RangeDto? = null,
+    val trackingDistanceMeters: Double? = null,
+    val strafeSpeedMetersPerSecond: RangeDto? = null,
+    val stopProbability: Double? = null,
+    val verified: Boolean = false,
+) {
+    fun toGeometry(): TrainerGeometry {
+        val d = TrainerGeometry.DEFAULT
+        fun RangeDto.range() = PositiveRange(min, max)
+        return TrainerGeometry(
+            fieldYawDegrees = fieldYawDegrees ?: d.fieldYawDegrees,
+            fieldPitchDegrees = fieldPitchDegrees ?: d.fieldPitchDegrees,
+            clickTargetDiameterDegrees = clickTargetDiameterDegrees?.range() ?: d.clickTargetDiameterDegrees,
+            clickTargetDistanceMeters = clickTargetDistanceMeters?.range() ?: d.clickTargetDistanceMeters,
+            flickAngles = flickAngles?.map { AngleBucket(it.maxDegrees, it.weight) } ?: d.flickAngles,
+            microStepDegrees = microStepDegrees?.range() ?: d.microStepDegrees,
+            switchingSeparationDegrees = switchingSeparationDegrees ?: d.switchingSeparationDegrees,
+            trackingDiameterDegrees = trackingDiameterDegrees?.range() ?: d.trackingDiameterDegrees,
+            trackingDistanceMeters = trackingDistanceMeters ?: d.trackingDistanceMeters,
+            strafeSpeedMetersPerSecond = strafeSpeedMetersPerSecond?.range() ?: d.strafeSpeedMetersPerSecond,
+            stopProbability = stopProbability ?: d.stopProbability,
+            verified = verified,
+        )
+    }
+}
 
 @Serializable
 private data class IndexDto(val games: List<String>)
@@ -61,6 +107,8 @@ fun parseGameProfile(text: String): GameProfile {
             sensitivityDecimals = dto.sensitivity.decimals,
             sources = dto.sources,
             notes = dto.notes,
+            geometry = dto.trainer.toGeometry(),
+            trainerAspectRatio = dto.fov.trainerAspect?.let { it.width.toDouble() / it.height } ?: (16.0 / 9.0),
         )
     } catch (e: IllegalArgumentException) {
         throw GameProfileException("invalid game profile '${dto.id}': ${e.message}", e)

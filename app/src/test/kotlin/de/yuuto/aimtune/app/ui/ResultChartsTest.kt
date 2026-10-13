@@ -14,7 +14,7 @@ class ResultChartsTest {
     private val tokens = Tokens.load()
 
     private fun result() = OptimizationResult(
-        optimumCm360 = 44.0, atRangeEdge = false, intervalLowCm360 = 40.0, intervalHighCm360 = 48.0, confidencePercent = 70,
+        optimumCm360 = 44.0, atRangeEdge = false, driftDetected = false, intervalLowCm360 = 40.0, intervalHighCm360 = 48.0, confidencePercent = 70,
         negligibleDifference = 1.0, expectedRegret = 0.5, maxExpectedImprovement = 0.2, recommendMoreRounds = true, roundsToTarget = 5,
         curve = (0..10).map { CurvePoint(30.0 + it * 3.0, 50.0 + it, 4.0) },
         hyper = GpHyperParams(1.0, 1.0, 0.3, 0.0, 0.0), rounds = 12, sessions = 2,

@@ -9,8 +9,10 @@ import kotlin.math.sqrt
 /**
  * One round as the optimizer sees it: where it was played and the round's score. [group] says which
  * kind of round it was (the scenario); scores of one group share an unknown level of their own.
+ * [step] is the position of the round within its session (0 for the first): warming up, learning and
+ * fatigue show up as a drift of the scores with it.
  */
-data class Observation(val sessionId: Long, val cm360: Double, val score: Double, val group: Int = 0) {
+data class Observation(val sessionId: Long, val cm360: Double, val score: Double, val group: Int = 0, val step: Int = 0) {
     init {
         require(cm360 > 0.0 && cm360.isFinite() && score.isFinite()) { "invalid observation" }
     }
@@ -30,6 +32,8 @@ data class GpHyperParams(
     val noiseVariance: Double,
     val sessionVariance: Double,
     val groupVariance: Double = 0.0,
+    /** Variance of the per-session slope of the score against `step / TREND_STEP_SCALE`; 0 means no drift. */
+    val trendVariance: Double = 0.0,
 )
 
 /** Posterior of the score function on a set of points, in the units of the scores. */
@@ -49,9 +53,11 @@ private val SQRT5 = sqrt(5.0)
 
 /**
  * Gaussian process regression of the round score over `ln(cm360)`:
- * `y = f(x) + offset(session) + offset(group) + noise` with a Matern 5/2 prior on f. The offsets are
- * integrated out through extra "same session" and "same group" covariance terms, so rounds of
- * several sessions and scenarios combine into one estimate of f.
+ * `y = f(x) + offset(session) + slope(session) * step + offset(group) + noise` with a Matern 5/2 prior
+ * on f. The offsets and slopes are integrated out through extra "same session", "same group" and
+ * "same session, both late" covariance terms, so rounds of several sessions and scenarios combine
+ * into one estimate of f and a drift within a session (learning, fatigue) is not mistaken for a
+ * better or worse sensitivity.
  * Scores are standardized internally; results come back in score units.
  */
 class GaussianProcess private constructor(
@@ -95,11 +101,14 @@ class GaussianProcess private constructor(
             val scale = if (sd < MIN_SCALE) 1.0 else sd
             val yStd = DoubleArray(n) { (ys[it] - mean) / scale }
             val xs = DoubleArray(n) { observations[it].x }
+            val steps = DoubleArray(n) { observations[it].step / TREND_STEP_SCALE }
             val k = DoubleArray(n * n)
             for (i in 0 until n) {
                 for (j in 0 until n) {
                     var v = hyper.signalVariance * matern52(xs[i] - xs[j], hyper.lengthscale)
-                    if (observations[i].sessionId == observations[j].sessionId) v += hyper.sessionVariance
+                    if (observations[i].sessionId == observations[j].sessionId) {
+                        v += hyper.sessionVariance + hyper.trendVariance * steps[i] * steps[j]
+                    }
                     if (observations[i].group == observations[j].group) v += hyper.groupVariance
                     if (i == j) v += hyper.noiseVariance
                     k[i * n + j] = v
@@ -112,5 +121,8 @@ class GaussianProcess private constructor(
         }
 
         private const val MIN_SCALE = 1e-9
+
+        /** The trend variance refers to a slope per this many rounds, so a typical session spans about 1-3 units. */
+        const val TREND_STEP_SCALE = 10.0
     }
 }

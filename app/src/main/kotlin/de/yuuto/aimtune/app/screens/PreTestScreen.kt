@@ -37,7 +37,11 @@ class PreTestScreen(ctx: AppContext) : UiScreen(ctx) {
         content.add(
             ui.label(t("pretest.description"), Styles.BODY_MUTED, wrap = true),
         ).left().width(DESCRIPTION_WIDTH).padBottom(48f).row()
-        val rows = PreTestChecks.rows(acceleration, ctx.rawAccelConfirmed, ctx.source.name, ctx.source is WindowsRawInputSource)
+        val profile = ctx.trainerConfig()?.profile
+        val rows = PreTestChecks.rows(
+            acceleration, ctx.rawAccelConfirmed, ctx.source.name, ctx.source is WindowsRawInputSource,
+            targetsVerified = profile?.geometry?.verified, gameName = profile?.name.orEmpty(),
+        )
         rows.forEach { content.add(checkRow(it)).left().width(ROW_WIDTH).padBottom(ROW_GAP).row() }
 
         val footer = Table()

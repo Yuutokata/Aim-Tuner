@@ -8,6 +8,7 @@ import de.yuuto.aimtune.core.math.ViewAngles
 import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.core.scenario.Scenario
 import de.yuuto.aimtune.core.scenario.ScenarioKind
+import de.yuuto.aimtune.core.scenario.TrainerGeometry
 import de.yuuto.aimtune.core.units.degreesPerCount
 
 private const val NANOS_PER_MS = 1_000_000L
@@ -43,7 +44,8 @@ object HeadlessRound {
         roundSeconds: Int = 45,
         sessionOffsetNanos: Long = 0L,
         accel: AccelCurve? = null,
-    ): RoundRecording = run(player, dpi, cm360, seed, roundSeconds, sessionOffsetNanos, kind.create(roundSeconds * NANOS_PER_SECOND, seed), accel)
+        geometry: TrainerGeometry? = null,
+    ): RoundRecording = run(player, dpi, cm360, seed, roundSeconds, sessionOffsetNanos, kind.create(roundSeconds * NANOS_PER_SECOND, seed, geometry), accel)
 
     fun run(
         player: SimulatedPlayer,

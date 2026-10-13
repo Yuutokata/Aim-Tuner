@@ -3,6 +3,7 @@ package de.yuuto.aimtune.app
 import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.input.NanoClock
 import de.yuuto.aimtune.core.recording.RoundRecording
+import de.yuuto.aimtune.core.scenario.ShotResult
 import de.yuuto.aimtune.core.scenario.TargetEvent
 import de.yuuto.aimtune.games.GameProfiles
 import de.yuuto.aimtune.input.RawMouseSource
@@ -19,12 +20,13 @@ class TrainerTest {
         private val queue = ConcurrentLinkedQueue<MouseEvent>()
         override val name = "fake"
         override val clock = NanoClock { now }
+        override var reportsClicks = false
         override var eventsReceived = 0L
         override fun start() = Unit
         override fun setWindowFocused(focused: Boolean) = Unit
         override fun close() = Unit
-        fun push(dx: Int, dy: Int) {
-            queue.add(MouseEvent(now, dx, dy))
+        fun push(dx: Int, dy: Int, click: Boolean = false) {
+            queue.add(MouseEvent(now, dx, dy, click))
             eventsReceived++
         }
         override fun drain(consumer: (MouseEvent) -> Unit) {
@@ -124,5 +126,44 @@ class TrainerTest {
         trainer.update()
         assertEquals(0.0, trainer.view.yawDegrees)
         assertEquals(500, trainer.lastEvent?.dx)
+    }
+
+    @Test
+    fun `a click in the report stream is shot at the view of its own report, not at the view of the frame`() {
+        val source = FakeSource().also { it.reportsClicks = true }
+        val finished = mutableListOf<RoundRecording>()
+        val trainer = trainer(source) { finished += it }
+        source.now = 10 * second
+        trainer.startRound()
+        val target = trainer.activeTargets.single()
+        val yaw = Math.toDegrees(Math.atan2(target.center.x, -target.center.z))
+        val pitch = Math.toDegrees(Math.asin(target.center.y / target.center.length))
+        val dpc = trainer.degreesPerCountValue
+
+        source.now += 400_000_000L
+        source.push(Math.round(yaw / dpc).toInt(), -Math.round(pitch / dpc).toInt())
+        source.now += 1_000_000L
+        source.push(0, 0, click = true)
+        // The hand keeps moving after the click, and the frame is only processed later.
+        source.now += 1_000_000L
+        source.push(900, 900)
+        source.now += 12_000_000L
+        trainer.update()
+
+        assertEquals(1, trainer.hits, "the shot belongs to the click's report")
+        assertEquals(0, trainer.misses)
+        assertEquals(ShotResult.IGNORED, trainer.fire(), "clicks of the UI are not shots when the stream reports clicks")
+    }
+
+    @Test
+    fun `a click right after the round started is the one that started it and is not a shot`() {
+        val source = FakeSource().also { it.reportsClicks = true }
+        val trainer = trainer(source) { }
+        source.now = 10 * second
+        trainer.startRound()
+        source.now += 20_000_000L
+        source.push(0, 0, click = true)
+        trainer.update()
+        assertEquals(0, trainer.misses)
     }
 }

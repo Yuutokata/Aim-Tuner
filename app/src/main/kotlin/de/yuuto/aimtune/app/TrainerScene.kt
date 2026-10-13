@@ -12,6 +12,7 @@ import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.attributes.IntAttribute
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
+import com.badlogic.gdx.graphics.glutils.HdpiUtils
 import com.badlogic.gdx.utils.Disposable
 import de.yuuto.aimtune.core.math.ViewAngles
 import de.yuuto.aimtune.core.scenario.Target
@@ -20,7 +21,15 @@ import de.yuuto.aimtune.core.scenario.Target
  * Plain 3D room with one sphere per target. The camera sits at the origin and uses the vertical
  * FOV derived from the game profile's FOV, independent of the window aspect ratio.
  */
-class TrainerScene(verticalFovDegrees: Float, private val modelRadius: Double = DEFAULT_MODEL_RADIUS) : Disposable {
+class TrainerScene(
+    verticalFovDegrees: Float,
+    /** The picture is letterboxed to this width / height, whatever the window's shape. */
+    private val aspectRatio: Double = 16.0 / 9.0,
+    private val modelRadius: Double = DEFAULT_MODEL_RADIUS,
+) : Disposable {
+    private var windowWidth = 16
+    private var windowHeight = 9
+
     private val camera = PerspectiveCamera(verticalFovDegrees, 16f, 9f).apply {
         near = NEAR_PLANE
         far = FAR_PLANE
@@ -47,8 +56,11 @@ class TrainerScene(verticalFovDegrees: Float, private val modelRadius: Double = 
     private val targetInstance = ModelInstance(targetModel)
 
     fun resize(width: Int, height: Int) {
-        camera.viewportWidth = width.toFloat()
-        camera.viewportHeight = height.toFloat()
+        windowWidth = width
+        windowHeight = height
+        val box = letterbox(width, height, aspectRatio)
+        camera.viewportWidth = box.width.toFloat()
+        camera.viewportHeight = box.height.toFloat()
     }
 
     fun render(view: ViewAngles, targets: List<Target>) {
@@ -58,6 +70,8 @@ class TrainerScene(verticalFovDegrees: Float, private val modelRadius: Double = 
         camera.up.set(0f, 1f, 0f)
         camera.update()
 
+        val box = letterbox(windowWidth, windowHeight, aspectRatio)
+        HdpiUtils.glViewport(box.x, box.y, box.width, box.height)
         batch.begin(camera)
         batch.render(room, environment)
         for (target in targets) {
@@ -66,6 +80,7 @@ class TrainerScene(verticalFovDegrees: Float, private val modelRadius: Double = 
             batch.render(targetInstance, environment)
         }
         batch.end()
+        HdpiUtils.glViewport(0, 0, windowWidth, windowHeight)
     }
 
     override fun dispose() {
@@ -85,4 +100,15 @@ class TrainerScene(verticalFovDegrees: Float, private val modelRadius: Double = 
         const val ROOM_CENTER_Z = -10f
         const val SPHERE_DIVISIONS = 24
     }
+}
+
+/** A rectangle in window pixels. */
+data class PixelBox(val x: Int, val y: Int, val width: Int, val height: Int)
+
+/** The largest centered box of shape [aspectRatio] (width / height) inside a window of [width] x [height]. */
+fun letterbox(width: Int, height: Int, aspectRatio: Double): PixelBox {
+    require(width > 0 && height > 0 && aspectRatio > 0.0) { "window and aspect ratio must be positive" }
+    val boxWidth = minOf(width.toDouble(), height * aspectRatio).toInt().coerceAtLeast(1)
+    val boxHeight = minOf(height.toDouble(), width / aspectRatio).toInt().coerceAtLeast(1)
+    return PixelBox((width - boxWidth) / 2, (height - boxHeight) / 2, boxWidth, boxHeight)
 }

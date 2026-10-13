@@ -35,7 +35,7 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
             sessionRoundDone = true
         }
     }
-    private val scene = TrainerScene(config.profile.verticalFovDegrees.toFloat())
+    private val scene = TrainerScene(config.profile.verticalFovDegrees.toFloat(), config.profile.trainerAspectRatio)
     private val hud = Hud(config, ctx.ui.tokens, ctx.i18n, roundLabel = session?.label?.let { ctx.i18n.t(it) })
 
     /** Exposed for the screenshot tour. */

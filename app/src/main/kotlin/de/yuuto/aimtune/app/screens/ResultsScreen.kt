@@ -103,6 +103,7 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
         card.add(ui.label(if (data.sessions == 1) t("results.rounds_one", data.rounds) else t("results.rounds_many", data.rounds, data.sessions), Styles.CAPTION_MUTED)).left().padTop(4f).row()
         val advice = when {
             result.atRangeEdge -> t("results.advice_edge")
+            result.driftDetected -> t("results.advice_drift")
             result.recommendMoreRounds ->
                 if (result.roundsToTarget == 1) t("results.advice_more_one") else t("results.advice_more_many", result.roundsToTarget)
             else -> t("results.advice_done")

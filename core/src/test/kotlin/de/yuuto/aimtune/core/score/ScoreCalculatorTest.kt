@@ -21,12 +21,20 @@ class ScoreCalculatorTest {
         }
 
     @Test
-    fun `default weights follow the design mockup`() {
+    fun `default weights are accuracy 40 time to hit 30 tracking 20 and consistency does not score`() {
         val w = MetricWeights.DEFAULT.normalized(ScoreMetric.entries.toSet())
-        assertEquals(0.4, w.getValue(ACCURACY), 1e-12)
-        assertEquals(0.3, w.getValue(TIME_TO_HIT), 1e-12)
-        assertEquals(0.2, w.getValue(ScoreMetric.TRACKING), 1e-12)
-        assertEquals(0.1, w.getValue(CONSISTENCY), 1e-12)
+        assertEquals(40.0 / 90.0, w.getValue(ACCURACY), 1e-12)
+        assertEquals(30.0 / 90.0, w.getValue(TIME_TO_HIT), 1e-12)
+        assertEquals(20.0 / 90.0, w.getValue(ScoreMetric.TRACKING), 1e-12)
+        assertEquals(false, CONSISTENCY in w.keys)
+    }
+
+    @Test
+    fun `consistency never changes a score and a weight on it alone is refused`() {
+        val base = (0 until 6).map { round(accuracy = 0.5 + it * 0.05, ttkMs = 900.0 - it * 20) }
+        val withSpread = base.mapIndexed { i, m -> m + (CONSISTENCY to (0.1 + 0.3 * (i % 2))) }
+        assertEquals(calculator.scoreRounds(base), calculator.scoreRounds(withSpread))
+        assertFailsWith<IllegalArgumentException> { MetricWeights(mapOf(CONSISTENCY to 1.0)) }
     }
 
     @Test
@@ -45,10 +53,10 @@ class ScoreCalculatorTest {
     }
 
     @Test
-    fun `lower error spread scores higher`() {
-        val rounds = listOf(round(0.8, 500.0, 0.30), round(0.8, 500.0, 0.20), round(0.8, 500.0, 0.10))
-        val scores = calculator.scoreRounds(rounds).map { assertNotNull(it) }
-        assertTrue(scores[0] < scores[1] && scores[1] < scores[2])
+    fun `the error spread is a diagnostic and does not change the score`() {
+        val rounds = listOf(round(0.8, 500.0, 0.30), round(0.7, 600.0, 0.20), round(0.6, 700.0, 0.10))
+        val without = rounds.map { it - CONSISTENCY }
+        assertEquals(calculator.scoreRounds(without), calculator.scoreRounds(rounds))
     }
 
     @Test

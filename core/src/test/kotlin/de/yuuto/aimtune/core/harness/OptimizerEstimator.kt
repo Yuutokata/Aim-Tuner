@@ -52,7 +52,11 @@ fun playBlindTest(
         scenarios += kind.id
         cm360s += cm360
         val scores = calculator.scoreRounds(inputs, scenarios)
-        history = cm360s.indices.map { Observation(sessionOf(it), cm360s[it], scores[it] ?: UNKNOWN_SCORE, group = scenarios[it].hashCode()) }
+        val stepInSession = HashMap<Long, Int>()
+        history = cm360s.indices.map {
+            val step = checkNotNull(stepInSession.merge(sessionOf(it), 1, Int::plus)) - 1
+            Observation(sessionOf(it), cm360s[it], scores[it] ?: UNKNOWN_SCORE, group = scenarios[it].hashCode(), step = step)
+        }
     }
     return SimulatedTest(optimizer.analyze(history), history, cm360s)
 }

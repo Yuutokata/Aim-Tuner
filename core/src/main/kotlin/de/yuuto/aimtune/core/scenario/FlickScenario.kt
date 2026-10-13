@@ -13,6 +13,8 @@ data class FlickConfig(
     val maxDistance: Double = 20.0,
     val targetRadius: Double = 0.25,
     val minSeparationDegrees: Double = 15.0,
+    /** When set, targets follow the game's realistic geometry (angular sizes, flick-angle mix) instead of the fixed values above. */
+    val geometry: TrainerGeometry? = null,
 ) {
     init {
         require(durationNanos > 0) { "durationNanos must be positive" }
@@ -61,23 +63,33 @@ class FlickScenario(private val config: FlickConfig, seed: Long) : Scenario {
     }
 
     private fun spawn(nowNanos: Long, previous: Target?) {
-        var candidate = randomTarget()
+        var candidate = randomTarget(previous)
         var attempts = 0
-        while (previous != null && attempts < MAX_PLACEMENT_ATTEMPTS &&
+        while (config.geometry == null && previous != null && attempts < MAX_PLACEMENT_ATTEMPTS &&
             candidate.center.angleToDegrees(previous.center) < config.minSeparationDegrees
         ) {
-            candidate = randomTarget()
+            candidate = randomTarget(previous)
             attempts++
         }
         current = candidate
         eventLog += TargetEvent.Spawned(nowNanos, candidate)
     }
 
-    private fun randomTarget(): Target {
+    private fun randomTarget(previous: Target? = null): Target {
+        config.geometry?.let { return realisticTarget(it, previous) }
         val yaw = random.nextDouble(-config.maxYawDegrees, config.maxYawDegrees)
         val pitch = random.nextDouble(-config.maxPitchDegrees, config.maxPitchDegrees)
         val distance = random.nextDouble(config.minDistance, config.maxDistance)
         return Target(nextId++, ViewAngles.directionOf(yaw, pitch) * distance, config.targetRadius)
+    }
+
+    /** The next target [TrainerGeometry.drawFlickAngle] degrees from the previous one (from the starting view for the first). */
+    private fun realisticTarget(g: TrainerGeometry, previous: Target?): Target {
+        val (fromYaw, fromPitch) = previous?.let { anglesOf(it.center) } ?: (0.0 to 0.0)
+        val (yaw, pitch) = placeAt(fromYaw, fromPitch, g.drawFlickAngle(random), random, g.fieldYawDegrees, g.fieldPitchDegrees)
+        val distance = g.clickTargetDistanceMeters.uniform(random)
+        val radius = g.radiusFor(g.clickTargetDiameterDegrees.logUniform(random), distance)
+        return Target(nextId++, ViewAngles.directionOf(yaw, pitch) * distance, radius)
     }
 
     private companion object {

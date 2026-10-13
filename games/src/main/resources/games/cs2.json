@@ -2,11 +2,71 @@
   "id": "cs2",
   "name": "Counter-Strike 2",
   "yaw": 0.022,
-  "fov": { "degrees": 90.0, "type": "horizontal", "aspect": { "width": 4, "height": 3 }, "scaling": "hor_plus" },
-  "sensitivity": { "decimals": 3 },
+  "fov": {
+    "degrees": 90.0,
+    "type": "horizontal",
+    "aspect": {
+      "width": 4,
+      "height": 3
+    },
+    "scaling": "hor_plus"
+  },
+  "sensitivity": {
+    "decimals": 3
+  },
   "sources": [
     "https://totalcsgo.com/commands/myaw",
     "https://steamcommunity.com/app/730/discussions/0/135508833656280880/"
   ],
-  "notes": "m_yaw default is 0.022. The 90 degree FOV is horizontal at 4:3 (about 73.7 vertical, about 106.3 horizontal at 16:9) with the vertical angle kept for wider screens; these FOV values come from community sources, not Valve documentation."
+  "notes": "m_yaw default is 0.022. The 90 degree FOV is horizontal at 4:3 (about 73.7 vertical, about 106.3 horizontal at 16:9) with the vertical angle kept for wider screens; these FOV values come from community sources, not Valve documentation. Trainer geometry reuses the Valorant assumptions (head about 0.2 m, 6-30 m); CS2 heads and ranges differ, so verified is false.",
+  "trainer": {
+    "fieldYawDegrees": 50.0,
+    "fieldPitchDegrees": 25.0,
+    "clickTargetDiameterDegrees": {
+      "min": 0.4,
+      "max": 1.9
+    },
+    "clickTargetDistanceMeters": {
+      "min": 6.0,
+      "max": 30.0
+    },
+    "flickAngles": [
+      {
+        "maxDegrees": 5,
+        "weight": 0.3
+      },
+      {
+        "maxDegrees": 10,
+        "weight": 0.3
+      },
+      {
+        "maxDegrees": 20,
+        "weight": 0.2
+      },
+      {
+        "maxDegrees": 40,
+        "weight": 0.15
+      },
+      {
+        "maxDegrees": 90,
+        "weight": 0.05
+      }
+    ],
+    "microStepDegrees": {
+      "min": 1.5,
+      "max": 8.0
+    },
+    "switchingSeparationDegrees": 10.0,
+    "trackingDiameterDegrees": {
+      "min": 2.0,
+      "max": 3.7
+    },
+    "trackingDistanceMeters": 14.0,
+    "strafeSpeedMetersPerSecond": {
+      "min": 3.0,
+      "max": 6.0
+    },
+    "stopProbability": 0.25,
+    "verified": false
+  }
 }

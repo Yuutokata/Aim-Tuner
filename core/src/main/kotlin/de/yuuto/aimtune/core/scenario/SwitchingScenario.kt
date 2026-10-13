@@ -15,6 +15,8 @@ data class SwitchingConfig(
     val targetRadius: Double = 0.3,
     /** Smallest angle between two visible targets, and between a new target and the one just hit. */
     val minSeparationDegrees: Double = 14.0,
+    /** When set, targets are head-sized angles and the separation comes from the game's geometry. */
+    val geometry: TrainerGeometry? = null,
 ) {
     init {
         require(durationNanos > 0) { "durationNanos must be positive" }
@@ -66,7 +68,7 @@ class SwitchingScenario(private val config: SwitchingConfig, seed: Long) : Scena
     private fun spawn(nowNanos: Long, avoid: List<Vec3>) {
         var candidate = randomTarget()
         var attempts = 0
-        while (attempts < MAX_PLACEMENT_ATTEMPTS && avoid.any { candidate.center.angleToDegrees(it) < config.minSeparationDegrees }) {
+        while (attempts < MAX_PLACEMENT_ATTEMPTS && avoid.any { candidate.center.angleToDegrees(it) < separation }) {
             candidate = randomTarget()
             attempts++
         }
@@ -74,11 +76,17 @@ class SwitchingScenario(private val config: SwitchingConfig, seed: Long) : Scena
         eventLog += TargetEvent.Spawned(nowNanos, candidate)
     }
 
+    private val separation: Double get() = config.geometry?.switchingSeparationDegrees ?: config.minSeparationDegrees
+
     private fun randomTarget(): Target {
-        val yaw = random.nextDouble(-config.maxYawDegrees, config.maxYawDegrees)
-        val pitch = random.nextDouble(-config.maxPitchDegrees, config.maxPitchDegrees)
-        val distance = random.nextDouble(config.minDistance, config.maxDistance)
-        return Target(nextId++, ViewAngles.directionOf(yaw, pitch) * distance, config.targetRadius)
+        val g = config.geometry
+        val maxYaw = g?.fieldYawDegrees?.let { minOf(it, config.maxYawDegrees) } ?: config.maxYawDegrees
+        val maxPitch = g?.fieldPitchDegrees?.let { minOf(it, config.maxPitchDegrees) } ?: config.maxPitchDegrees
+        val yaw = random.nextDouble(-maxYaw, maxYaw)
+        val pitch = random.nextDouble(-maxPitch, maxPitch)
+        val distance = if (g != null) g.clickTargetDistanceMeters.uniform(random) else random.nextDouble(config.minDistance, config.maxDistance)
+        val radius = if (g != null) g.radiusFor(g.clickTargetDiameterDegrees.logUniform(random), distance) else config.targetRadius
+        return Target(nextId++, ViewAngles.directionOf(yaw, pitch) * distance, radius)
     }
 
     private companion object {

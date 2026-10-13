@@ -5,40 +5,46 @@ import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.sqrt
 
-/** Metrics that feed the round score, each with the direction in which it improves. */
-enum class ScoreMetric(val higherIsBetter: Boolean) {
+/**
+ * Metrics of a round, each with the direction in which it improves. [scoresRounds] says whether it
+ * enters the score the optimizer maximizes. Consistency does not: the spread of the relative
+ * first-movement error falls steadily as the sensitivity gets lower (the hand's fixed noise shrinks in
+ * degrees), so it has no best sensitivity of its own and would only pull the result toward the slow
+ * end (docs/REVIEW.md C3). It is kept as a diagnostic.
+ */
+enum class ScoreMetric(val higherIsBetter: Boolean, val scoresRounds: Boolean = true) {
     ACCURACY(true),
     TIME_TO_HIT(false),
     TRACKING(true),
-    CONSISTENCY(false),
+    CONSISTENCY(false, scoresRounds = false),
 }
 
 /** Relative importance of each metric; only ratios matter. Metrics without a weight count as 0. */
 data class MetricWeights(val values: Map<ScoreMetric, Double>) {
     init {
         require(values.values.all { it >= 0.0 && it.isFinite() }) { "weights must be finite and non-negative" }
-        require(values.values.sum() > 0.0) { "at least one weight must be positive" }
+        require(values.filterKeys { it.scoresRounds }.values.sum() > 0.0) { "at least one weight of a scoring metric must be positive" }
     }
 
     /** Weights restricted to [available] and scaled to sum to 1. */
     fun normalized(available: Set<ScoreMetric>): Map<ScoreMetric, Double> {
-        val picked = available.associateWith { values[it] ?: 0.0 }
+        val picked = available.filter { it.scoresRounds }.associateWith { values[it] ?: 0.0 }
         val total = picked.values.sum()
         require(total > 0.0) { "no available metric has a positive weight" }
         return picked.mapValues { it.value / total }
     }
 
     companion object {
-        /** Defaults of the settings screen in docs/design: accuracy 40, time to hit 30, tracking 20, consistency 10. */
+        /** Defaults of the settings screen: accuracy 40, time to hit 30, tracking 20 (consistency is not scored, see [ScoreMetric]). */
         val DEFAULT = MetricWeights(
-            mapOf(ScoreMetric.ACCURACY to 40.0, ScoreMetric.TIME_TO_HIT to 30.0, ScoreMetric.TRACKING to 20.0, ScoreMetric.CONSISTENCY to 10.0),
+            mapOf(ScoreMetric.ACCURACY to 40.0, ScoreMetric.TIME_TO_HIT to 30.0, ScoreMetric.TRACKING to 20.0),
         )
     }
 }
 
 /** The metric values of a round that the score uses; a round only has the metrics its scenario produces. */
 fun RoundMetrics.scoreInputs(): Map<ScoreMetric, Double> = buildMap {
-    if (shots > 0) put(ScoreMetric.ACCURACY, accuracy)
+    if (shots > 0) put(ScoreMetric.ACCURACY, firstShotAccuracy ?: accuracy)
     meanTimeToHitMs?.let { put(ScoreMetric.TIME_TO_HIT, it) }
     errorSpread?.let { put(ScoreMetric.CONSISTENCY, it) }
     trackingOnTargetRatio?.let { put(ScoreMetric.TRACKING, it) }
@@ -85,7 +91,7 @@ class ScoreCalculator(private val weights: MetricWeights, private val minRounds:
     }
 
     private fun scoreRound(round: Map<ScoreMetric, Double>, baselines: Map<ScoreMetric, Baseline>): Double? {
-        val usable = round.keys.filter { it in baselines && (weights.values[it] ?: 0.0) > 0.0 }.toSet()
+        val usable = round.keys.filter { it.scoresRounds && it in baselines && (weights.values[it] ?: 0.0) > 0.0 }.toSet()
         if (usable.isEmpty()) return null
         val w = weights.normalized(usable)
         return usable.sumOf { metric ->

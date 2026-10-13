@@ -11,6 +11,10 @@ const val GAME_CUSTOM = GameProfile.CUSTOM_ID
 private const val MAX_DPI = 100_000.0
 private const val MAX_FOV_DEGREES = 179.0
 
+/** A turn of the view that takes less or more mouse travel than this is a typing mistake, not a sensitivity. */
+const val MIN_PLAUSIBLE_CM360 = 3.0
+const val MAX_PLAUSIBLE_CM360 = 600.0
+
 enum class SetupStep { DPI, GAME, STYLE, PAD }
 
 /** What is wrong with the current input of a step; [key] is the text in the i18n bundles. */
@@ -18,6 +22,7 @@ enum class SetupIssue(val key: String) {
     DPI_INVALID("setup.issue.dpi"),
     GAME_MISSING("setup.issue.game"),
     SENSITIVITY_INVALID("setup.issue.sensitivity"),
+    CM360_IMPLAUSIBLE("setup.issue.cm360"),
     CUSTOM_YAW_INVALID("setup.issue.custom_yaw"),
     CUSTOM_FOV_INVALID("setup.issue.custom_fov"),
     STYLE_MISSING("setup.issue.style"),
@@ -101,6 +106,7 @@ data class SetupDraft(
         gameId == GAME_CUSTOM && customFov == null -> SetupIssue.CUSTOM_FOV_INVALID
         profile(profiles) == null -> SetupIssue.GAME_MISSING
         sensitivity == null -> SetupIssue.SENSITIVITY_INVALID
+        currentCm360(profiles)?.let { it < MIN_PLAUSIBLE_CM360 || it > MAX_PLAUSIBLE_CM360 } == true -> SetupIssue.CM360_IMPLAUSIBLE
         else -> null
     }
 

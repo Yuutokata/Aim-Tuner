@@ -98,6 +98,7 @@ class BetweenRoundsScreen(ctx: AppContext, private val run: BlindRun) : UiScreen
         block.add(ui.progressBar(result.confidencePercent / 100f, BAR_WIDTH)).left().padBottom(8f).row()
         val note = when {
             result.atRangeEdge -> t("between.note_edge")
+            result.driftDetected -> t("between.note_drift")
             result.confidencePercent >= target -> t("between.note_reached", target)
             else -> t("between.note_more", roundsText(result.roundsToTarget), target)
         }

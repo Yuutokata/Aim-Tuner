@@ -26,6 +26,8 @@ data class OptimizationResult(
     val optimumCm360: Double,
     /** True when [optimumCm360] is at an end of the searched range, so a better value may lie outside it. */
     val atRangeEdge: Boolean,
+    /** True when the scores drift within sessions (the fit chose a trend); the result may then reflect warming up or tiring, and the confidence is capped. */
+    val driftDetected: Boolean,
     val intervalLowCm360: Double,
     val intervalHighCm360: Double,
     val confidencePercent: Int,
@@ -58,6 +60,10 @@ data class OptimizerConfig(
     val minRoundsForFullConfidence: Int = 10,
     val minNegligibleDifference: Double = 0.5,
     val repeatEvery: Int = 6,
+    /** After the initial design, every this many rounds is again a space-filling point instead of the model's choice. */
+    val interleaveEvery: Int = 4,
+    /** Hyperparameters are searched on at most this many of the newest rounds; the fit itself uses all of them. */
+    val maxRoundsForHyperSearch: Int = 150,
     /** Other cm/360 values within this log distance of the previous round are not suggested next. */
     val exclusionLn: Double = 0.03,
     val maxRounds: Int = 80,
@@ -88,6 +94,9 @@ class SensitivityOptimizer(
     fun suggestNext(history: List<Observation>): Suggestion {
         val n = history.size
         if (n < config.initialDesignRounds) return Suggestion(designPoint(n), SuggestionKind.DESIGN)
+        // Every few rounds a fresh design point: sensitivities spread over the whole run keep a drift in time
+        // from being confused with a difference between sensitivities.
+        if (n % config.interleaveEvery == config.interleaveEvery - 1) return Suggestion(designPoint(n), SuggestionKind.DESIGN)
         val gp = fitBest(history) ?: return Suggestion(designPoint(n), SuggestionKind.DESIGN)
         val posterior = gp.posterior(grid)
         val last = history.last().x
@@ -118,13 +127,16 @@ class SensitivityOptimizer(
         // A best value at the edge of the searched range may only be the end of a slope: the real optimum can lie outside.
         val atEdge = optimumX - lnLo < EDGE_FRACTION * width || lnHi - optimumX < EDGE_FRACTION * width
         val rawConfidence = (100.0 * summary.probabilityNegligibleLoss).toInt()
+        val drift = gp.hyper.trendVariance > 0.0
         val limited = history.size < config.minRoundsForFullConfidence || atEdge
-        val confidence = if (limited) minOf(rawConfidence, LIMITED_CONFIDENCE_CAP) else rawConfidence
+        val capped = if (limited) minOf(rawConfidence, LIMITED_CONFIDENCE_CAP) else rawConfidence
+        val confidence = if (drift) minOf(capped, DRIFT_CONFIDENCE_CAP) else capped
         val target = config.targetConfidencePercent
         val more = confidence < target && history.size < config.maxRounds
         return OptimizationResult(
             optimumCm360 = exp(optimumX),
             atRangeEdge = atEdge,
+            driftDetected = drift,
             intervalLowCm360 = exp(summary.lowX),
             intervalHighCm360 = exp(summary.highX),
             confidencePercent = confidence,
@@ -142,7 +154,8 @@ class SensitivityOptimizer(
 
     /** The i-th point of a seeded, shuffled, stratified design over the log range. */
     private fun designPoint(index: Int): Double {
-        val random = Random(seed)
+        // Every pass over the design uses its own shuffle and jitter; pass 0 is the initial design.
+        val random = Random(seed xor ((index / config.initialDesignRounds).toLong() * SEED_MIX))
         val n = config.initialDesignRounds
         val strata = (0 until n).shuffled(random)
         val jitter = List(n) { DESIGN_JITTER_MIN + random.nextDouble() * (1.0 - 2 * DESIGN_JITTER_MIN) }
@@ -232,14 +245,32 @@ class SensitivityOptimizer(
     private fun fitBest(history: List<Observation>): GaussianProcess? {
         val multiSession = history.map { it.sessionId }.distinct().size > 1
         val multiGroup = history.map { it.group }.distinct().size > 1
-        var best: GaussianProcess? = null
+        // A long history makes every fit slow (cubic); the hyperparameters hardly change after a few hundred rounds.
+        val searchOn = if (history.size > config.maxRoundsForHyperSearch) history.takeLast(config.maxRoundsForHyperSearch) else history
+        var bestHyper: GpHyperParams? = null
+        var bestLml = Double.NEGATIVE_INFINITY
         for (ls in LENGTHSCALE_FACTORS) for (sv in SIGNAL_VARIANCES) for (nv in NOISE_VARIANCES) {
             for (tv in if (multiSession) SESSION_VARIANCES else listOf(0.0)) for (gv in if (multiGroup) GROUP_VARIANCES else listOf(0.0)) {
-                val gp = GaussianProcess.fit(history, GpHyperParams(ls * width, sv, nv, tv, gv)) ?: continue
-                if (best == null || gp.logMarginalLikelihood > best.logMarginalLikelihood) best = gp
+                val hyper = GpHyperParams(ls * width, sv, nv, tv, gv)
+                val gp = GaussianProcess.fit(searchOn, hyper) ?: continue
+                if (gp.logMarginalLikelihood > bestLml) {
+                    bestLml = gp.logMarginalLikelihood
+                    bestHyper = hyper
+                }
             }
         }
-        return best
+        // The drift is searched only around the best fit without one (a third of the cost of a joint search).
+        bestHyper?.let { base ->
+            for (trend in TREND_VARIANCES.filter { it > 0.0 }) {
+                val hyper = base.copy(trendVariance = trend)
+                val gp = GaussianProcess.fit(searchOn, hyper) ?: continue
+                if (gp.logMarginalLikelihood > bestLml + TREND_MIN_LML_GAIN) {
+                    bestLml = gp.logMarginalLikelihood
+                    bestHyper = hyper
+                }
+            }
+        }
+        return bestHyper?.let { GaussianProcess.fit(history, it) }
     }
 
     private fun normalPdf(z: Double) = exp(-0.5 * z * z) / sqrt(2.0 * PI)
@@ -256,6 +287,9 @@ class SensitivityOptimizer(
         const val Z_80 = 1.2816
         const val LIMITED_CONFIDENCE_CAP = 50
 
+        /** With a drift in the scores a time trend and the sensitivity can not be fully separated. */
+        const val DRIFT_CONFIDENCE_CAP = 60
+
         /** An optimum within this share of the log range width from either end counts as at the edge. */
         const val EDGE_FRACTION = 0.02
         const val MAX_ROUNDS_ESTIMATE = 40
@@ -265,5 +299,9 @@ class SensitivityOptimizer(
         val NOISE_VARIANCES = listOf(0.15, 0.3, 0.5, 0.8, 1.2)
         val SESSION_VARIANCES = listOf(0.0, 0.1, 0.4)
         val GROUP_VARIANCES = listOf(0.0, 0.4)
+        val TREND_VARIANCES = listOf(0.0, 0.05, 0.3)
+
+        /** A trend must raise the log marginal likelihood by this much to be taken (a mild Occam penalty against false alarms). */
+        const val TREND_MIN_LML_GAIN = 1.0
     }
 }

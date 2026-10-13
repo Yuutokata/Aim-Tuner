@@ -14,6 +14,9 @@ internal const val WM_APP = 0x8000
 
 internal const val RID_INPUT = 0x10000003
 internal const val RIM_TYPEMOUSE = 0
+
+/** RAWMOUSE usButtonFlags: the left button went down (the low 16 bits of ulButtons). */
+internal const val RI_MOUSE_LEFT_BUTTON_DOWN = 0x0001
 internal const val RIM_INPUTSINK = 1
 
 internal const val HID_USAGE_PAGE_GENERIC: Short = 0x01

@@ -132,4 +132,44 @@ class RoundMetricsTest {
         assertNull(r.meanTimeToHitMs)
         assertNull(r.errorSpread)
     }
+
+    @Test
+    fun `a tremor fragment before the flick is not the first reach`() {
+        val t = target(0, yaw = 20.0)
+        val rec = recording(
+            // 0.6 degrees of drift at 160 ms, then the real flick at 300 ms.
+            listOf(Reach(150.0, 80.0, dx = counts(0.6)), Reach(300.0, 150.0, dx = counts(20.0))),
+            listOf(TargetEvent.Spawned(0, t), TargetEvent.Hit(650 * ms, 0)),
+        )
+        val m = computeRoundMetrics(rec).movements.single()
+        assertEquals(0.0, assertNotNull(m.firstErrorRatio), 0.06)
+        assertEquals(0, m.correctiveSubmovements)
+    }
+
+    @Test
+    fun `movement left over from the previous click right after the spawn is not the first reach`() {
+        val t = target(0, yaw = 20.0)
+        val rec = recording(
+            // 8 degrees the wrong way, peaking about 70 ms after the spawn (no human reacts that fast), then the real flick.
+            listOf(Reach(0.0, 140.0, dx = -counts(8.0)), Reach(300.0, 150.0, dx = counts(28.0))),
+            listOf(TargetEvent.Spawned(0, t), TargetEvent.Hit(650 * ms, 0)),
+        )
+        val m = computeRoundMetrics(rec).movements.single()
+        // From the spawn the view moved 8 degrees away and then 28 back: the flick lands 20 degrees from the start.
+        assertEquals(0.0, assertNotNull(m.firstErrorRatio), 0.2)
+        assertTrue(assertNotNull(m.reactionNanos) > 100 * ms)
+    }
+
+    @Test
+    fun `a reach toward a target that was already visible may start at once`() {
+        val first = target(0, yaw = 20.0)
+        val second = target(1, yaw = -20.0)
+        val rec = recording(
+            listOf(Reach(100.0, 150.0, dx = counts(20.0)), Reach(310.0, 150.0, dx = -counts(40.0))),
+            listOf(TargetEvent.Spawned(0, first), TargetEvent.Spawned(0, second), TargetEvent.Hit(300 * ms, 0), TargetEvent.Hit(700 * ms, 1)),
+            totalMs = 800.0,
+        )
+        val movements = computeRoundMetrics(rec).movements
+        assertNotNull(movements.single { it.targetId == 1 }.firstErrorRatio)
+    }
 }

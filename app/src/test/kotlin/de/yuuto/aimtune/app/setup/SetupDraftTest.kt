@@ -112,4 +112,11 @@ class SetupDraftTest {
         assertEquals(PadPreset.CUSTOM, draft.padPreset)
         assertEquals("61", draft.customPadWidthText)
     }
+
+    @Test
+    fun `a sensitivity that makes a turn shorter than 3 cm or longer than 6 m is refused`() {
+        assertEquals(SetupIssue.CM360_IMPLAUSIBLE, complete.copy(sensitivityText = "500").issue(SetupStep.GAME, profiles))
+        assertEquals(SetupIssue.CM360_IMPLAUSIBLE, complete.copy(sensitivityText = "0.0005").issue(SetupStep.GAME, profiles))
+        assertNull(complete.copy(sensitivityText = "0.5").issue(SetupStep.GAME, profiles))
+    }
 }

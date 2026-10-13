@@ -36,7 +36,10 @@ class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
             ui.label(t("accel.intro", AccelRun.DEFAULT_CALIBRATION_ROUNDS), Styles.BODY_MUTED, wrap = true),
         ).left().width(TEXT_WIDTH).padBottom(40f).row()
         content.add(baselineCard()).left().width(CARD_WIDTH).padBottom(24f).row()
-        content.add(rawAccelCheck()).left()
+        content.add(rawAccelCheck()).left().row()
+        if (!ctx.source.hasReportTimestamps) {
+            content.add(ui.label(t("accel.needs_raw_input", ctx.source.name), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padTop(24f)
+        }
 
         val footer = Table()
         footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
@@ -53,7 +56,7 @@ class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
         if (canStart()) ctx.startAccelRun()
     }
 
-    private fun canStart() = baseline != null && ctx.rawAccelConfirmed
+    private fun canStart() = baseline != null && ctx.rawAccelConfirmed && ctx.source.hasReportTimestamps
 
     private fun baselineCard(): Table {
         val card = Table()

@@ -17,6 +17,8 @@ data class MicroConfig(
     val minDistance: Double = 10.0,
     val maxDistance: Double = 14.0,
     val targetRadius: Double = 0.15,
+    /** When set, targets are head-sized angles and the steps come from the game's geometry. */
+    val geometry: TrainerGeometry? = null,
 ) {
     init {
         require(durationNanos > 0) { "durationNanos must be positive" }
@@ -70,14 +72,19 @@ class MicroScenario(private val config: MicroConfig, seed: Long) : Scenario {
         val (nextYaw, nextPitch) = nextAngles()
         yaw = nextYaw
         pitch = nextPitch
-        val distance = random.nextDouble(config.minDistance, config.maxDistance)
-        val target = Target(nextId++, ViewAngles.directionOf(yaw, pitch) * distance, config.targetRadius)
+        val g = config.geometry
+        val distance = if (g != null) g.clickTargetDistanceMeters.uniform(random) else random.nextDouble(config.minDistance, config.maxDistance)
+        val radius = if (g != null) g.radiusFor(g.clickTargetDiameterDegrees.logUniform(random), distance) else config.targetRadius
+        val target = Target(nextId++, ViewAngles.directionOf(yaw, pitch) * distance, radius)
         current = target
         eventLog += TargetEvent.Spawned(nowNanos, target)
     }
 
     /** A random spot whose true angle to the previous target is within the step range and inside the field. */
     private fun nextAngles(): Pair<Double, Double> {
+        config.geometry?.let { g ->
+            return placeAt(yaw, pitch, g.microStepDegrees.uniform(random), random, minOf(g.fieldYawDegrees, config.maxYawDegrees), minOf(g.fieldPitchDegrees, config.maxPitchDegrees))
+        }
         val from = ViewAngles.directionOf(yaw, pitch)
         repeat(MAX_PLACEMENT_ATTEMPTS) {
             val candidateYaw = yaw + random.nextDouble(-config.maxStepDegrees, config.maxStepDegrees)

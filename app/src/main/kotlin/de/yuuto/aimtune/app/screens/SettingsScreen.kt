@@ -43,7 +43,6 @@ private val METRIC_KEYS = mapOf(
     ScoreMetric.ACCURACY to "metric.accuracy",
     ScoreMetric.TIME_TO_HIT to "metric.time_to_hit",
     ScoreMetric.TRACKING to "metric.tracking",
-    ScoreMetric.CONSISTENCY to "metric.consistency",
 )
 
 /** Edit game, DPI, sensitivity, round length and score weights; aim style and pad via "Run setup again". */
@@ -51,7 +50,8 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
     private var draft = SetupDraft.fromSettings(ctx.settings.current)
     private var roundSeconds = ctx.settings.current.roundSeconds
     private var language = Language.fromCode(ctx.settings.current.language)
-    private val weights = ctx.settings.current.metricWeights.toMutableMap()
+    // Weights of metrics that do not score rounds (consistency, from older settings) are dropped on the first save.
+    private val weights = ctx.settings.current.metricWeights.filterKeys { name -> ScoreMetric.entries.firstOrNull { it.name == name }?.scoresRounds == true }.toMutableMap()
     private val scenarios = ctx.settings.current.scenarios.toMutableSet()
     private var message: Pair<String, Boolean>? = null
     private var liveCm: Label? = null

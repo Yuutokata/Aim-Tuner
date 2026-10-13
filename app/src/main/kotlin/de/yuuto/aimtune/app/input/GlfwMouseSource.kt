@@ -37,6 +37,8 @@ class GlfwMouseSource(
         onCursorPosition(x, y)
     }
 
+    override val hasReportTimestamps = false
+
     override val eventsReceived: Long get() = received.get()
 
     override fun start() {

@@ -45,8 +45,7 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
         val profiles = GameProfiles.load(paths?.dataDir?.resolve("games")).also { problems += it.problems }
         val database = if (paths == null) null else openDatabase(paths, problems)
 
-        val source = createSource()
-        source.start()
+        val source = startSource()
         val gate = MouseGate(source)
         gate.setWindowFocused(isWindowFocused())
         log.log(System.Logger.Level.INFO, "mouse source: ${source.name}")
@@ -120,6 +119,20 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
         GLFW.glfwGetWindowAttrib(windowHandle(), GLFW.GLFW_FOCUSED) == GLFW.GLFW_TRUE
 
     private fun windowHandle(): Long = (Gdx.graphics as Lwjgl3Graphics).window.windowHandle
+
+    /** Starts the chosen source; with `auto`, a Raw Input window that cannot be created falls back to GLFW instead of ending the app. */
+    private fun startSource(): RawMouseSource {
+        val chosen = createSource()
+        try {
+            chosen.start()
+            return chosen
+        } catch (e: IllegalStateException) {
+            if (options.source != SourceKind.AUTO || chosen is GlfwMouseSource) throw e
+            log.log(System.Logger.Level.ERROR, "Raw Input could not be started (${e.message}); using the GLFW fallback", e)
+            chosen.close()
+            return GlfwMouseSource(windowHandle()).also { it.start() }
+        }
+    }
 
     private fun createSource(): RawMouseSource {
         val isWindows = System.getProperty("os.name").startsWith("Windows")

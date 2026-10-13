@@ -24,8 +24,11 @@ data class GainPoint(val speed: Double, val logGain: Double, val standardError: 
 /**
  * Error against speed: a movement that landed at `(1 + e)` times its distance wanted `1 / (1 + e)`
  * times the gain it got. Movements are grouped into bins of similar speed (equal counts), each bin's
- * mean log ratio gives the wanted log gain there, and the whole is normalized so the average wanted
- * log gain over all movements is 0: it says how the wanted gain changes with speed, not what the
+ * median log ratio gives the wanted log gain there, and the whole is normalized so the median wanted
+ * log gain over all movements is 0. The median, not the mean: the noise of a reach is about symmetric
+ * in the error itself, so the mean of its logarithm is pulled down by an amount that grows with the
+ * relative noise, which differs between slow, small reaches and fast, large ones; the mean therefore
+ * invented a speed dependence for players who have none (docs/REVIEW.md M3): it says how the wanted gain changes with speed, not what the
  * sensitivity should be (that is the optimizer's job). See docs/ALGORITHMS.md ("Acceleration").
  */
 class AccelAnalysis(samples: List<MovementSample>, private val minPerBin: Int = MIN_PER_BIN) {
@@ -39,7 +42,7 @@ class AccelAnalysis(samples: List<MovementSample>, private val minPerBin: Int = 
 
     init {
         val logRatios = used.map { ln(1.0 + it.errorRatio) }
-        val meanLog = if (logRatios.isEmpty()) 0.0 else logRatios.average()
+        val centerLog = if (logRatios.isEmpty()) 0.0 else median(logRatios)
         val bins = binCount(used.size)
         val sorted = used.indices.sortedBy { used[it].speed }
         points = if (bins < 2) {
@@ -51,14 +54,22 @@ class AccelAnalysis(samples: List<MovementSample>, private val minPerBin: Int = 
                 val mean = ys.average()
                 val sd = if (ys.size > 1) sqrt(ys.sumOf { (it - mean) * (it - mean) } / (ys.size - 1)) else 0.0
                 val speeds = slice.map { used[it].speed }.sorted()
-                GainPoint(speeds[speeds.size / 2], meanLog - mean, sd / sqrt(ys.size.toDouble()), ys.size)
+                // The standard error of a median of roughly normal values is sqrt(pi / 2) times that of the mean.
+                GainPoint(speeds[speeds.size / 2], centerLog - median(ys), MEDIAN_SE_FACTOR * sd / sqrt(ys.size.toDouble()), ys.size)
             }
         }
+    }
+
+    private fun median(values: List<Double>): Double {
+        val sorted = values.sorted()
+        val mid = sorted.size / 2
+        return if (sorted.size % 2 == 1) sorted[mid] else (sorted[mid - 1] + sorted[mid]) / 2.0
     }
 
     private fun binCount(count: Int): Int = (count / minPerBin).coerceAtMost(MAX_BINS).let { if (it < MIN_BINS) 0 else it }
 
     companion object {
+        private val MEDIAN_SE_FACTOR = sqrt(Math.PI / 2.0)
         const val MIN_PER_BIN = 20
         const val MIN_BINS = 4
         const val MAX_BINS = 10

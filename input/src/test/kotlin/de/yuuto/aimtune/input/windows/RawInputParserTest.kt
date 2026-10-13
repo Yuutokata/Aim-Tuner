@@ -17,13 +17,14 @@ import kotlin.test.assertNull
 class RawInputParserTest {
     private fun x64() = assumeTrue(Native.POINTER_SIZE == 8, "layout offsets below assume 64-bit")
 
-    private fun packet(type: Int = RIM_TYPEMOUSE, flags: Int = 0, dx: Int, dy: Int, size: Int = 48): Memory {
+    private fun packet(type: Int = RIM_TYPEMOUSE, flags: Int = 0, dx: Int, dy: Int, size: Int = 48, buttons: Int = 0): Memory {
         val memory = Memory(64)
         memory.clear()
         val buffer = memory.getByteBuffer(0, 64).order(ByteOrder.LITTLE_ENDIAN)
         buffer.putInt(0, type)
         buffer.putInt(4, size)
         buffer.putShort(24, flags.toShort())
+        buffer.putInt(28, buttons)
         buffer.putInt(36, dx)
         buffer.putInt(40, dy)
         return memory
@@ -53,7 +54,17 @@ class RawInputParserTest {
     }
 
     @Test
-    fun `ignores button only reports and non mouse packets`() {
+    fun `a left button press is decoded with or without movement, other buttons and empty reports are not clicks`() {
+        x64()
+        assertEquals(RawMouseMove(0, 0, true), RawInputParser.parseRelativeMove(packet(dx = 0, dy = 0, buttons = RI_MOUSE_LEFT_BUTTON_DOWN), 48))
+        assertEquals(RawMouseMove(4, -2, true), RawInputParser.parseRelativeMove(packet(dx = 4, dy = -2, buttons = RI_MOUSE_LEFT_BUTTON_DOWN), 48))
+        assertEquals(RawMouseMove(4, -2, false), RawInputParser.parseRelativeMove(packet(dx = 4, dy = -2, buttons = 0x0002), 48))
+        // The left button going up (0x2) or the right one (0x4) is not a shot.
+        assertNull(RawInputParser.parseRelativeMove(packet(dx = 0, dy = 0, buttons = 0x0004), 48))
+    }
+
+    @Test
+    fun `ignores empty reports and non mouse packets`() {
         x64()
         assertNull(RawInputParser.parseRelativeMove(packet(dx = 0, dy = 0), 48))
         assertNull(RawInputParser.parseRelativeMove(packet(type = 1, dx = 3, dy = 3), 48))

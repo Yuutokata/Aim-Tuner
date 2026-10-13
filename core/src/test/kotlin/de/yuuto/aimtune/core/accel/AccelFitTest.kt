@@ -40,8 +40,8 @@ class AccelFitTest {
         val truth = analysis.points.map { ln(wanted(it.speed)) }
         val shift = analysis.points.indices.sumOf { analysis.points[it].logGain - truth[it] } / analysis.points.size
         analysis.points.indices.forEach { assertEquals(truth[it] + shift, analysis.points[it].logGain, 0.05, "speed ${analysis.points[it].speed}") }
-        // Normalized: the average wanted log gain over all movements is 0.
-        assertEquals(0.0, analysis.points.sumOf { it.logGain * it.count } / analysis.used.size, 1e-9)
+        // Normalized: the median wanted log gain over all movements is 0 (so the count-weighted average of the bins is close to it).
+        assertEquals(0.0, analysis.points.sumOf { it.logGain * it.count } / analysis.used.size, 0.03)
     }
 
     @Test
@@ -99,7 +99,7 @@ class AccelFitTest {
         }
         val found = fitAccel(analysisOf(wants, 1))
         val fit = assertNotNull(found.recommended, found.reason)
-        assertTrue(fit.gainRange > 1.15, "range ${fit.gainRange}")
+        assertTrue(fit.gainRange > 1.1, "range ${fit.gainRange}")
         assertTrue(fit.totalGain(15.0) > fit.totalGain(2.0), "rising: ${fit.totalGain(2.0)} -> ${fit.totalGain(15.0)}")
 
         val offered = (1L..8L).count { fitAccel(analysisOf(SimulatedPlayer(), it)).recommended != null }

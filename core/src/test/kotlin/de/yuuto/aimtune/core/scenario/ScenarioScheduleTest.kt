@@ -10,14 +10,14 @@ class ScenarioScheduleTest {
     private fun counts(schedule: ScenarioSchedule, rounds: Int) = (0 until rounds).groupingBy { schedule.kindFor(it) }.eachCount()
 
     @Test
-    fun `default weights give tracking a fifth of the rounds and split the rest`() {
+    fun `default weights give tracking two ninths of the rounds and split the rest`() {
         val schedule = ScenarioSchedule(ScenarioKind.entries.toSet(), MetricWeights.DEFAULT)
-        assertEquals(0.2, schedule.shares.getValue(ScenarioKind.TRACKING), 1e-12)
-        assertEquals(0.8 / 3, schedule.shares.getValue(ScenarioKind.FLICK), 1e-12)
-        val played = counts(schedule, 150)
+        assertEquals(2.0 / 9, schedule.shares.getValue(ScenarioKind.TRACKING), 1e-12)
+        assertEquals(7.0 / 27, schedule.shares.getValue(ScenarioKind.FLICK), 1e-12)
+        val played = counts(schedule, 135)
         assertEquals(30, played.getValue(ScenarioKind.TRACKING))
         assertTrue(ScenarioKind.entries.all { (played[it] ?: 0) > 0 })
-        assertEquals(150, played.values.sum())
+        assertEquals(135, played.values.sum())
     }
 
     @Test
@@ -26,7 +26,7 @@ class ScenarioScheduleTest {
         assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.MICRO), noTracking.shares.keys)
         assertEquals(0.5, noTracking.shares.getValue(ScenarioKind.FLICK), 1e-12)
         val flickAndTracking = ScenarioSchedule(setOf(ScenarioKind.FLICK, ScenarioKind.TRACKING), MetricWeights.DEFAULT)
-        assertEquals(0.8, flickAndTracking.shares.getValue(ScenarioKind.FLICK), 1e-12)
+        assertEquals(7.0 / 9, flickAndTracking.shares.getValue(ScenarioKind.FLICK), 1e-12)
     }
 
     @Test

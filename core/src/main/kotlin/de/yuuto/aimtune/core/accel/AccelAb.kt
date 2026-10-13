@@ -39,7 +39,7 @@ class AccelAbPlan(private val scenarios: List<ScenarioKind>, private val seed: L
     }
 
     companion object {
-        const val DEFAULT_MAX_PAIRS = 10
+        const val DEFAULT_MAX_PAIRS = 12
         private val GROUP_MIX = 0x9E3779B97F4A7C15uL.toLong()
         private const val PAIR_MIX = 7_919L
     }
@@ -61,7 +61,8 @@ data class AbVerdict(val status: AbStatus, val pairs: Int, val meanDifference: D
  * Decides a blind A/B test from the rounds played so far. All rounds are scored together (the same
  * score as everywhere else), each complete pair gives one difference, and a t interval of the mean
  * difference decides: the curve is better if the lower bound is above 0, worse if the upper bound
- * is below 0, and without a decision after [maxPairs] pairs there is no measurable difference.
+ * is below 0 (and, for either, the mean difference is at least [minEffectPoints]), and without a
+ * decision after [maxPairs] pairs there is no measurable difference.
  *
  * The test is looked at after every pair, and every look is another chance to be fooled by luck, so
  * each look uses the strict one-sided level [alphaPerLook] (a Pocock-style correction); the level
@@ -73,6 +74,7 @@ fun evaluateAb(
     minPairs: Int = DEFAULT_MIN_PAIRS,
     maxPairs: Int = AccelAbPlan.DEFAULT_MAX_PAIRS,
     alphaPerLook: Double = DEFAULT_ALPHA_PER_LOOK,
+    minEffectPoints: Double = DEFAULT_MIN_EFFECT_POINTS,
 ): AbVerdict {
     val scores = ScoreCalculator(weights).scoreRounds(outcomes.map { it.inputs })
     val byPair = outcomes.indices.groupBy { outcomes[it].pair }
@@ -90,16 +92,25 @@ fun evaluateAb(
     val high = mean + margin
     val status = when {
         n < minPairs -> AbStatus.NEED_MORE_ROUNDS
-        low > 0.0 -> AbStatus.ACCEL_BETTER
-        high < 0.0 -> AbStatus.ACCEL_WORSE
+        low > 0.0 && mean >= minEffectPoints -> AbStatus.ACCEL_BETTER
+        high < 0.0 && mean <= -minEffectPoints -> AbStatus.ACCEL_WORSE
         n >= maxPairs -> AbStatus.NO_DIFFERENCE
         else -> AbStatus.NEED_MORE_ROUNDS
     }
     return AbVerdict(status, n, mean, low, high)
 }
 
-const val DEFAULT_MIN_PAIRS = 4
-const val DEFAULT_ALPHA_PER_LOOK = 0.02
+const val DEFAULT_MIN_PAIRS = 6
+
+/**
+ * One-sided level of every look. 300 simulated tests with no difference gave a 'winner' in 12 % of the
+ * runs at 0.02 per look and six looks (docs/REVIEW.md M3); 0.01 and a minimum number of pairs and effect
+ * bring that down (see `ReviewAccelTest`).
+ */
+const val DEFAULT_ALPHA_PER_LOOK = 0.01
+
+/** A difference smaller than this many score points is not worth a curve, however sure the interval is. */
+const val DEFAULT_MIN_EFFECT_POINTS = 2.0
 
 /**
  * The value that Student's t with [degreesOfFreedom] exceeds with probability [upperTail]: the

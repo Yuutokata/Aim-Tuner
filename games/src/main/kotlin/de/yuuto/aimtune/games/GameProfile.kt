@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.games
 
+import de.yuuto.aimtune.core.scenario.TrainerGeometry
 import de.yuuto.aimtune.core.units.Fov
 import de.yuuto.aimtune.core.units.FovType
 import de.yuuto.aimtune.core.units.cm360
@@ -26,12 +27,21 @@ data class GameProfile(
     val sensitivityDecimals: Int,
     val sources: List<String> = emptyList(),
     val notes: String? = null,
+    /**
+     * Width / height of the picture the trainer draws, whatever the window's shape: the scene is letterboxed
+     * to it, so the horizontal FOV is exactly what the game shows at this aspect ratio. How a game scales
+     * its FOV for other shapes is not documented for Valorant (docs/REVIEW.md M7), so the trainer does not guess.
+     */
+    val trainerAspectRatio: Double = WIDESCREEN_ASPECT,
+    /** Angular target sizes, engagement angles and movement speeds the trainer uses; defaults are unverified assumptions. */
+    val geometry: TrainerGeometry = TrainerGeometry.DEFAULT,
 ) {
     init {
         require(ID_PATTERN.matches(id)) { "game id must match ${ID_PATTERN.pattern}, was '$id'" }
         require(name.isNotBlank()) { "game name must not be blank" }
         require(yawDegreesPerCount.isFinite() && yawDegreesPerCount > 0.0) { "yaw must be positive, was $yawDegreesPerCount" }
         require(fovAspectRatio.isFinite() && fovAspectRatio > 0.0) { "fov aspect ratio must be positive, was $fovAspectRatio" }
+        require(trainerAspectRatio.isFinite() && trainerAspectRatio in 1.0..3.0) { "trainer aspect ratio must be in 1..3, was $trainerAspectRatio" }
         require(sensitivityDecimals in 0..MAX_DECIMALS) { "sensitivity decimals must be in 0..$MAX_DECIMALS, was $sensitivityDecimals" }
     }
 

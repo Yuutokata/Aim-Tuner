@@ -1,8 +1,21 @@
 package de.yuuto.aimtune.core.scenario
 
 /** Basic outcome of a round, derived from its target events. Richer metrics come with milestone M3. */
-data class RoundSummary(val hits: Int, val misses: Int, val meanTimeToHitNanos: Long?) {
+data class RoundSummary(
+    val hits: Int,
+    val misses: Int,
+    val meanTimeToHitNanos: Long?,
+    /** Clicks that were the first since the round began or since the last hit, and how many of them hit. */
+    val firstShots: Int = 0,
+    val firstShotHits: Int = 0,
+) {
     val shots: Int get() = hits + misses
+
+    /**
+     * Share of reaches whose first click hit, or null when nothing was fired. Valorant rewards the first
+     * shot on the head: a second click after a miss costs time but did not make the first one good.
+     */
+    val firstShotAccuracy: Double? get() = if (firstShots == 0) null else firstShotHits.toDouble() / firstShots
 
     /** Hits per shot in [0, 1]; 0 when no shot was fired. */
     val accuracy: Double get() = if (shots == 0) 0.0 else hits.toDouble() / shots
@@ -19,18 +32,30 @@ fun summarize(events: List<TargetEvent>): RoundSummary {
     var misses = 0
     var totalHitTime = 0L
     var previousHitNanos = Long.MIN_VALUE
+    var firstShots = 0
+    var firstShotHits = 0
+    var awaitingFirstShot = true
     for (event in events) {
         when (event) {
             is TargetEvent.Spawned -> spawnTimes[event.target.id] = event.timeNanos
             is TargetEvent.Hit -> {
+                if (awaitingFirstShot) {
+                    firstShots++
+                    firstShotHits++
+                }
+                awaitingFirstShot = true
                 hits++
                 val spawn = checkNotNull(spawnTimes[event.targetId]) { "hit without spawn: ${event.targetId}" }
                 totalHitTime += event.timeNanos - maxOf(spawn, previousHitNanos)
                 previousHitNanos = event.timeNanos
             }
-            is TargetEvent.Miss -> misses++
+            is TargetEvent.Miss -> {
+                misses++
+                if (awaitingFirstShot) firstShots++
+                awaitingFirstShot = false
+            }
             is TargetEvent.Waypoint -> Unit
         }
     }
-    return RoundSummary(hits, misses, if (hits == 0) null else totalHitTime / hits)
+    return RoundSummary(hits, misses, if (hits == 0) null else totalHitTime / hits, firstShots, firstShotHits)
 }

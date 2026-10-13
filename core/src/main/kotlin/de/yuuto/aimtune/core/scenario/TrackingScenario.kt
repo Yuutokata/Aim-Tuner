@@ -21,12 +21,34 @@ data class TrackingConfig(
     val maxSpeedDegreesPerSecond: Double = 22.0,
     val minSegmentSeconds: Double = 1.2,
     val maxSegmentSeconds: Double = 2.8,
+    /** Share of segments in which the target stands still (a counter-strafe) instead of moving. */
+    val stopProbability: Double = 0.0,
 ) {
     init {
         require(durationNanos > 0) { "durationNanos must be positive" }
         require(0.0 < minSpeedDegreesPerSecond && minSpeedDegreesPerSecond <= maxSpeedDegreesPerSecond) { "invalid speed range" }
         require(0.0 < minSegmentSeconds && minSegmentSeconds <= maxSegmentSeconds) { "invalid segment length range" }
         require(distance > 0.0 && targetRadius > 0.0) { "distance and radius must be positive" }
+        require(stopProbability in 0.0..0.9) { "stop probability must be in 0..0.9" }
+    }
+
+    companion object {
+        /** Tracking with the angular size, strafe speed and stops of a game's [geometry]. */
+        fun from(geometry: TrainerGeometry, durationNanos: Long): TrackingConfig {
+            val speeds = geometry.trackingSpeedDegreesPerSecond
+            return TrackingConfig(
+                durationNanos = durationNanos,
+                maxYawDegrees = minOf(35.0, geometry.fieldYawDegrees),
+                maxPitchDegrees = minOf(15.0, geometry.fieldPitchDegrees),
+                distance = geometry.trackingDistanceMeters,
+                targetRadius = geometry.radiusFor(geometry.trackingDiameterDegrees.mid, geometry.trackingDistanceMeters),
+                minSpeedDegreesPerSecond = speeds.min,
+                maxSpeedDegreesPerSecond = speeds.max,
+                minSegmentSeconds = 0.8,
+                maxSegmentSeconds = 2.2,
+                stopProbability = geometry.stopProbability,
+            )
+        }
     }
 }
 
@@ -107,6 +129,7 @@ class TrackingScenario(private val config: TrackingConfig, seed: Long) : Scenari
         // Speeds and headings are spread evenly over their ranges (in random order), so every round
         // is about equally hard and rounds differ in shape, not in difficulty.
         val speeds = stratified(durations.size, config.minSpeedDegreesPerSecond, config.maxSpeedDegreesPerSecond)
+            .map { if (random.nextDouble() < config.stopProbability) 0.0 else it }
         val headings = stratified(durations.size, 0.0, 2 * Math.PI)
         val points = mutableListOf(Point(0L, center(yaw, pitch)))
         var offset = 0L

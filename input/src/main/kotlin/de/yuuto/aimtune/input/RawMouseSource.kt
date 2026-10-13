@@ -16,6 +16,24 @@ interface RawMouseSource : AutoCloseable {
     /** Clock that stamps the events; the consumer should use it for any time it compares with them. */
     val clock: NanoClock
 
+    /**
+     * True when every event is stamped when its own device report arrived (Raw Input on its own
+     * thread). Sources that deliver in the frame loop stamp a whole frame of reports with one time; the
+     * speed of a report, which the acceleration simulation and its analysis need, is then meaningless
+     * (docs/REVIEW.md M4), so acceleration is only offered when this is true.
+     */
+    val hasReportTimestamps: Boolean get() = true
+
+    /**
+     * True when the source reports the left button in [MouseEvent.leftPressed], in the same ordered
+     * stream as the movement. The trainer then shoots at the view of the click's own report instead of
+     * at the view of the frame in which the click happened to be processed (docs/REVIEW.md M8).
+     */
+    val reportsClicks: Boolean get() = false
+
+    /** Reports that were lost because the consumer did not keep up (diagnostics). */
+    val droppedEvents: Long get() = 0L
+
     /** Total events accepted since [start] (diagnostics). */
     val eventsReceived: Long
 

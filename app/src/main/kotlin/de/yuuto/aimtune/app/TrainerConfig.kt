@@ -4,6 +4,7 @@ import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.setup.SetupStep
 import de.yuuto.aimtune.core.accel.AccelCurve
 import de.yuuto.aimtune.core.scenario.ScenarioKind
+import de.yuuto.aimtune.core.scenario.TrainerGeometry
 import de.yuuto.aimtune.games.GameProfile
 import de.yuuto.aimtune.games.GameProfiles
 import de.yuuto.aimtune.storage.AppSettings
@@ -18,6 +19,8 @@ data class TrainerConfig(
     val scenario: ScenarioKind = ScenarioKind.FLICK,
     /** Raw Accel simulated in the trainer; null plays with the plain sensitivity. */
     val accel: AccelCurve? = null,
+    /** Target sizes and distances of the rounds; the game's own by default, null only for the fixed legacy values (old recordings). */
+    val geometry: TrainerGeometry? = profile.geometry,
 )
 
 /** The trainer config for saved [settings], or null while onboarding is incomplete. */

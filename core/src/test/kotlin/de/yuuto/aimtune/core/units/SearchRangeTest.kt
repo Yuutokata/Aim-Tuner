@@ -17,49 +17,50 @@ class SearchRangeTest {
     }
 
     @Test
-    fun `default table follows the onboarding mockup`() {
-        val r = searchRange(AimStyle.MIXED, currentCm360 = 40.0, padWidthCm = 90.0)
-        assertEquals(30.0, r.minCm360, 1e-9)
-        assertEquals(50.0, r.maxCm360, 1e-9)
-    }
-
-    @Test
-    fun `current value is always inside the range`() {
+    fun `current value is always inside the range with room on both sides`() {
         for (style in AimStyle.entries) {
-            for (current in listOf(8.0, 20.0, 41.0, 90.0, 200.0)) {
-                val r = searchRange(style, current, padWidthCm = 45.0)
-                assertTrue(current in r, "$style $current -> $r")
+            for (current in listOf(0.5, 8.0, 20.0, 41.0, 65.6, 90.0, 200.0, 3000.0)) {
+                for (pad in listOf(20.0, 32.0, 90.0)) {
+                    val r = searchRange(style, current, padWidthCm = pad)
+                    assertTrue(current in r, "$style $current $pad -> $r")
+                    assertTrue(r.minCm360 <= current / 1.19 && r.maxCm360 >= current * 1.19, "$style $current $pad has no room on both sides: $r")
+                    assertTrue(r.maxCm360 / r.minCm360 <= 6.0 + 1e-9, "$style $current $pad is too wide: $r")
+                }
             }
         }
     }
 
     @Test
-    fun `a narrow pad caps the upper bound`() {
-        val big = searchRange(AimStyle.ARM, currentCm360 = 50.0, padWidthCm = 90.0)
-        val small = searchRange(AimStyle.ARM, currentCm360 = 50.0, padWidthCm = 40.0)
-        assertTrue(small.maxCm360 < big.maxCm360)
-        assertTrue(small.maxCm360 <= 40.0 + 1e-9 || 50.0 in small)
+    fun `a small pad does not cut off sensitivities above the current value`() {
+        // The case from the review: mixed style, 32 cm pad, 65.6 cm per 360. It used to end 10 % above the current value.
+        val r = searchRange(AimStyle.MIXED, currentCm360 = 65.6, padWidthCm = 32.0)
+        assertTrue(r.maxCm360 >= 65.6 * 1.6 - 1e-9, "range $r")
+        assertTrue(r.minCm360 <= 30.0 + 1e-9)
+        assertEquals(searchRange(AimStyle.MIXED, 65.6, 90.0), r, "the pad width does not shape the range")
+        // The current value sits in the middle of the range on the log scale, not at an end.
+        val position = kotlin.math.ln(65.6 / r.minCm360) / kotlin.math.ln(r.maxCm360 / r.minCm360)
+        assertTrue(position in 0.3..0.7, "position $position")
     }
 
     @Test
-    fun `range keeps a minimum width even when the pad cap is tight`() {
-        val r = searchRange(AimStyle.ARM, currentCm360 = 46.0, padWidthCm = 30.0)
-        assertTrue(r.maxCm360 / r.minCm360 >= SearchRange.MIN_RATIO - 1e-9)
+    fun `the style window is used when the current value is inside it`() {
+        val r = searchRange(AimStyle.MIXED, currentCm360 = 40.0, padWidthCm = 90.0)
+        assertTrue(r.minCm360 <= 30.0 && r.maxCm360 >= 50.0)
     }
 
     @Test
-    fun `a current value beyond the pad is still included and flagged as not fitting`() {
+    fun `half a turn warns about small pads`() {
+        assertFalse(doesHalfTurnFitPad(cm360 = 65.6, padWidthCm = 27.0))
+        assertTrue(doesHalfTurnFitPad(cm360 = 65.6, padWidthCm = 45.0))
         assertFalse(doesTurnFitPad(cm360 = 60.0, padWidthCm = 45.0))
-        assertTrue(doesTurnFitPad(cm360 = 43.3, padWidthCm = 45.0))
-        assertTrue(60.0 in searchRange(AimStyle.MIXED, currentCm360 = 60.0, padWidthCm = 45.0))
     }
 
     @Test
     fun `the table is configurable`() {
         val table = SearchRangeTable(mapOf(AimStyle.WRIST to (10.0 to 20.0), AimStyle.MIXED to (20.0 to 40.0), AimStyle.ARM to (40.0 to 80.0)))
         val r = searchRange(AimStyle.WRIST, currentCm360 = 15.0, padWidthCm = 90.0, table = table)
-        assertEquals(10.0, r.minCm360, 1e-9)
-        assertEquals(20.0, r.maxCm360, 1e-9)
+        assertEquals(9.375, r.minCm360, 1e-9)
+        assertEquals(24.0, r.maxCm360, 1e-9)
     }
 
     @Test

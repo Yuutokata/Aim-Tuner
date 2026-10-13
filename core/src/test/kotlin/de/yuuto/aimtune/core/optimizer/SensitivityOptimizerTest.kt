@@ -28,7 +28,7 @@ class SensitivityOptimizerTest {
         var history = emptyList<Observation>()
         repeat(rounds) {
             val s = optimizer.suggestNext(history)
-            history = history + Observation(0, s.cm360, score(s.cm360, random, noise))
+            history = history + Observation(0, s.cm360, score(s.cm360, random, noise), step = history.size)
         }
         return optimizer to history
     }
@@ -137,5 +137,48 @@ class SensitivityOptimizerTest {
         assertEquals(2, result.sessions)
         assertTrue(abs(ln(result.optimumCm360 / truth)) < 0.25, "merged optimum ${result.optimumCm360}")
         assertTrue(exp(abs(ln(result.curve.maxBy { it.meanScore }.cm360 / truth))) < 1.3)
+    }
+
+    @Test
+    fun `a drift of the scores within a session is detected and caps the confidence`() {
+        val optimizer = SensitivityOptimizer(range, seed = 5)
+        val random = Random(5)
+        var history = emptyList<Observation>()
+        repeat(30) {
+            val s = optimizer.suggestNext(history)
+            // The player gets steadily better during the session: +1.2 points per round on top of the sensitivity effect.
+            history = history + Observation(0, s.cm360, score(s.cm360, random, noise = 2.0) + 1.2 * history.size, step = history.size)
+        }
+        val result = assertNotNull(optimizer.analyze(history))
+        assertTrue(result.driftDetected, "drift should be seen: ${result.hyper}")
+        assertTrue(result.confidencePercent <= 60, "confidence ${result.confidencePercent}")
+    }
+
+    @Test
+    fun `without a drift the fit does not choose a trend`() {
+        val (optimizer, history) = run(24, seed = 8, noise = 1.0)
+        val result = assertNotNull(optimizer.analyze(history))
+        assertEquals(0.0, result.hyper.trendVariance)
+        assertEquals(false, result.driftDetected)
+    }
+
+    @Test
+    fun `every fourth round after the design is again a space filling point`() {
+        val optimizer = SensitivityOptimizer(range, seed = 2)
+        val (_, history) = run(12, seed = 2)
+        val picks = (7..12).map { n -> n to optimizer.suggestNext(history.take(n).let { if (it.size < n) history else it }).kind }
+        assertTrue(picks.filter { (n, _) -> n % 4 == 3 }.all { (_, kind) -> kind == SuggestionKind.DESIGN }, "$picks")
+        val designPoints = (6..30).filter { it % 4 == 3 }.map { SensitivityOptimizer(range, 2).suggestNext(List(it) { i -> Observation(0, 40.0 + i, 50.0 + i % 5, step = i) }).cm360 }
+        assertEquals(designPoints.size, designPoints.distinct().size, "the extra design points are not repeats")
+    }
+
+    @Test
+    fun `a long history is fitted with hyperparameters searched on the newest rounds only`() {
+        val random = Random(1)
+        val history = List(400) { Observation((it / 20).toLong(), 20.0 * exp(random.nextDouble() * ln(5.0)), score(20.0 * exp(random.nextDouble() * ln(5.0)), random), step = it % 20) }
+        val started = System.nanoTime()
+        assertNotNull(SensitivityOptimizer(range, 1).analyze(history))
+        val seconds = (System.nanoTime() - started) / 1e9
+        assertTrue(seconds < 20.0, "400 rounds took $seconds s")
     }
 }

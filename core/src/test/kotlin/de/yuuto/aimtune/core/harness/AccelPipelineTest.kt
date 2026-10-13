@@ -166,3 +166,30 @@ class AccelPipelineTest {
         assertTrue(confirmedAll >= offeredAll * 0.6, "confirmed $confirmedAll of $offeredAll")
     }
 }
+
+class AbVerdictRulesTest {
+    private fun outcomes(plainScores: List<Double>, accelScores: List<Double>): List<AbOutcome> =
+        plainScores.indices.flatMap { i ->
+            listOf(
+                AbOutcome(i, AbCondition.PLAIN, mapOf(de.yuuto.aimtune.core.score.ScoreMetric.ACCURACY to plainScores[i])),
+                AbOutcome(i, AbCondition.ACCEL, mapOf(de.yuuto.aimtune.core.score.ScoreMetric.ACCURACY to accelScores[i])),
+            )
+        }
+
+    private val weights = MetricWeights(mapOf(de.yuuto.aimtune.core.score.ScoreMetric.ACCURACY to 1.0))
+
+    @Test
+    fun `fewer than six pairs never decide`() {
+        // Five pairs with a huge, perfectly consistent difference still need more rounds.
+        val v = evaluateAb(outcomes(List(5) { 0.2 + it * 0.01 }, List(5) { 0.9 + it * 0.01 }), weights)
+        assertTrue(v.status == AbStatus.NEED_MORE_ROUNDS, "was ${v.status}")
+    }
+
+    @Test
+    fun `a large consistent difference is decided from six pairs on`() {
+        val plain = List(8) { 0.2 + (it % 3) * 0.02 }
+        val accel = List(8) { 0.9 + (it % 3) * 0.02 }
+        assertTrue(evaluateAb(outcomes(plain, accel), weights).status == AbStatus.ACCEL_BETTER)
+        assertTrue(evaluateAb(outcomes(accel, plain), weights).status == AbStatus.ACCEL_WORSE)
+    }
+}

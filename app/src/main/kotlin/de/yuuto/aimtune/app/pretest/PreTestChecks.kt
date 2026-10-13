@@ -19,17 +19,33 @@ object PreTestChecks {
     const val POINTER = "pointer"
     const val RAW_ACCEL = "rawaccel"
     const val INPUT = "input"
+    const val TARGETS = "targets"
 
     /**
      * The notice rows. Windows pointer acceleration is read from the system. Raw Accel cannot be
      * detected (its driver keeps no queryable settings), so the user confirms it by hand. The input
      * row says whether the precise raw source is in use.
      */
-    fun rows(acceleration: PointerAcceleration?, rawAccelConfirmed: Boolean, sourceName: String, sourceIsRaw: Boolean): List<CheckRow> = listOf(
+    fun rows(
+        acceleration: PointerAcceleration?,
+        rawAccelConfirmed: Boolean,
+        sourceName: String,
+        sourceIsRaw: Boolean,
+        /** Whether the game profile's target sizes were checked against the game; null leaves the row out. */
+        targetsVerified: Boolean? = null,
+        gameName: String = "",
+    ): List<CheckRow> = listOfNotNull(
         pointerRow(acceleration),
         rawAccelRow(rawAccelConfirmed),
         inputRow(sourceName, sourceIsRaw),
+        targetsVerified?.let { targetsRow(it, gameName) },
     )
+
+    private fun targetsRow(verified: Boolean, gameName: String): CheckRow = if (verified) {
+        CheckRow(TARGETS, "pretest.targets.title", "pretest.targets.verified", "pretest.state.ok", CheckLevel.OK)
+    } else {
+        CheckRow(TARGETS, "pretest.targets.title", "pretest.targets.estimated", "pretest.state.estimated", CheckLevel.ATTENTION, detailArg = gameName)
+    }
 
     private fun pointerRow(acceleration: PointerAcceleration?): CheckRow {
         val title = "pretest.pointer.title"

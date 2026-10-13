@@ -195,6 +195,7 @@ class AppContext(
 
     /** Starts the acceleration steps at the recommended sensitivity; back to the intro if there is none yet. */
     fun startAccelRun() {
+        if (!source.hasReportTimestamps) return showAccel()
         val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
         val result = stored.result ?: return showAccel()
         val run = AccelRun(stored.config.copy(cm360 = result.optimumCm360), stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++)

@@ -20,6 +20,16 @@ data class MetricsParams(
     val segmentation: SegmentationParams = SegmentationParams(),
     /** Targets closer than this to the crosshair at spawn time are not analysed as movements. */
     val minTargetDistanceDegrees: Double = 2.0,
+    /**
+     * The speed peak of the first reach comes at least this long after a target appeared. A reach
+     * whose peak comes earlier is the hand still moving from the previous click, not a reaction
+     * (docs/REVIEW.md C2). The peak, not the start, because the start of a smooth reach is found
+     * early (the slow ramp-up is above the low end threshold). Not applied to targets that were
+     * already visible, where the player may be on the way before the previous hit.
+     */
+    val minReactionPeakNanos: Long = 120_000_000L,
+    /** The first reach covers at least this share of the distance to the target; smaller movements are tremor, not a reach. */
+    val minFirstReachFraction: Double = 0.25,
 )
 
 /** One reach from a target's spawn to the hit on it. */
@@ -41,6 +51,8 @@ data class RoundMetrics(
     val hits: Int,
     val shots: Int,
     val accuracy: Double,
+    /** Share of reaches whose first click hit (null without clicks); the accuracy the score uses. */
+    val firstShotAccuracy: Double?,
     val movements: List<MovementMetric>,
     val meanTimeToHitMs: Double?,
     val meanFirstError: Double?,
@@ -74,6 +86,7 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
         hits = summary.hits,
         shots = summary.shots,
         accuracy = summary.accuracy,
+        firstShotAccuracy = summary.firstShotAccuracy,
         movements = movements,
         meanTimeToHitMs = summary.meanTimeToHitNanos?.let { it / 1e6 },
         meanFirstError = errors.averageOrNull(),
@@ -116,7 +129,8 @@ private fun movementMetric(
     if (distance < params.minTargetDistanceDegrees) return null
 
     val inWindow = submovements.filter { it.peakNanos in t0..t1 }
-    val first = inWindow.firstOrNull()
+    val firstIndex = inWindow.indexOfFirst { isFirstReach(it, track, if (fromNanos > spawn.timeNanos) null else t0, toTarget, distance, targetPitch, params) }
+    val first = inWindow.getOrNull(firstIndex)
     val firstError = first?.let {
         val end = track.viewAt(it.endNanos - 1)
         val moved = offset(start.yawDegrees, start.pitchDegrees, end.yawDegrees, end.pitchDegrees, targetPitch)
@@ -131,9 +145,19 @@ private fun movementMetric(
         reactionNanos = first?.let { it.startNanos - t0 },
         firstErrorRatio = firstError,
         firstPeakSpeedCountsPerMs = first?.peakSpeedCountsPerMs,
-        correctiveSubmovements = maxOf(0, inWindow.size - 1),
+        correctiveSubmovements = if (first == null) maxOf(0, inWindow.size - 1) else inWindow.size - 1 - firstIndex,
         pathEfficiency = if (path > 0.0) minOf(1.0, distance / path) else null,
     )
+}
+
+/** A submovement that is a reach toward the target rather than leftover motion or tremor. */
+private fun isFirstReach(sub: Submovement, track: ViewTrack, newTargetAtNanos: Long?, toTarget: Offset, distance: Double, targetPitch: Double, params: MetricsParams): Boolean {
+    if (newTargetAtNanos != null && sub.peakNanos < newTargetAtNanos + params.minReactionPeakNanos) return false
+    val from = track.viewAt(sub.startNanos - 1)
+    val to = track.viewAt(sub.endNanos - 1)
+    val moved = offset(from.yawDegrees, from.pitchDegrees, to.yawDegrees, to.pitchDegrees, targetPitch)
+    val along = (moved.x * toTarget.x + moved.y * toTarget.y) / distance
+    return along >= params.minFirstReachFraction * distance
 }
 
 private fun angularPath(recording: RoundRecording, track: ViewTrack, t0: Long, t1: Long, referencePitchDegrees: Double): Double {

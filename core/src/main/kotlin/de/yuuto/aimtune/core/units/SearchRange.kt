@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.core.units
 
+import kotlin.math.ln
 import kotlin.math.sqrt
 
 /** How the player moves the mouse during a flick. */
@@ -37,15 +38,28 @@ class SearchRangeTable(val ranges: Map<AimStyle, Pair<Double, Double>>) {
     }
 }
 
-private const val CURRENT_VALUE_MARGIN = 1.1
+/** The range reaches at least this factor below and above the current value. */
+private const val CURRENT_VALUE_REACH = 1.6
 
-/** A full turn must fit within the pad width (the player can still lift and reposition for more). */
+/** A range never gets wider than this ratio; the side of the style window that is farther from the current value gives way. */
+private const val MAX_RATIO = 6.0
+
+/** The current value keeps at least this margin to both ends, also when the range had to be trimmed. */
+private const val CURRENT_VALUE_MARGIN = 1.2
+
+/** Half a turn fits within the pad width: the most a player has to cover in one swipe, longer turns need a lift. */
+fun doesHalfTurnFitPad(cm360: Double, padWidthCm: Double): Boolean = cm360 / 2.0 <= padWidthCm
+
+/** A full turn fits within the pad width. Informational only; it no longer limits the search range. */
 fun doesTurnFitPad(cm360: Double, padWidthCm: Double): Boolean = cm360 <= padWidthCm
 
 /**
- * The search range for an aim style: the table window, with its upper bound capped by the pad width
- * and kept at least [SearchRange.MIN_RATIO] wide, then widened if needed so [currentCm360] lies
- * strictly inside (the current setting is always a valid candidate, even when it does not fit the pad).
+ * The search range: centred on the current value in log space (at least 1.6x below and above it, so the
+ * optimum can lie on either side), widened to the aim style's window of [table], and trimmed to a ratio
+ * of 6 if style and current value are far apart (the style side gives way, the current value stays
+ * inside with a margin). The pad width does not shape the range: players lift the mouse for long turns,
+ * and cutting the range at the pad width hid optima above the current value for small pads
+ * (docs/REVIEW.md M1). [padWidthCm] only has to be valid; use [doesHalfTurnFitPad] to warn.
  */
 fun searchRange(
     style: AimStyle,
@@ -55,10 +69,15 @@ fun searchRange(
 ): SearchRange {
     require(currentCm360.isFinite() && currentCm360 > 0.0) { "currentCm360 must be positive, was $currentCm360" }
     require(padWidthCm.isFinite() && padWidthCm > 0.0) { "padWidthCm must be positive, was $padWidthCm" }
-    var (lo, hi) = table.ranges.getValue(style)
-    hi = minOf(hi, padWidthCm)
-    if (hi < lo * SearchRange.MIN_RATIO) lo = hi / SearchRange.MIN_RATIO
-    if (currentCm360 <= lo) lo = currentCm360 / CURRENT_VALUE_MARGIN
-    if (currentCm360 >= hi) hi = currentCm360 * CURRENT_VALUE_MARGIN
+    val (tableLo, tableHi) = table.ranges.getValue(style)
+    var lo = minOf(currentCm360 / CURRENT_VALUE_REACH, tableLo)
+    var hi = maxOf(currentCm360 * CURRENT_VALUE_REACH, tableHi)
+    if (hi / lo > MAX_RATIO) {
+        val loSide = ln(currentCm360 / lo)
+        val hiSide = ln(hi / currentCm360)
+        if (loSide > hiSide) lo = hi / MAX_RATIO else hi = lo * MAX_RATIO
+        lo = minOf(lo, currentCm360 / CURRENT_VALUE_MARGIN)
+        hi = maxOf(hi, currentCm360 * CURRENT_VALUE_MARGIN)
+    }
     return SearchRange(lo, hi)
 }

@@ -11,12 +11,16 @@ enum class ScenarioKind(val id: String, val displayName: String, val usesClicks:
     SWITCHING("switching", "Target switching", true),
     ;
 
-    /** A new seeded round of this scenario with its default geometry. */
-    fun create(durationNanos: Long, seed: Long): Scenario = when (this) {
-        FLICK -> FlickScenario(FlickConfig(durationNanos = durationNanos), seed)
-        MICRO -> MicroScenario(MicroConfig(durationNanos = durationNanos), seed)
-        TRACKING -> TrackingScenario(TrackingConfig(durationNanos = durationNanos), seed)
-        SWITCHING -> SwitchingScenario(SwitchingConfig(durationNanos = durationNanos), seed)
+    /**
+     * A new seeded round of this scenario. Without [geometry] the fixed legacy values are used (they
+     * are what the simulation harness was calibrated on); with it the targets follow the game's
+     * angular sizes, distances and speeds.
+     */
+    fun create(durationNanos: Long, seed: Long, geometry: TrainerGeometry? = null): Scenario = when (this) {
+        FLICK -> FlickScenario(FlickConfig(durationNanos = durationNanos, geometry = geometry), seed)
+        MICRO -> MicroScenario(MicroConfig(durationNanos = durationNanos, geometry = geometry), seed)
+        TRACKING -> TrackingScenario(geometry?.let { TrackingConfig.from(it, durationNanos) } ?: TrackingConfig(durationNanos = durationNanos), seed)
+        SWITCHING -> SwitchingScenario(SwitchingConfig(durationNanos = durationNanos, geometry = geometry), seed)
     }
 
     companion object {

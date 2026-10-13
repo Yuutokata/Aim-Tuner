@@ -20,7 +20,7 @@ sealed interface RoundReport {
     data object Pending : RoundReport
 
     /** [saveError] is null when the round was stored, or the reason it was not. */
-    data class Done(val metrics: RoundMetrics, val saveError: String?) : RoundReport
+    data class Done(val metrics: RoundMetrics, val saveError: String?, val noMouseInput: Boolean = false) : RoundReport
 
     data class Failed(val message: String) : RoundReport
 }
@@ -48,6 +48,22 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
     var report: RoundReport? = null
         private set
 
+    init {
+        // Rounds stored with an older metric definition are recomputed from their raw events before anything reads them.
+        repository?.let { repo ->
+            executor.execute {
+                try {
+                    val refresh = repo.refreshMetrics()
+                    if (refresh.updated > 0 || refresh.failed > 0) {
+                        log.log(System.Logger.Level.INFO, "recomputed metrics of ${refresh.updated} stored rounds, ${refresh.failed} could not be read")
+                    }
+                } catch (e: Exception) {
+                    log.log(System.Logger.Level.ERROR, "recomputing stored metrics failed: ${e.message}", e)
+                }
+            }
+        }
+    }
+
     /** [runKey] separates the rounds of one blind test run into their own session; null keeps them with the game and DPI. [kind] is the session type the rounds belong to. */
     fun submit(
         recording: RoundRecording,
@@ -62,7 +78,7 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
             export(recording, startedAtMs)
             report = try {
                 val metrics = computeRoundMetrics(recording)
-                RoundReport.Done(metrics, store(recording, metrics, startedAtMs, blind, gameId, runKey, kind))
+                RoundReport.Done(metrics, store(recording, metrics, startedAtMs, blind, gameId, runKey, kind), recording.mouseEvents.isEmpty())
             } catch (e: Exception) {
                 log.log(System.Logger.Level.ERROR, "round analysis failed", e)
                 RoundReport.Failed(e.message ?: e.javaClass.simpleName)

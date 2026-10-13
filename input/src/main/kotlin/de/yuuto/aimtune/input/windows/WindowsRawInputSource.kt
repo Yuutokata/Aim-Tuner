@@ -55,6 +55,10 @@ class WindowsRawInputSource(override val clock: NanoClock = QpcClock()) : RawMou
         override fun callback(hwnd: HWND, uMsg: Int, wParam: WPARAM, lParam: LPARAM): LRESULT = handleMessage(hwnd, uMsg, wParam, lParam)
     }
 
+    override val reportsClicks = true
+
+    override val droppedEvents: Long get() = droppedOverflow.get()
+
     override val eventsReceived: Long get() = received.get()
 
     /** Events that arrived flagged as background input (diagnostic only, not used for gating). */
@@ -165,7 +169,7 @@ class WindowsRawInputSource(override val clock: NanoClock = QpcClock()) : RawMou
             droppedOverflow.incrementAndGet()
             return
         }
-        queue.add(MouseEvent(arrival, move.dx, move.dy))
+        queue.add(MouseEvent(arrival, move.dx, move.dy, move.leftPressed))
         queued.incrementAndGet()
         received.incrementAndGet()
     }

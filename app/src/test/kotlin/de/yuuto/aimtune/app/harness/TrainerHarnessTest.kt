@@ -78,21 +78,21 @@ class TrainerHarnessTest {
     @Test
     fun `the trainer driven by the simulated source records exactly what the headless runner records`() {
         for (seed in listOf(1L, 2L, 3L)) {
-            assertEquals(HeadlessRound.flick(player, dpi, cm360, seed, ROUND_SECONDS), playWithSimulatedSource(seed), "seed $seed")
+            assertEquals(HeadlessRound.of(ScenarioKind.FLICK, player, dpi, cm360, seed, ROUND_SECONDS, geometry = config(seed).geometry), playWithSimulatedSource(seed), "seed $seed")
         }
     }
 
     @Test
     fun `every scenario recorded by the trainer equals the headless runner`() {
         for (kind in ScenarioKind.entries) {
-            assertEquals(HeadlessRound.of(kind, player, dpi, cm360, 5, ROUND_SECONDS), playWithSimulatedSource(5, kind), kind.id)
+            assertEquals(HeadlessRound.of(kind, player, dpi, cm360, 5, ROUND_SECONDS, geometry = config(5).geometry), playWithSimulatedSource(5, kind), kind.id)
         }
     }
 
     @Test
     fun `a round with simulated acceleration is recorded alike by the trainer and the headless runner`() {
         val curve = NaturalCurve(0.2, 1.5)
-        val headless = HeadlessRound.flick(wantsRisingGain, dpi, cm360, 6, ROUND_SECONDS, accel = curve)
+        val headless = HeadlessRound.of(ScenarioKind.FLICK, wantsRisingGain, dpi, cm360, 6, ROUND_SECONDS, accel = curve, geometry = config(6).geometry)
         assertEquals(headless, playWithSimulatedSource(6, accel = curve))
         assertEquals(curve, headless.accel)
     }

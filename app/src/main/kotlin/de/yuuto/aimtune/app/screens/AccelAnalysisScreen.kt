@@ -45,7 +45,7 @@ class AccelAnalysisScreen(ctx: AppContext, private val run: AccelRun) : UiScreen
         }
         if (candidate == null) {
             content.add(
-                ui.label(t("accel.analysis.plain_supported"), Styles.CAPTION_MUTED, wrap = true),
+                ui.label(t("accel.analysis.plain_supported") + " " + t("accel.analysis.trial_hint"), Styles.CAPTION_MUTED, wrap = true),
             ).left().width(TEXT_WIDTH)
         }
 
@@ -54,6 +54,8 @@ class AccelAnalysisScreen(ctx: AppContext, private val run: AccelRun) : UiScreen
         footer.add().expandX()
         if (candidate != null) {
             footer.addButton(ui.button(t("accel.analysis.test_blind"), Styles.PRIMARY) { start() }, minWidth = 260f)
+        } else if (fit.points.size >= 2) {
+            footer.addButton(ui.button(t("accel.analysis.try_anyway"), Styles.SECONDARY) { startTrial() }, minWidth = 260f)
         }
         return ui.frame(null, content, footer)
     }
@@ -62,6 +64,11 @@ class AccelAnalysisScreen(ctx: AppContext, private val run: AccelRun) : UiScreen
 
     override fun onEnter() {
         if (candidate != null) start()
+    }
+
+    private fun startTrial() {
+        run.startTrial()
+        ctx.showAccelStep(run)
     }
 
     private fun start() {

@@ -26,7 +26,6 @@ data class AccelFit(
     fun totalGain(speed: Double): Double = sensitivityFactor * curve.multiplier(speed)
 }
 
-/** What the fitting found: every family's fit, and the best one if it clears the bar. */
 /** Why the analysis ended as it did; the app turns it into a translated text, [AccelFitResult.reason] is the English one. */
 enum class AccelReason { NOT_ENOUGH_MOVEMENTS, NARROW_SPEED_RANGE, NO_FIT, NOT_BETTER_THAN_NONE, SMALL_CHANGE, FITS }
 
@@ -130,3 +129,25 @@ private fun objective(family: Family, params: DoubleArray, points: List<GainPoin
 
 private const val MIN_MULTIPLIER = 1e-3
 private const val MAX_LOG_FACTOR = 2.0
+
+/**
+ * A mild curve for a player who wants to try one although the analysis found none: the gain moves by
+ * [strength] (15 % by default) from slow to fast hands, upward or downward, and the low-speed sensitivity stays
+ * as it is. It is a hypothesis, not a finding; the blind test decides if it is worth keeping.
+ */
+fun trialAccel(rising: Boolean, strength: Double = TRIAL_STRENGTH): AccelFit {
+    require(strength > 0.0 && strength < 0.9) { "strength must be between 0 and 0.9" }
+    val limit = if (rising) 1.0 + strength else 1.0 - strength
+    return AccelFit(
+        family = "natural (trial)",
+        curve = NaturalCurve(decayRate = TRIAL_DECAY, limit = limit),
+        sensitivityFactor = 1.0,
+        chiSquare = 0.0,
+        nullChiSquare = 0.0,
+        bicGain = 0.0,
+        gainRange = if (rising) limit else 1.0 / limit,
+    )
+}
+
+const val TRIAL_STRENGTH = 0.15
+private const val TRIAL_DECAY = 0.05

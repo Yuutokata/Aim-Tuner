@@ -139,7 +139,12 @@ class BlindTest(
         }
 
         /** The optimizer's view of [rounds] with their [scores]; each scenario is its own group. */
-        private fun observations(rounds: List<PastRound>, scores: List<Double?>): List<Observation> =
-            rounds.indices.map { Observation(rounds[it].sessionId, rounds[it].cm360, scores[it] ?: UNKNOWN_SCORE, rounds[it].scenario.hashCode()) }
+        private fun observations(rounds: List<PastRound>, scores: List<Double?>): List<Observation> {
+            val stepInSession = HashMap<Long, Int>()
+            return rounds.indices.map {
+                val step = checkNotNull(stepInSession.merge(rounds[it].sessionId, 1, Int::plus)) - 1
+                Observation(rounds[it].sessionId, rounds[it].cm360, scores[it] ?: UNKNOWN_SCORE, rounds[it].scenario.hashCode(), step)
+            }
+        }
     }
 }

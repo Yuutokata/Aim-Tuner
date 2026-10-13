@@ -12,6 +12,7 @@ import de.yuuto.aimtune.core.accel.AccelFit
 import de.yuuto.aimtune.core.accel.AccelFitResult
 import de.yuuto.aimtune.core.accel.evaluateAb
 import de.yuuto.aimtune.core.accel.fitAccel
+import de.yuuto.aimtune.core.accel.trialAccel
 import de.yuuto.aimtune.core.accel.movementSamples
 import de.yuuto.aimtune.core.metrics.RoundMetrics
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
@@ -66,8 +67,20 @@ class AccelRun(
 
     val dpi: Double get() = baseConfig.dpi
 
-    /** The curve under test, once the analysis has recommended one. */
-    val candidate: AccelFit? get() = fit?.recommended
+    private var trial: AccelFit? = null
+
+    /** The curve under test: the one the analysis recommended, or the mild trial curve the player asked for. */
+    val candidate: AccelFit? get() = fit?.recommended ?: trial
+
+    /** True when the curve under test is a hypothesis of the player's and not a finding of the analysis. */
+    val isTrial: Boolean get() = fit?.recommended == null && trial != null
+
+    /** Whether the wanted gain the analysis measured rises with speed; a guess for the direction of a trial curve. */
+    val trialRises: Boolean
+        get() {
+            val points = fit?.points.orEmpty()
+            return points.size < 2 || points.last().logGain >= points.first().logGain
+        }
 
     val calibrationDone: Int get() = calibration.size
 
@@ -133,6 +146,13 @@ class AccelRun(
     /** Begins the blind test of the recommended curve. */
     fun startTest() {
         check(phase == AccelPhase.ANALYSIS && candidate != null) { "there is no curve to test" }
+        phase = AccelPhase.TEST
+    }
+
+    /** Begins the blind test of a mild trial curve although the analysis found none. */
+    fun startTrial(rising: Boolean = trialRises) {
+        check(phase == AccelPhase.ANALYSIS && fit?.recommended == null) { "the analysis already has a curve, or it is not done" }
+        trial = trialAccel(rising)
         phase = AccelPhase.TEST
     }
 

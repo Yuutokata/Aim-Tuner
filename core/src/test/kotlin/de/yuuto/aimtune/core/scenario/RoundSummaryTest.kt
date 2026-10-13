@@ -3,6 +3,7 @@ package de.yuuto.aimtune.core.scenario
 import de.yuuto.aimtune.core.math.Vec3
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class RoundSummaryTest {
@@ -31,5 +32,26 @@ class RoundSummaryTest {
         assertEquals(3, s.shots)
         assertEquals(2.0 / 3.0, s.accuracy, 1e-12)
         assertEquals(500L, s.meanTimeToHitNanos)
+    }
+
+    @Test
+    fun `first shot accuracy counts the first click of every reach, not every click`() {
+        val events = listOf(
+            TargetEvent.Spawned(0, target(0)),
+            TargetEvent.Miss(100), // first shot of reach 1 missed
+            TargetEvent.Miss(200), // a second miss does not count again
+            TargetEvent.Hit(400, 0),
+            TargetEvent.Spawned(400, target(1)),
+            TargetEvent.Hit(1000, 1), // first shot of reach 2 hit
+            TargetEvent.Spawned(1000, target(2)),
+            TargetEvent.Hit(1300, 2),
+        )
+        val s = summarize(events)
+        assertEquals(5, s.shots)
+        assertEquals(3, s.firstShots)
+        assertEquals(2, s.firstShotHits)
+        assertEquals(2.0 / 3.0, assertNotNull(s.firstShotAccuracy), 1e-12)
+        assertEquals(3.0 / 5.0, s.accuracy, 1e-12)
+        assertNull(summarize(listOf(TargetEvent.Spawned(0, target(0)))).firstShotAccuracy)
     }
 }

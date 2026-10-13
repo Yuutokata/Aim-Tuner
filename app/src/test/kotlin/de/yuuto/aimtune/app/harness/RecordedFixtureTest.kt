@@ -31,6 +31,8 @@ class RecordedFixtureTest {
         val config = TrainerConfig(
             dpi = log.dpi, cm360 = log.cm360, profile = checkNotNull(GameProfiles.load().find("valorant")),
             roundSeconds = ((log.endNanos - log.startNanos) / 1_000_000_000L).toInt(), seed = log.seed,
+            // The fixture was recorded with the fixed geometry of M2-M8.
+            geometry = null,
         )
         var finished: RoundRecording? = null
         val source = ReplayMouseSource(log, clock)

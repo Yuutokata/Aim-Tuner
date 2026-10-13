@@ -2,6 +2,7 @@ package de.yuuto.aimtune.app.accel
 
 import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.core.accel.AbStatus
+import de.yuuto.aimtune.core.accel.trialAccel
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.sim.HeadlessRound
@@ -54,6 +55,30 @@ class AccelRunTest {
         assertNull(run.candidate)
         assertFailsWith<IllegalStateException> { run.startTest() }
         assertFailsWith<IllegalStateException> { run.nextRoundConfig() }
+    }
+
+    @Test
+    fun `a player can test a mild trial curve although the analysis found none`() {
+        val run = newRun()
+        while (run.phase == AccelPhase.CALIBRATION) play(run, SimulatedPlayer())
+        assertNull(run.candidate)
+        run.startTrial(rising = true)
+        assertEquals(AccelPhase.TEST, run.phase)
+        assertTrue(run.isTrial)
+        val trial = checkNotNull(run.candidate)
+        assertEquals(1.0, trial.sensitivityFactor, "the low-speed sensitivity stays as it is")
+        assertTrue(trial.curve.multiplier(30.0) in 1.1..1.16)
+        val configs = (0 until 2).map { run.nextRoundConfig().also { _ -> play(run, SimulatedPlayer()) } }
+        assertEquals(1, configs.count { it.accel != null }, "one round of a pair has the curve")
+        assertTrue(configs.all { it.cm360 == 55.0 })
+    }
+
+    @Test
+    fun `a falling trial curve lowers the gain with speed and a found curve cannot be replaced by a trial`() {
+        val falling = trialAccel(rising = false)
+        assertTrue(falling.curve.multiplier(30.0) < 0.9 && falling.gainRange in 1.1..1.2)
+        val run = sampleAccelRun(base, AccelPhase.ANALYSIS)
+        assertFailsWith<IllegalStateException> { run.startTrial() }
     }
 
     @Test

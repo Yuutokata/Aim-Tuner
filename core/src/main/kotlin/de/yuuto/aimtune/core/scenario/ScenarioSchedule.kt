@@ -8,7 +8,7 @@ val ScenarioKind.producedMetrics: Set<ScoreMetric>
     get() = when (this) {
         ScenarioKind.TRACKING -> setOf(ScoreMetric.TRACKING)
         ScenarioKind.FLICK, ScenarioKind.MICRO, ScenarioKind.SWITCHING ->
-            setOf(ScoreMetric.ACCURACY, ScoreMetric.TIME_TO_HIT, ScoreMetric.CONSISTENCY)
+            setOf(ScoreMetric.ACCURACY, ScoreMetric.TIME_TO_HIT)
     }
 
 /**

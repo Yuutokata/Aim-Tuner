@@ -65,7 +65,7 @@ class Trainer(
         summary = null
         recordedMouse.clear()
         accelProcessor = config.accel?.let { AccelProcessor(it, config.dpi) }
-        scenario = config.scenario.create(roundNanos, roundSeed)
+        scenario = config.scenario.create(roundNanos, roundSeed, config.geometry)
         roundStartNanos = nowNanos()
         scenario?.start(roundStartNanos)
         phase = Phase.RUNNING
@@ -93,11 +93,11 @@ class Trainer(
     fun fire(): ShotResult {
         val s = scenario ?: return ShotResult.IGNORED
         if (phase != Phase.RUNNING) return ShotResult.IGNORED
+        // With a source that reports clicks, shots come from the report stream (see applyPendingMouse).
+        if (source.reportsClicks) return ShotResult.IGNORED
         // Bring the view and moving targets up to date first so the shot uses the latest state.
         applyPendingMouse()
-        val now = nowNanos()
-        s.update(now)
-        return s.fire(Vec3.ZERO, view.direction(), now)
+        return shoot(s, nowNanos())
     }
 
     private fun finishRound(s: Scenario) {
@@ -125,10 +125,27 @@ class Trainer(
             lastEvent = event
             rate.record(event.timeNanos)
             if (phase == Phase.RUNNING) {
-                val scale = accelProcessor?.scaleFor(event) ?: 1.0
-                view = view.rotatedByCounts(event.dx * scale, event.dy * scale, degreesPerCount)
-                recordedMouse += event
+                if (event.dx != 0 || event.dy != 0) {
+                    val scale = accelProcessor?.scaleFor(event) ?: 1.0
+                    view = view.rotatedByCounts(event.dx * scale, event.dy * scale, degreesPerCount)
+                    recordedMouse += if (event.leftPressed) event.copy(leftPressed = false) else event
+                }
+                // A click in the report stream is shot at the view of that very report. A click within the
+                // first moments is the one that started the round (it can arrive after the queue was cleared).
+                if (event.leftPressed && source.reportsClicks && event.timeNanos - roundStartNanos >= MIN_SHOT_DELAY_NANOS) {
+                    scenario?.let { shoot(it, event.timeNanos) }
+                }
             }
         }
+    }
+
+    private fun shoot(s: Scenario, nowNanos: Long): ShotResult {
+        s.update(nowNanos)
+        return s.fire(Vec3.ZERO, view.direction(), nowNanos)
+    }
+
+    private companion object {
+        /** No target can be answered sooner than this after the round began. */
+        const val MIN_SHOT_DELAY_NANOS = 150_000_000L
     }
 }

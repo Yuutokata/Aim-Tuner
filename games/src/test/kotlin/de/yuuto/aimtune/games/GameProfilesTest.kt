@@ -95,4 +95,21 @@ class GameProfilesTest {
         assertFailsWith<GameProfileException> { parseGameProfile(valid.replace("\"width\":16", "\"width\":0")) }
         assertFailsWith<GameProfileException> { parseGameProfile("{}") }
     }
+
+    @Test
+    fun `trainer geometry is read from the profile and falls back to the defaults`() {
+        val valorant = assertNotNull(bundled.find("valorant"))
+        assertEquals(0.4, valorant.geometry.clickTargetDiameterDegrees.min)
+        assertEquals(1.9, valorant.geometry.clickTargetDiameterDegrees.max)
+        assertEquals(false, valorant.geometry.verified)
+        val plain = parseGameProfile(valid)
+        assertEquals(de.yuuto.aimtune.core.scenario.TrainerGeometry.DEFAULT, plain.geometry)
+        val custom = parseGameProfile(valid.replace("\"sensitivity\"", "\"trainer\":{\"clickTargetDiameterDegrees\":{\"min\":1.0,\"max\":2.0},\"verified\":true},\"sensitivity\""))
+        assertEquals(1.0, custom.geometry.clickTargetDiameterDegrees.min)
+        assertEquals(true, custom.geometry.verified)
+        assertEquals(de.yuuto.aimtune.core.scenario.TrainerGeometry.DEFAULT.flickAngles, custom.geometry.flickAngles)
+        assertFailsWith<GameProfileException> {
+            parseGameProfile(valid.replace("\"sensitivity\"", "\"trainer\":{\"clickTargetDiameterDegrees\":{\"min\":3.0,\"max\":2.0}},\"sensitivity\""))
+        }
+    }
 }

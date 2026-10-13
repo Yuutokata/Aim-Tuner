@@ -144,6 +144,7 @@ class Hud(private val config: TrainerConfig, private val tokens: Tokens, private
             error?.let { it to text },
             m.meanCorrectiveSubmovements?.let { i18n.t("hud.corrections", "%.1f".format(Locale.ROOT, it)) to text },
             m.meanPathEfficiency?.let { i18n.t("hud.path_efficiency", "%.0f".format(Locale.ROOT, it * 100)) to text },
+            if (report.noMouseInput) i18n.t("hud.no_mouse") to tokens.caution else null,
             (if (report.saveError == null) i18n.t("hud.saved") else i18n.t("hud.not_saved", report.saveError)) to
                 (if (report.saveError == null) muted else tokens.caution),
         )
@@ -153,7 +154,7 @@ class Hud(private val config: TrainerConfig, private val tokens: Tokens, private
         val last = trainer.lastEvent
         val lines = listOf(
             "source: ${source.name}",
-            "events: ${source.eventsReceived}  rate: %.0f/s".format(Locale.ROOT, trainer.rate.ratePerSecond(trainer.nowNanos())),
+            "events: ${source.eventsReceived}  rate: %.0f/s  dropped: ${source.droppedEvents}".format(Locale.ROOT, trainer.rate.ratePerSecond(trainer.nowNanos())),
             "last: ${last?.let { "dx=${it.dx} dy=${it.dy}" } ?: "-"}",
             "yaw %.2f  pitch %.2f".format(Locale.ROOT, trainer.view.yawDegrees, trainer.view.pitchDegrees),
             "deg/count %.5f  seed ${config.seed}  fps $fps".format(Locale.ROOT, trainer.degreesPerCountValue),
