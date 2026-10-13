@@ -81,7 +81,7 @@ Single source of truth for project status. Update at the end of every task and b
 - [x] Simulated player wants a speed-dependent gain (`gainPreference`, in in/s; it plans with it and gets what the curve gives, sees its true view) so the analysis has something to find
 - [x] Error-vs-speed analysis (`AccelAnalysis`: wanted gain per speed bin, normalized to the average movement; all click scenarios pooled, because flicks alone cover too narrow a speed range)
 - [x] Curve fitting (`fitAccel`: classic, natural, power with a free overall factor) + model selection against "no accel" (BIC gain of 10 and at least 8 % gain change)
-- [ ] In-app simulation + blind A/B with a measurable-gain decision
+- [x] Blind A/B (`AccelAbPlan`, `evaluateAb`): pairs of rounds with the same scenario and targets in counterbalanced order, paired t interval with a Pocock-style per-look level; calibrated on simulated rounds with no difference (1 of 30 false "better", 0 "worse"); the end-to-end `AccelPipelineTest` shows analysis -> fit -> A/B on the simulated players
 - [ ] Raw Accel export (settings.json), only offered when A/B shows a gain
 - [ ] Accel screens in the app
 - [ ] Hands-on test by the user
