@@ -6,6 +6,9 @@ The optimizer needs a 1-D GP with a noise model and an acquisition function over
 ## Decision
 Implement the GP in `core` with EJML for Cholesky, not a general ML framework.
 
+## Amendment (M5)
+The linear algebra is a plain Cholesky factorization written in `core` (about 100 lines, with growing diagonal jitter) instead of EJML. The matrices have at most a few hundred rows, so a dependency adds nothing, and it avoids using an API we had not verified. Everything else in the decision stands.
+
 ## Consequences
 - Small dependency footprint, full control over kernel, noise and session offsets.
 - We own the numerics (jitter, conditioning) and must test them, including against the simulated player.

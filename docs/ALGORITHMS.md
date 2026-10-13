@@ -58,17 +58,28 @@ The two terms give an interior optimum. Because everything depends on `c / optim
 
 Measured with the baseline estimator (9 grid points x 4 rounds = 36 rounds, 20-140 cm/360, 8 seeds): within a factor 1.3 of the truth in 88-100 % of the runs, median error factor 1.06-1.18 (see `core/build/reports/harness/baseline-convergence.txt`). That is the number the optimizer has to beat with fewer rounds. These tolerances describe this simulated player; they say nothing about real humans.
 
-## Bayesian optimization *(draft, M5)*
+## Bayesian optimization (M5, implemented in `core/optimizer`)
 
-Variable `x = ln(cm360)`. GP with Matern 5/2 kernel plus learned observation noise; Cholesky via EJML. Mean function with session offsets (learning/fatigue) or per-session normalization. Acquisition: Expected Improvement (UCB as alternative); occasional repeats of tested points to estimate noise. Blind order is randomized by the optimizer, not shown to the user.
+**Model.** `x = ln(cm360)`. Round scores (0-100, computed over all rounds together, see "Metrics and score") are standardized and modelled as `y = f(x) + offset(session) + noise` with a Matern 5/2 prior on `f`. The session offset (a better or worse day) is integrated out by adding a "same session" covariance `tau^2` to the kernel matrix, so rounds of many sessions give one estimate of `f` without a day-to-day shift biasing the optimum. Hyperparameters (lengthscale 0.12-1.2 times the log width of the search range, signal variance, noise variance 0.15-1.2, session variance 0 / 0.1 / 0.4) are picked from a small grid by marginal likelihood. The noise floor is deliberately not tiny: with few rounds a near-zero noise estimate gives an overconfident fit. Cholesky is hand-written (ADR 0004 amendment).
 
-## Confidence *(draft, M5)*
+**Choosing the next sensitivity** (`suggestNext`, a pure function of the history and a seed, so a test can be stopped and continued):
+1. Rounds 1-6: a seeded, shuffled, stratified design over the log range (hidden random order).
+2. Afterwards: expected improvement over the best posterior mean on a 121-point grid, excluding values within 3 % of the previous round's.
+3. Repeats: from round 8 on, if no point has been tested twice in a session, or every 6th round, the tested point with the best posterior mean is replayed, so the noise is observable.
 
-From the posterior: width of the credible interval of the argmax (sampling or Laplace), mapped to a 0-100% value, plus a recommendation whether more rounds are worthwhile (expected improvement of the next round vs. threshold).
+**Result** (`analyze`, from 3 rounds on): the argmax of the posterior mean refined by a parabola, plus 400 posterior draws of `f` on the grid. From the draws:
+- the central 80 % interval of the best cm/360 ("Range 38-46"),
+- the expected regret (score points lost by choosing the estimate instead of the true best),
+- the confidence: the share of draws in which the estimate loses at most `negligible = max(0.5, 0.2 * sd of the round scores)` points against that draw's best. Below 10 rounds it is capped at 50 %.
+More rounds are recommended while the confidence is under 85 %; "about N more rounds" assumes the failure share shrinks like 1/rounds and is only a rough guide.
 
-## Multi-session merging *(draft, M5)*
+**Why this confidence and not the interval width.** Scores are flat near the optimum (the simulated player loses under 2 points between 38 and 73 cm/360), so the argmax interval stays wide however many rounds are played, while any value in it is practically as good. The loss-based number answers the question that matters: could a different value be noticeably better. The interval is still shown.
 
-All rounds of all sessions enter one GP with per-session offset terms, so results combine without letting day-to-day shifts bias the optimum.
+**Measured on the simulated player** (12 seeds, 28 rounds, tolerance x1.3 around the truth): 67-83 % of runs within tolerance, against 67-92 % for the 36-round grid baseline, so the optimizer reaches about the same accuracy with 22 % fewer rounds, not a dramatic gain (`core/build/reports/harness/optimizer-convergence.txt`). Calibration over 120 runs: runs reporting 80 % or more confidence were within x1.3 of the truth 96 % of the time, 60-80 % confidence 78 %, below 40 % only 57 %.
+
+## Multi-session merging (M5)
+
+Rounds with the same game and DPI from all sessions enter one fit; each blind-test run is its own session for the offset term. Scores are recomputed over all of them every time. See `SensitivityOptimizerTest` (merged sessions with a 10 point worse second day).
 
 ## Accel analysis and fitting *(draft, M7)*
 
