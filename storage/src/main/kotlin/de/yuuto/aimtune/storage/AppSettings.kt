@@ -75,6 +75,6 @@ data class AppSettings(
         const val CURRENT_VERSION = 1
         const val DEFAULT_ROUND_SECONDS = 45
         val DEFAULT_WEIGHTS: Map<String, Double> = MetricWeights.DEFAULT.values.mapKeys { it.key.name }
-        val DEFAULT_SCENARIOS: List<String> = ScenarioKind.entries.map { it.id }
+        val DEFAULT_SCENARIOS: List<String> = listOf(ScenarioKind.FLICK.id)
     }
 }

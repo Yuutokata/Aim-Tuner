@@ -45,7 +45,7 @@ data class SimulatedPlayer(
     /** Fraction of the remaining error corrected per control step (every 40 ms). */
     val trackingGain: Double = 0.7,
     /** Fastest the hand can move while tracking smoothly; slower than a flick, so a high cm/360 falls behind fast targets. */
-    val trackingMaxHandSpeedCmPerS: Double = 8.0,
+    val trackingMaxHandSpeedCmPerS: Double = 4.0,
     /** Hand noise per control step as a multiple of the flick hand noise (smooth pursuit is less precise than a flick). */
     val trackingNoiseShare: Double = 2.0,
 ) {

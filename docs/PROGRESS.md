@@ -70,7 +70,9 @@ Single source of truth for project status. Update at the end of every task and b
 - [x] Per-scenario score baselines; score combination: weights decide the score and the share of rounds each scenario gets (`ScenarioSchedule`)
 - [x] Simulated player plays all four scenarios; trainer, HUD, between-rounds and settings screens (scenario toggles) know them; storage keeps waypoints and tracking metrics
 - [x] Mixed-scenario convergence test and report; optimizer: scenario offsets, edge-of-range flag with capped confidence
-- [ ] Hands-on test by the user: all four scenarios feel right and are playable, tracking needs no clicking, settings toggles work, the recommendation still makes sense with the mix
+- [x] Hands-on test by the user (first try): the result still matched their sensitivity; tracking was too fast and changed direction too often; confidence stayed at 19 % after 9 rounds in 3 sessions (about 39 more rounds estimated) with all four scenarios on
+- [x] Fixes: tracking slowed down (6-22 degrees per second, segments 1.2-2.8 s, radius 0.5 m); default is now flick only, other scenarios are opt-in toggles in Settings
+- [ ] Second hands-on test: tracking playable now, flick-only confidence rises as in M5, mixed scenarios opt-in
 
 ### M7 Accel
 - [ ] Verify Raw Accel modes, units, settings.json schema
@@ -117,7 +119,7 @@ Single source of truth for project status. Update at the end of every task and b
 - The confidence definition (chance that the estimate loses at most 0.2 x the score spread against the true best) and the 85 % target are my choice; revisit with real data. The scores of real humans may be flatter or noisier than the simulated player, then confidence will stay lower.
 - Scenario geometry (target sizes, distances, tracking speeds 12-40 degrees per second, three targets for switching) is my first guess, not taken from a game; revisit after real play.
 - Tracking has no click or hold: the on-target time is measured from the crosshair alone. Real tracking drills usually need the fire button held; this was left out to keep the input simple.
-- Default is all four scenarios on, with the weights deciding their share. Rounds are spread over four kinds, so confidence rises more slowly than with flick only; the user can switch scenarios off. Decide the default after the M6 hands-on test.
+- Default is flick only. With all four on, rounds are spread over four kinds and a scenario needs 3 rounds of its own before its rounds count (until then they are a neutral 50), so confidence stalled in the user's test (19 % after 9 rounds). Idea if mixed tests should work: score rounds of a scenario without a baseline against the pooled baseline of the same metrics, or play scenarios in blocks.
 - In the simulation micro-adjust prefers the lowest sensitivity of the range; if real players show the same, a mixed result can end at the edge of the range (the app then says so and caps the confidence).
 - Blind rounds are only comparable per game and DPI; changing the game profile (FOV) starts a separate data set.
 - Export Raw Accel settings needs a save location: LibGDX has no file dialog (options: native dialog via LWJGL tinyfd, or fixed folder). Decide at M7.

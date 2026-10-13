@@ -79,11 +79,11 @@ class SettingsStoreTest {
     }
 
     @Test
-    fun `enabled scenarios default to all, survive a round trip and reject bad selections`() {
-        assertEquals(ScenarioKind.entries.toSet(), AppSettings().enabledScenarios())
+    fun `enabled scenarios default to flick only, survive a round trip and reject bad selections`() {
+        assertEquals(setOf(ScenarioKind.FLICK), AppSettings().enabledScenarios())
         val file = dir.resolve("old.json")
         Files.writeString(file, """{"version":1,"dpi":800.0}""")
-        assertEquals(ScenarioKind.entries.toSet(), SettingsStore(file).load().enabledScenarios())
+        assertEquals(setOf(ScenarioKind.FLICK), SettingsStore(file).load().enabledScenarios())
 
         val store = store()
         store.save(AppSettings(scenarios = listOf("flick", "tracking")))

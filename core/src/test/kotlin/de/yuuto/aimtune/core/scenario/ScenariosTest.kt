@@ -120,7 +120,7 @@ class TrackingScenarioTest {
         val events = playedEvents(seed = 11, stepNanos = 10_000_000L)
         val spawn = events.first() as TargetEvent.Spawned
         val waypoints = events.filterIsInstance<TargetEvent.Waypoint>()
-        assertTrue(waypoints.size > 10)
+        assertTrue(waypoints.size > 5)
         val points = listOf(spawn.timeNanos to spawn.target.center) + waypoints.map { it.timeNanos to it.center }
         points.forEach { (_, c) ->
             val t = Target(0, c, 1.0)

@@ -15,12 +15,12 @@ data class TrackingConfig(
     val maxYawDegrees: Double = 35.0,
     val maxPitchDegrees: Double = 15.0,
     val distance: Double = 14.0,
-    val targetRadius: Double = 0.4,
+    val targetRadius: Double = 0.5,
     /** Angular speed of each straight segment, drawn uniformly. */
-    val minSpeedDegreesPerSecond: Double = 12.0,
-    val maxSpeedDegreesPerSecond: Double = 40.0,
-    val minSegmentSeconds: Double = 0.5,
-    val maxSegmentSeconds: Double = 1.4,
+    val minSpeedDegreesPerSecond: Double = 6.0,
+    val maxSpeedDegreesPerSecond: Double = 22.0,
+    val minSegmentSeconds: Double = 1.2,
+    val maxSegmentSeconds: Double = 2.8,
 ) {
     init {
         require(durationNanos > 0) { "durationNanos must be positive" }
