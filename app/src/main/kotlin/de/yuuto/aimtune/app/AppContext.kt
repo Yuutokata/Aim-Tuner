@@ -107,7 +107,7 @@ class AppContext(
     /** Ends the run and shows what it found; back to the menu when nothing was played or stored. */
     fun stopBlindTest(run: BlindRun) {
         val result = run.test.step().result
-        val data = ResultsData(run.profile, run.dpi, run.currentCm360, result, run.test.totalRounds, run.test.sessionCount)
+        val data = ResultsData(run.profile, run.dpi, run.currentCm360, result, run.test.totalRounds, run.test.sessionCount, run.test.scoredRounds())
         run.test.close()
         if (run.test.totalRounds == 0) showMenu() else switchTo(ResultsScreen(this, data))
     }
@@ -118,6 +118,7 @@ class AppContext(
         val config = stored.config
         val data = ResultsData(
             config.profile, config.dpi, config.cm360, stored.result, stored.rounds.size, stored.rounds.map { it.sessionId }.distinct().size,
+            BlindTest.scoreRounds(stored.weights, stored.rounds),
         )
         switchTo(ResultsScreen(this, data))
     }

@@ -5,6 +5,9 @@ import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.utils.Align
 import de.yuuto.aimtune.app.AppContext
+import de.yuuto.aimtune.app.blind.ScoredRound
+import de.yuuto.aimtune.app.ui.ChartActor
+import de.yuuto.aimtune.app.ui.sensitivityChart
 import de.yuuto.aimtune.app.ui.Styles
 import de.yuuto.aimtune.app.ui.addButton
 import de.yuuto.aimtune.app.ui.button
@@ -22,6 +25,7 @@ private const val CARD_PADDING = 32f
 private const val UNIT_GAP = 16f
 private const val UNIT_BASELINE_LIFT = 28f
 private const val FOOTER_BUTTON_HEIGHT = 64f
+private const val CHART_MIN_HEIGHT = 240f
 
 /** What the results screen shows; built by [AppContext] from a finished run or from stored rounds. */
 data class ResultsData(
@@ -31,6 +35,8 @@ data class ResultsData(
     val result: OptimizationResult?,
     val rounds: Int,
     val sessions: Int,
+    /** Every round with its score, for the chart dots. */
+    val scored: List<ScoredRound> = emptyList(),
 )
 
 /**
@@ -42,7 +48,7 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
 
     override fun build(): Actor {
         val content = Table()
-        content.add(ui.label("Results", Styles.HEADING)).left().padBottom(48f).row()
+        content.add(ui.label("Results", Styles.HEADING)).left().padBottom(24f).row()
         val result = data.result
         if (result == null || recommendedSensitivity == null) {
             content.add(ui.label(emptyText(), Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH * 2)
@@ -50,7 +56,8 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
             val columns = Table()
             columns.add(recommendation(result, recommendedSensitivity)).top().left()
             columns.add(confidenceCard(result)).top().left().width(CARD_WIDTH).padLeft(COLUMN_GAP)
-            content.add(columns).left()
+            content.add(columns).left().padBottom(32f).row()
+            content.add(chartBlock(result)).left().grow()
         }
         return ui.frame(null, content, footer(recommendedSensitivity))
     }
@@ -74,6 +81,13 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
         val change = ((result.optimumCm360 / data.currentCm360 - 1.0) * 100.0).roundToInt()
         val range = "Range %.1f–%.1f · now %.1f (%+d %%)".format(Locale.ROOT, result.intervalLowCm360, result.intervalHighCm360, data.currentCm360, change)
         block.add(ui.label(range, Styles.MONO_MUTED)).left()
+        return block
+    }
+
+    private fun chartBlock(result: OptimizationResult): Table {
+        val block = Table()
+        block.add(ui.caps("Score by cm/360° · line, 95 % band, rounds")).left().padBottom(12f).row()
+        block.add(ChartActor(ui, sensitivityChart(ui.tokens, result, data.scored))).grow().minHeight(CHART_MIN_HEIGHT)
         return block
     }
 

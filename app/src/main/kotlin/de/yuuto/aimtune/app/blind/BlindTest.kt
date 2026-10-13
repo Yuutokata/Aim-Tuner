@@ -18,6 +18,9 @@ import java.util.concurrent.Executors
 /** A stored round of an earlier session, reduced to what the optimizer needs; [scenario] is the scenario id. */
 data class PastRound(val sessionId: Long, val cm360: Double, val inputs: Map<ScoreMetric, Double>, val scenario: String = ScenarioKind.FLICK.id)
 
+/** A blind round as the results chart plots it; [score] is null while the round has no usable score yet. */
+data class ScoredRound(val cm360: Double, val score: Double?, val sessionId: Long)
+
 /**
  * What the user may see about a finished round; the sensitivity is deliberately not part of it.
  * Click scenarios have hits and time to hit, tracking has the share of time on target.
@@ -80,6 +83,9 @@ class BlindTest(
     /** Sensitivity of the next round. Blind: callers must not show it. */
     fun nextCm360(): Double = job.get().next.cm360
 
+    /** Every round in the model (earlier sessions and this run) with its current score; null score while it has none. */
+    fun scoredRounds(): List<ScoredRound> = scoreRounds(weights, past + played)
+
     /** Rounds of this run and of all earlier sessions in the model. */
     val totalRounds: Int get() = past.size + played.size
 
@@ -113,6 +119,12 @@ class BlindTest(
 
         /** A round without a usable score yet (fewer than three rounds) only counts for the design phase. */
         private const val UNKNOWN_SCORE = 50.0
+
+        /** [rounds] with the score the model sees for each, for the results chart. */
+        fun scoreRounds(weights: MetricWeights, rounds: List<PastRound>): List<ScoredRound> {
+            val scores = ScoreCalculator(weights).scoreRounds(rounds.map { it.inputs }, rounds.map { it.scenario })
+            return rounds.indices.map { ScoredRound(rounds[it].cm360, scores[it], rounds[it].sessionId) }
+        }
 
         /** The result of stored rounds alone, for the results screen. */
         fun analyzeStored(

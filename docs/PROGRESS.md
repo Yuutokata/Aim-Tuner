@@ -4,8 +4,8 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Current
 
-- **Milestone:** M7 Accel
-- **Task:** implemented and committed locally (not pushed); waiting for the user's hands-on test (see Next steps). M1-M6 are pushed.
+- **Milestone:** M8 Results, i18n, packaging (in progress)
+- **Task:** results charts done; next history, i18n, jpackage, README. M7 is pushed, its second hands-on part (analysis, blind test, Raw Accel import) is still open.
 
 ## Checklist
 
@@ -88,7 +88,8 @@ Single source of truth for project status. Update at the end of every task and b
 - [ ] Hands-on test, second part: analysis result, blind test and Raw Accel import
 
 ### M8 Results, i18n, packaging
-- [ ] Results view (sens + accel tabs) + charts + history + copy-to-clipboard
+- [x] Chart actor (`ChartActor`/`ChartSpec`: grid, bands, dashed lines, dots, markers), score chart on the results screen, wanted-gain chart on the accel analysis screen (no results tab, see DESIGN.md)
+- [ ] History (+ line chart per session, game filter)
 - [ ] i18n en/de
 - [ ] jpackage installer
 - [ ] README screenshots, CONTRIBUTING "add a game"

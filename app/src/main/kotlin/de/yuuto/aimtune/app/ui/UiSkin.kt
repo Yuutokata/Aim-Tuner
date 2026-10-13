@@ -68,6 +68,9 @@ class UiSkin(val tokens: Tokens, framebufferHeight: Int) : Disposable {
     val surfaceSolid: Drawable = shapes.solid(tokens.surface)
     val whiteSolid: Drawable = shapes.solid(Color.WHITE)
 
+    /** A filled circle of [diameter] design units, owned by this skin (chart dots, legend marks). */
+    fun dot(color: Color, diameter: Float): Drawable = shapes.circle(diameter, color)
+
     /** Filled and empty segments of the step indicator. */
     val stepOn: Drawable = shapes.pill(STEP_HEIGHT, tokens.accent)
     val stepOff: Drawable = shapes.pill(STEP_HEIGHT, tokens.neutral(800))

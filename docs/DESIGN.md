@@ -83,12 +83,12 @@ LibGDX `I18NBundle`: `assets/i18n/messages.properties` (English default) and `me
 | Label letter-spacing | Dropped | `BitmapFont` has no tracking |
 | Fonts sized in pixels | Fonts are generated per framebuffer height in design units (`Fonts.kt`), shared by HUD and UI | Consistent size at any window size |
 | Between rounds (1i): "Good round." headline, 85 % marker on the bar | Neutral headline "Round n complete", plain progress bar without marker, target stated in the text | No judgement of a single round; marker needs a custom actor |
-| Results (1j): score chart with uncertainty band, "46 rounds · 5 sessions" | Numbers only (recommended sens, cm/360 with range, confidence, rounds and sessions, copy button); no chart, no Acceleration tab | Charts come with the results milestone (M8) |
+| Results (1j): chart on the right of the numbers, Sensitivity / Acceleration tabs, legend | Numbers on top, the score chart below (fitted line, 95 % band, round dots, dashed optimum with its value), no tabs and no legend (the chart caption names the elements) | The chart needs the full width at 1080 high; acceleration has its own flow, see below |
 | Menu: "Continue session", History | Results item only (stored rounds, key R) | A new run merges with stored rounds, so there is nothing to continue; history comes in M8 |
 | In-test HUD (1h) with progress bar below the timer and "Esc · pause" | Timer, scenario name, "Round n / N", "Esc aborts the round"; no bar, no pause | Aborting discards the round, a pause would taint it |
 | Settings (1n) has metric weights only | A "Scenarios" block under the weights: four toggles for what a blind test plays; the weights decide how often | M6 scenarios need a way to be switched off |
 | Between rounds (1i): hits, accuracy, time to hit | A caption with the scenario name; tracking shows "Time on target" instead of hits | Tracking has no hits |
-| Acceleration is only a tab on the results view (1j) | Its own menu item "Acceleration" with an intro, calibration and test round screens, an analysis screen (numbers, no chart) and a verdict screen with export and copy | The acceleration steps need rounds of their own and a decision before an export; the chart and the tab come with M8 |
+| Acceleration is only a tab on the results view (1j) | Its own menu item "Acceleration" with an intro, calibration and test round screens, an analysis screen with a chart of the wanted gain per hand speed (dots, 95 % band) and the fitted curve, and a verdict screen with export and copy | The acceleration steps need rounds of their own and a decision before an export, so a tab on the results view would have nothing to show most of the time |
 | Pad presets include Desk mat | Adopted (small / medium / large / desk mat / custom) | Extends the spec's three presets |
 
 ## Open design questions
