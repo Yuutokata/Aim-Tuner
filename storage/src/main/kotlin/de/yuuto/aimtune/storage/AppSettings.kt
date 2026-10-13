@@ -2,10 +2,8 @@ package de.yuuto.aimtune.storage
 
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.score.ScoreMetric
+import de.yuuto.aimtune.core.units.AimStyle
 import kotlinx.serialization.Serializable
-
-@Serializable
-enum class AimStyle { WRIST, MIXED, ARM }
 
 class SettingsException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
@@ -20,7 +18,8 @@ data class AppSettings(
     val dpi: Double? = null,
     val gameId: String? = null,
     val inGameSensitivity: Double? = null,
-    val aimStyle: AimStyle? = null,
+    /** [AimStyle] name; stored as text so the core enum stays free of serialization. */
+    val aimStyle: String? = null,
     val padWidthCm: Double? = null,
     val padHeightCm: Double? = null,
     val roundSeconds: Int = DEFAULT_ROUND_SECONDS,
@@ -36,7 +35,13 @@ data class AppSettings(
         positive("padWidthCm", padWidthCm)
         positive("padHeightCm", padHeightCm)
         if (roundSeconds <= 0) throw SettingsException("roundSeconds must be positive, was $roundSeconds")
+        aimStyleOrNull()
         toMetricWeights()
+    }
+
+    /** @throws SettingsException if [aimStyle] is set to something that is not an aim style. */
+    fun aimStyleOrNull(): AimStyle? = aimStyle?.let { name ->
+        AimStyle.entries.firstOrNull { it.name == name } ?: throw SettingsException("unknown aim style '$name'")
     }
 
     /** @throws SettingsException for unknown metric names or weights that are negative or all zero. */

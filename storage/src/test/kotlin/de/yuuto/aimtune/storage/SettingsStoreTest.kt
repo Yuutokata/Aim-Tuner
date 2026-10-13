@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.storage
 
+import de.yuuto.aimtune.core.units.AimStyle
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.score.ScoreMetric
 import org.junit.jupiter.api.io.TempDir
@@ -30,7 +31,7 @@ class SettingsStoreTest {
     fun `settings round trip and parent directories are created`() {
         val store = store()
         val settings = AppSettings(
-            language = "de", dpi = 1600.0, gameId = "valorant", inGameSensitivity = 0.35, aimStyle = AimStyle.MIXED,
+            language = "de", dpi = 1600.0, gameId = "valorant", inGameSensitivity = 0.35, aimStyle = "MIXED",
             padWidthCm = 45.0, padHeightCm = 40.0, roundSeconds = 60,
             metricWeights = mapOf("ACCURACY" to 50.0, "TIME_TO_HIT" to 50.0),
         )
@@ -60,6 +61,13 @@ class SettingsStoreTest {
         assertFailsWith<SettingsException> { SettingsStore(file).load() }
         assertFailsWith<SettingsException> { store().save(AppSettings(roundSeconds = 0)) }
         assertFailsWith<SettingsException> { store().save(AppSettings(metricWeights = mapOf("NOPE" to 1.0))) }
+        assertFailsWith<SettingsException> { store().save(AppSettings(aimStyle = "SIDEWAYS")) }
+    }
+
+    @Test
+    fun `aim style converts to the core enum`() {
+        assertEquals(AimStyle.ARM, AppSettings(aimStyle = "ARM").aimStyleOrNull())
+        assertNull(AppSettings().aimStyleOrNull())
     }
 
     @Test
