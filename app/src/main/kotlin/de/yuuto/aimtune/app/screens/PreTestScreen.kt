@@ -44,13 +44,13 @@ class PreTestScreen(ctx: AppContext) : UiScreen(ctx) {
         footer.add(ui.button("Back", Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
         footer.addButton(ui.button("Re-check", Styles.SECONDARY) { recheck() }, minWidth = 180f).padRight(16f)
-        footer.addButton(ui.button("Start test", Styles.PRIMARY) { ctx.showTrainer() }, minWidth = 220f)
+        footer.addButton(ui.button("Start test", Styles.PRIMARY) { ctx.startBlindTest() }, minWidth = 220f)
         return ui.frame(null, content, footer)
     }
 
     override fun onEscape() = ctx.showMenu()
 
-    override fun onEnter() = ctx.showTrainer()
+    override fun onEnter() = ctx.startBlindTest()
 
     private fun recheck() {
         acceleration = WindowsPointerSettings.readAcceleration()

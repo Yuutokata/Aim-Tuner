@@ -38,6 +38,8 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
         left.add(ui.label("Find the sens\nyou aim best with.", Styles.HEADING)).left().padBottom(HEADING_GAP).row()
         left.add(menuItem("Start test", startSubtitle(), "Enter") { ctx.showStart() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
+        left.add(menuItem("Results", resultsSubtitle(), "R") { ctx.showStoredResults() })
+            .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
         left.add(menuItem("Settings", "DPI, game, round length and score weights", "S") { ctx.showSettings() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).left().row()
         ctx.startupProblems.forEach { left.add(ui.label(it, Styles.CAUTION, wrap = true)).width(MENU_WIDTH).left().padTop(PROBLEM_GAP).row() }
@@ -55,12 +57,18 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
 
     override fun onKey(keycode: Int): Boolean = when (keycode) {
         Input.Keys.S -> true.also { ctx.showSettings() }
+        Input.Keys.R -> true.also { ctx.showStoredResults() }
         else -> false
     }
 
+    private val storedRounds by lazy { ctx.storedRoundCount() }
+
+    private fun resultsSubtitle(): String =
+        if (storedRounds == 0) "Play a blind test first" else "$storedRounds blind rounds stored"
+
     private fun startSubtitle(): String {
         val config = ctx.trainerConfig() ?: return "First, a short setup"
-        return "${config.roundSeconds} s flick rounds · ${config.profile.name}"
+        return "blind test · ${config.roundSeconds} s flick rounds · ${config.profile.name}"
     }
 
     private fun menuItem(title: String, subtitle: String, key: String, action: () -> Unit): Button {

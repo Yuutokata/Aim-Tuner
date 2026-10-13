@@ -49,6 +49,21 @@ class RoundProcessorTest {
     }
 
     @Test
+    fun `each blind test run gets its own session`() {
+        val file = dir.resolve("b.db")
+        val processor = RoundProcessor(Database.open(file))
+        processor.submit(recording(1), startedAtMs = 10, blind = true, gameId = "valorant", runKey = 100)
+        processor.submit(recording(2), startedAtMs = 20, blind = true, gameId = "valorant", runKey = 100)
+        processor.submit(recording(3), startedAtMs = 30, blind = true, gameId = "valorant", runKey = 200)
+        processor.close()
+        Database.open(file).use { db ->
+            val repo = RoundRepository(db)
+            assertEquals(2, repo.sessions().size)
+            assertEquals(listOf(2, 1), repo.sessions().map { s -> repo.rounds(s.id).size })
+        }
+    }
+
+    @Test
     fun `rounds are exported as raw event logs when an export folder is set`() {
         val exports = dir.resolve("logs")
         val processor = RoundProcessor(database = null, exportDir = exports)

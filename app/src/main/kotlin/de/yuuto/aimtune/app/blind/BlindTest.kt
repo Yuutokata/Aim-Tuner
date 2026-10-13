@@ -1,0 +1,118 @@
+package de.yuuto.aimtune.app.blind
+
+import de.yuuto.aimtune.core.metrics.RoundMetrics
+import de.yuuto.aimtune.core.optimizer.Observation
+import de.yuuto.aimtune.core.optimizer.OptimizationResult
+import de.yuuto.aimtune.core.optimizer.OptimizerConfig
+import de.yuuto.aimtune.core.optimizer.SensitivityOptimizer
+import de.yuuto.aimtune.core.optimizer.Suggestion
+import de.yuuto.aimtune.core.score.MetricWeights
+import de.yuuto.aimtune.core.score.ScoreCalculator
+import de.yuuto.aimtune.core.score.ScoreMetric
+import de.yuuto.aimtune.core.score.scoreInputs
+import de.yuuto.aimtune.core.units.SearchRange
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
+
+/** A stored round of an earlier session, reduced to what the optimizer needs. */
+data class PastRound(val sessionId: Long, val cm360: Double, val inputs: Map<ScoreMetric, Double>)
+
+/** What the user may see about a finished round; the sensitivity is deliberately not part of it. */
+data class RoundOutcome(val hits: Int, val shots: Int, val accuracy: Double, val meanTimeToHitMs: Double?) {
+    companion object {
+        fun of(metrics: RoundMetrics) = RoundOutcome(metrics.hits, metrics.shots, metrics.accuracy, metrics.meanTimeToHitMs)
+    }
+}
+
+/** Optimizer output after a round: the analysis of everything so far and the sensitivity to play next. */
+data class BlindStep(val result: OptimizationResult?, val next: Suggestion)
+
+/**
+ * One blind test run: rounds are played at sensitivities chosen by the optimizer, which the user
+ * never sees. Earlier sessions ([past]) are merged into every analysis. Scores are recomputed over
+ * all rounds after each round, because a score is relative to the player's own rounds. The model
+ * fit runs on a background thread; [nextCm360] and [step] wait for it only when called early.
+ */
+class BlindTest(
+    range: SearchRange,
+    private val weights: MetricWeights,
+    private val past: List<PastRound>,
+    seed: Long,
+    val plannedRounds: Int = DEFAULT_PLANNED_ROUNDS,
+    config: OptimizerConfig = OptimizerConfig(),
+) : AutoCloseable {
+    private val optimizer = SensitivityOptimizer(range, seed, config)
+    private val executor = Executors.newSingleThreadExecutor { Thread(it, "aimtune-optimizer").apply { isDaemon = true } }
+    private val played = mutableListOf<PastRound>()
+    private var job: CompletableFuture<BlindStep>
+
+    /** Rounds finished in this run. */
+    val roundsPlayed: Int get() = played.size
+
+    var lastOutcome: RoundOutcome? = null
+        private set
+
+    init {
+        job = schedule(past)
+    }
+
+    /** True once the analysis of the latest round is available. */
+    val isReady: Boolean get() = job.isDone
+
+    /** The analysis after the latest round, waiting for it if necessary. */
+    fun step(): BlindStep = job.get()
+
+    /** The analysis if it is ready, without waiting. */
+    fun resultOrNull(): OptimizationResult? = if (job.isDone) job.get().result else null
+
+    /** Sensitivity of the next round. Blind: callers must not show it. */
+    fun nextCm360(): Double = job.get().next.cm360
+
+    /** Rounds of this run and of all earlier sessions in the model. */
+    val totalRounds: Int get() = past.size + played.size
+
+    val sessionCount: Int get() = (past.map { it.sessionId } + if (played.isEmpty()) emptyList() else listOf(CURRENT_RUN)).distinct().size
+
+    /** Adds a finished round played at [cm360] and starts the analysis. */
+    fun recordRound(cm360: Double, metrics: RoundMetrics) {
+        played += PastRound(CURRENT_RUN, cm360, metrics.scoreInputs())
+        lastOutcome = RoundOutcome.of(metrics)
+        job = schedule(past + played)
+    }
+
+    private fun schedule(rounds: List<PastRound>): CompletableFuture<BlindStep> {
+        val snapshot = rounds.toList()
+        return CompletableFuture.supplyAsync({
+            val scores = ScoreCalculator(weights).scoreRounds(snapshot.map { it.inputs })
+            val history = snapshot.indices.map { Observation(snapshot[it].sessionId, snapshot[it].cm360, scores[it] ?: UNKNOWN_SCORE) }
+            BlindStep(optimizer.analyze(history), optimizer.suggestNext(history))
+        }, executor)
+    }
+
+    override fun close() {
+        executor.shutdownNow()
+    }
+
+    companion object {
+        const val DEFAULT_PLANNED_ROUNDS = 10
+
+        /** Session id of the running test; stored sessions have positive database ids. */
+        private const val CURRENT_RUN = -1L
+
+        /** A round without a usable score yet (fewer than three rounds) only counts for the design phase. */
+        private const val UNKNOWN_SCORE = 50.0
+
+        /** The result of stored rounds alone, for the results screen. */
+        fun analyzeStored(
+            range: SearchRange,
+            weights: MetricWeights,
+            rounds: List<PastRound>,
+            config: OptimizerConfig = OptimizerConfig(),
+        ): OptimizationResult? {
+            if (rounds.isEmpty()) return null
+            val scores = ScoreCalculator(weights).scoreRounds(rounds.map { it.inputs })
+            val history = rounds.indices.map { Observation(rounds[it].sessionId, rounds[it].cm360, scores[it] ?: UNKNOWN_SCORE) }
+            return SensitivityOptimizer(range, seed = 0L, config).analyze(history)
+        }
+    }
+}

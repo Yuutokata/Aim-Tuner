@@ -45,6 +45,13 @@ Rounds are analysed and saved by `RoundProcessor` on a background thread. If the
 - Games: `games` loads `GameProfile` JSON (bundled + user files); `core.SearchRange` derives the optimizer range from aim style and pad width.
 - `ScreenshotTour` (`--screenshots <dir>`) renders every screen with in-memory sample settings, for design review.
 
+## Optimizer and blind test (M5)
+
+- `core/optimizer`: `GaussianProcess` (Matern 5/2, session offset covariance, hand-written `Cholesky`), `SensitivityOptimizer` (`suggestNext(history)` and `analyze(history)`, both pure functions of the observations and a seed) with `OptimizationResult` (optimum, 80 % interval, confidence, regret, recommendation). Maths in ALGORITHMS.md.
+- `app/blind`: `BlindTest` holds one run: earlier rounds (`PastRound`), the rounds played now, and a background single-thread job that re-scores all rounds and runs the optimizer after every round (`step()`, `nextCm360()` wait for it only if called early). `BlindRun` adds the stored-session key and the config of the next round. `SampleBlindRun` feeds the screenshot tour.
+- Flow: pre-test notice -> `AppContext.startBlindTest()` (search range from aim style and pad width, earlier rounds from `RoundProcessor.pastBlindRounds`) -> `TrainerScreen` with a `BlindRun` (one round at the optimizer's hidden cm/360, HUD "Round n / N", no debug overlay) -> `BetweenRoundsScreen` -> next round or `stopBlindTest` -> `ResultsScreen`. The menu's Results item analyses the stored rounds with `BlindTest.analyzeStored`.
+- Storage: rounds are saved with `blind = true` and a `runKey`, so every run is one session row; `RoundRepository.blindFlickRounds(game, dpi)` collects the rounds of all sessions for merging.
+
 ## Verification harness
 
 Everything below runs without a human or a window (except the screenshots, which need a GPU context but a hidden window).

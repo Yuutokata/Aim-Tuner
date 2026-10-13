@@ -96,6 +96,30 @@ class RoundRepositoryTest {
     }
 
     @Test
+    fun `blind flick rounds are gathered across sessions of one game and dpi`() {
+        Database.open(dir.resolve("a.db")).use { db ->
+            val repo = RoundRepository(db)
+            val m = computeRoundMetrics(recording())
+            val a = repo.createSession(1, "valorant", 800.0, SessionKind.SENSITIVITY)
+            val b = repo.createSession(2, "valorant", 800.0, SessionKind.SENSITIVITY)
+            val otherGame = repo.createSession(3, "cs2", 800.0, SessionKind.SENSITIVITY)
+            val otherDpi = repo.createSession(4, "valorant", 1600.0, SessionKind.SENSITIVITY)
+            val accel = repo.createSession(5, "valorant", 800.0, SessionKind.ACCEL_AB)
+            repo.saveRound(a, recording(cm360 = 30.0), 10, blind = true, metrics = m)
+            repo.saveRound(a, recording(cm360 = 35.0), 11, blind = false, metrics = m)
+            repo.saveRound(b, recording(cm360 = 45.0), 20, blind = true, metrics = m)
+            for (other in listOf(otherGame, otherDpi, accel)) repo.saveRound(other, recording(cm360 = 99.0), 30, blind = true, metrics = m)
+
+            val rounds = repo.blindFlickRounds("valorant", 800.0)
+            assertEquals(listOf(30.0, 45.0), rounds.map { it.cm360 })
+            assertEquals(listOf(a, b), rounds.map { it.sessionId })
+            val inputs = rounds.first().scoreInputs()
+            assertEquals(0.5, inputs.getValue(de.yuuto.aimtune.core.score.ScoreMetric.ACCURACY), 1e-12)
+            assertEquals(m.meanTimeToHitMs, inputs[de.yuuto.aimtune.core.score.ScoreMetric.TIME_TO_HIT])
+        }
+    }
+
+    @Test
     fun `a failed save leaves nothing behind`() {
         Database.open(dir.resolve("a.db")).use { db ->
             val repo = RoundRepository(db)

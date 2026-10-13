@@ -15,15 +15,16 @@ import java.util.Locale
 /**
  * The trainer's on-screen text: round timer, hits, crosshair and the round summary. Drawn in
  * design units (1080 high, like the Scene2D screens) with the shared [Fonts] and token colors.
- * The debug overlay exists to verify raw input.
+ * The debug overlay exists to verify raw input. With a [roundLabel] the HUD is the blind one:
+ * it shows "Round 4 / 10" and never the sensitivity (no debug overlay either, it prints deg/count).
  */
-class Hud(private val config: TrainerConfig, private val tokens: Tokens) : Disposable {
+class Hud(private val config: TrainerConfig, private val tokens: Tokens, private val roundLabel: String? = null) : Disposable {
     private val batch = SpriteBatch()
     private val shapes = ShapeRenderer()
     private val camera = OrthographicCamera()
     private var width = 0f
     private var height = tokens.screenHeight
-    var showDebug = true
+    var showDebug = roundLabel == null
 
     private val text = tokens.text
     private val muted = tokens.neutral(500)
@@ -63,6 +64,10 @@ class Hud(private val config: TrainerConfig, private val tokens: Tokens) : Dispo
     }
 
     private fun drawReady(fonts: Fonts) {
+        if (roundLabel != null) {
+            drawBlindReady(roundLabel, fonts)
+            return
+        }
         draw(fonts.title, "${config.profile.name}  ·  ${config.roundSeconds} s flick round", width / 2, height * 0.62f, highlight, Align.center)
         draw(fonts.bodyLg, "Click to start", width / 2, height * 0.54f, text, Align.center)
         draw(
@@ -73,11 +78,19 @@ class Hud(private val config: TrainerConfig, private val tokens: Tokens) : Dispo
         draw(fonts.body, "Esc back to the menu  ·  F3 toggles debug", width / 2, height * 0.44f, muted, Align.center)
     }
 
+    private fun drawBlindReady(label: String, fonts: Fonts) {
+        draw(fonts.title, label, width / 2, height * 0.62f, highlight, Align.center)
+        draw(fonts.bodyLg, "Click to start", width / 2, height * 0.54f, text, Align.center)
+        draw(fonts.body, "${config.roundSeconds} s flick round  ·  your sensitivity stays hidden until the test ends", width / 2, height * 0.49f, muted, Align.center)
+        draw(fonts.body, "Esc stops the test", width / 2, height * 0.44f, muted, Align.center)
+    }
+
     private fun drawRunning(trainer: Trainer, fonts: Fonts) {
         val seconds = (trainer.timeLeftNanos() / 1_000_000_000L).toInt()
         draw(fonts.numberMd, "%d:%02d".format(Locale.ROOT, seconds / 60, seconds % 60), width / 2, height - MARGIN, text, Align.center)
         draw(fonts.label, "FLICK", MARGIN, height - MARGIN, muted, Align.left)
-        draw(fonts.mono, "Hits ${trainer.hits}   Misses ${trainer.misses}", width - MARGIN, height - MARGIN, text, Align.right)
+        val right = roundLabel ?: "Hits ${trainer.hits}   Misses ${trainer.misses}"
+        draw(fonts.mono, right, width - MARGIN, height - MARGIN, text, Align.right)
         draw(fonts.body, "Esc aborts the round", MARGIN, MARGIN + fonts.body.lineHeight, muted, Align.left)
     }
 

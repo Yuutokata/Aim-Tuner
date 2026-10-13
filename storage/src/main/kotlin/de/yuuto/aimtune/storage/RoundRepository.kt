@@ -3,6 +3,7 @@ package de.yuuto.aimtune.storage
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.metrics.RoundMetrics
 import de.yuuto.aimtune.core.recording.RoundRecording
+import de.yuuto.aimtune.core.score.ScoreMetric
 import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.scenario.TargetEvent
 import java.sql.Connection
@@ -90,6 +91,15 @@ class RoundRepository(private val database: Database) {
             }
         }
     }
+
+    /**
+     * The blind flick rounds of every sensitivity session with this game and DPI, oldest first: the
+     * data the optimizer merges across sessions. Rounds played without blinding are left out.
+     */
+    fun blindFlickRounds(gameId: String?, dpi: Double): List<RoundRow> =
+        sessions().filter { it.kind == SessionKind.SENSITIVITY && it.gameId == gameId && it.dpi == dpi }
+            .flatMap { rounds(it.id) }
+            .filter { it.blind && it.scenario == FLICK }
 
     /** Rounds of [sessionId], or of all sessions when null, oldest first. */
     fun rounds(sessionId: Long? = null): List<RoundRow> = database.transaction { c ->
@@ -205,6 +215,7 @@ class RoundRepository(private val database: Database) {
         }
 
     private companion object {
+        const val FLICK = "flick"
         const val SPAWNED = "spawned"
         const val HIT = "hit"
         const val MISS = "miss"
@@ -222,4 +233,12 @@ fun RoundMetrics.toNamedValues(): Map<String, Double> = buildMap {
     errorSpread?.let { put("error_spread", it) }
     meanCorrectiveSubmovements?.let { put("mean_corrective_submovements", it) }
     meanPathEfficiency?.let { put("mean_path_efficiency", it) }
+}
+
+/** The stored metrics a round's score is computed from, as [de.yuuto.aimtune.core.metrics.RoundMetrics.scoreInputs] would give them. */
+fun RoundRow.scoreInputs(): Map<ScoreMetric, Double> = buildMap {
+    val shots = metrics["shots"] ?: 0.0
+    metrics["accuracy"]?.takeIf { shots > 0 }?.let { put(ScoreMetric.ACCURACY, it) }
+    metrics["mean_time_to_hit_ms"]?.let { put(ScoreMetric.TIME_TO_HIT, it) }
+    metrics["error_spread"]?.let { put(ScoreMetric.CONSISTENCY, it) }
 }

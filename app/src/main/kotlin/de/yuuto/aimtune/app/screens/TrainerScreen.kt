@@ -11,18 +11,33 @@ import de.yuuto.aimtune.app.Phase
 import de.yuuto.aimtune.app.Trainer
 import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.app.TrainerScene
+import de.yuuto.aimtune.app.blind.BlindRun
+import de.yuuto.aimtune.core.metrics.computeRoundMetrics
 import de.yuuto.aimtune.core.scenario.FlickConfig
 
 private const val MILLIS_PER_SECOND = 1000L
 
-/** The 3D flick trainer: room, targets, HUD and the round state machine, at the current sensitivity. */
-class TrainerScreen(private val ctx: AppContext, private val config: TrainerConfig) : Screen {
+/**
+ * The 3D flick trainer: room, targets, HUD and the round state machine. Without a [blind] run it is
+ * the free trainer at the current sensitivity; with one it plays a single blind round at the
+ * sensitivity in [config] (chosen by the optimizer, never shown) and then moves on to the
+ * between-rounds screen.
+ */
+class TrainerScreen(private val ctx: AppContext, private val config: TrainerConfig, private val blind: BlindRun? = null) : Screen {
+    private var blindRoundDone = false
     private val trainer = Trainer(config, ctx.source) { recording ->
         val startedAtMs = System.currentTimeMillis() - config.roundSeconds * MILLIS_PER_SECOND
-        ctx.processor.submit(recording, startedAtMs, blind = false, gameId = ctx.settings.current.gameId)
+        val gameId = ctx.settings.current.gameId
+        if (blind == null) {
+            ctx.processor.submit(recording, startedAtMs, blind = false, gameId = gameId)
+        } else {
+            ctx.processor.submit(recording, startedAtMs, blind = true, gameId = gameId, runKey = blind.runKey)
+            blind.test.recordRound(config.cm360, computeRoundMetrics(recording))
+            blindRoundDone = true
+        }
     }
     private val scene = TrainerScene(config.profile.verticalFovDegrees.toFloat(), FlickConfig(durationNanos = 1).targetRadius.toFloat())
-    private val hud = Hud(config, ctx.ui.tokens)
+    private val hud = Hud(config, ctx.ui.tokens, roundLabel = blind?.nextRoundLabel())
 
     /** Exposed for the screenshot tour. */
     val roundPhase: Phase get() = trainer.phase
@@ -45,8 +60,12 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
 
             override fun keyDown(keycode: Int): Boolean {
                 when (keycode) {
-                    Input.Keys.ESCAPE -> if (trainer.phase == Phase.RUNNING) trainer.abort() else ctx.showMenu()
-                    Input.Keys.F3 -> hud.showDebug = !hud.showDebug
+                    Input.Keys.ESCAPE -> when {
+                        trainer.phase == Phase.RUNNING -> trainer.abort()
+                        blind != null -> ctx.stopBlindTest(blind)
+                        else -> ctx.showMenu()
+                    }
+                    Input.Keys.F3 -> if (blind == null) hud.showDebug = !hud.showDebug
                     else -> return false
                 }
                 syncCursor()
@@ -58,6 +77,10 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
 
     override fun render(delta: Float) {
         trainer.update()
+        if (blindRoundDone && blind != null) {
+            ctx.showBetweenRounds(blind)
+            return
+        }
         syncCursor()
         val bg = ctx.ui.tokens.bg
         Gdx.gl.glClearColor(bg.r, bg.g, bg.b, 1f)

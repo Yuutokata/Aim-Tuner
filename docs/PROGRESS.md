@@ -55,9 +55,13 @@ Single source of truth for project status. Update at the end of every task and b
 - [ ] Optimizer (M5), more scenarios (M6) and accel fitting (M7) plug into the harness when they exist; the end-to-end test then asserts the recovered optimum/curve against the same ground truth
 
 ### M5 Bayesian optimizer
-- [ ] GP + acquisition, noise, repeats, session offsets
-- [ ] Blind test flow, confidence, multi-session merge
-- [ ] Simulated player convergence tests
+- [x] GP over ln(cm360) (Matern 5/2, noise, per-session offsets, own Cholesky, ADR 0004 amended), expected improvement, design and repeat rounds
+- [x] Credible interval, loss-based confidence, "more rounds worthwhile" recommendation and rough rounds-to-target
+- [x] Simulated player convergence tests (optimizer vs grid baseline, calibration of the confidence)
+- [x] Blind test flow in the app: hidden sensitivity, "Round n / N" HUD, between-rounds screen with confidence, "Stop for today"
+- [x] Multi-session merge: every run is its own stored session; earlier blind rounds of the same game and DPI enter the model
+- [x] Minimal results screen (recommended sensitivity, cm/360 with range, confidence, copy to clipboard); chart comes in M8
+- [ ] Hands-on test by the user: play a short blind test, check that the sensitivity is never shown, the confidence and results make sense
 
 ### M6 More scenarios
 - [ ] Micro-adjust, tracking, target switching
@@ -78,6 +82,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Last session
 
+- M5: `core/optimizer` (GP, expected improvement, interval, confidence), `BlindTest`/`BlindRun` in `app/blind`, blind trainer HUD, between-rounds and results screens, menu "Results" item, stored-round merging. 181 tests pass. The blind flow as a whole (real mouse, clicking through the screens) is untested by me; the optimizer and `BlindTest` are tested with the simulated player and the screens by screenshots.
 - Verification harness (see checklist): simulated player, headless runner, simulated and replay mouse sources, round log files, `--record`, fixture regression test, `:app:screenshots`. 161 tests pass. Model parameters were tuned by hand so the optimum is interior and flat-topped; convergence numbers are documented in ALGORITHMS.md. The accel and optimizer parts of the requested end-to-end test cannot exist yet.
 
 - M4: game profiles (Valorant, CS2, custom yaw/FOV), search range, onboarding, pre-test notice, settings screen, UI skin from the design tokens, mouse gate (raw input only in the trainer while focused), screenshot tour. Launch options are now dev-only. 140 unit tests pass; I compared 8 rendered screens against the mockups but could not click through the app myself.
@@ -86,8 +91,9 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Next steps
 
-1. User tests M4: `gradlew.bat :app:run` (use `AIMTUNE_DATA_DIR` to avoid touching real data). First launch should show onboarding (DPI, game + sensitivity with live cm/360°, aim style, pad). Then check the menu, Settings (save/reset, weight sliders, round length), the pre-test notice (pointer acceleration row, Raw Accel checkbox) and that the trainer runs at your current sensitivity with the game's FOV. Settings are saved to `%APPDATA%\AimTune\settings.json`.
-2. Then ask whether to push M4, and start M5 (Bayesian optimizer, blind test flow, confidence, multi-session).
+1. User tests M5: `gradlew.bat :app:run` (use `AIMTUNE_DATA_DIR` for a scratch data folder, `--record <dir>` saves every round as a log). Start test, play 10-12 rounds: the sensitivity should differ between rounds without being shown anywhere (also not with F3), the between-rounds screen shows hits/accuracy/time and a confidence, "Stop for today" shows the result. Then restart the app and use Results (R) on the menu: the stored rounds should give the same recommendation; a second test run should merge with the first (session count 2).
+2. Please report: does the recommended sensitivity feel right, are the rounds too similar or too jumpy, and is the confidence plausible.
+3. Then ask whether to push M5, and continue with M6 (more scenarios, score combination).
 
 ## Known bugs
 
@@ -101,7 +107,9 @@ Single source of truth for project status. Update at the end of every task and b
 - Raw Accel cannot be detected (no query API, driver stores no readable settings), so the pre-test notice asks for a manual checkbox; the Windows pointer acceleration setting is auto-detected. Notice only, never enforced; "Open Raw Accel" button dropped.
 - Game FOV values for Valorant and CS2 come from community sources, not official docs; the sensitivity decimals (3) are unverified against the games' accepted precision.
 - Decided: "Consistency" is the spread (sample SD) of the signed first-movement error, lower is better (see ALGORITHMS.md). Chosen because it uses the same over/undershoot quantity as the optimizer and accel analysis and does not double-count time to hit. Revisit if sideways error turns out to matter.
-- Mockups show a fixed "round 4 / 10" and "about 20 min"; the spec wants flexible length and stop-anytime. Plan: the 10 is a suggested session length, "Stop for today" always available, "Continue session" needs persisted session state (M3/M5).
+- Rounds per test: 10 is a suggested length ("Round 4 / 10", afterwards just "Round 12"), "Stop for today" is always available. "Continue session" is not built: a new run merges with the stored rounds automatically, which covers the use. The mockup menu entry is skipped.
+- The confidence definition (chance that the estimate loses at most 0.2 x the score spread against the true best) and the 85 % target are my choice; revisit with real data. The scores of real humans may be flatter or noisier than the simulated player, then confidence will stay lower.
+- Blind rounds are only comparable per game and DPI; changing the game profile (FOV) starts a separate data set.
 - Export Raw Accel settings needs a save location: LibGDX has no file dialog (options: native dialog via LWJGL tinyfd, or fixed folder). Decide at M7.
 - Apex, Overwatch 2 and Fortnite tiles are omitted until yaw/FOV are verified (Valorant, CS2 and a custom yaw/FOV tile ship).
 - The simulated player is a model I made up (reaction, Fitts, noise terms); it checks that the pipeline recovers a known optimum, not that real humans behave this way. Revisit its parameters with real recordings (`--record`).
