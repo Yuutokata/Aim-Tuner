@@ -5,7 +5,7 @@ Single source of truth for project status. Update at the end of every task and b
 ## Current
 
 - **Milestone:** M8 Results, i18n, packaging (in progress)
-- **Task:** results charts, history and i18n done; next jpackage, README screenshots, CONTRIBUTING. M7 is pushed, its second hands-on part (analysis, blind test, Raw Accel import) is still open.
+- **Task:** results charts, history, i18n and packaging done; next README screenshots and CONTRIBUTING game guide check. M7 is pushed, its second hands-on part (analysis, blind test, Raw Accel import) is still open.
 
 ## Checklist
 
@@ -91,7 +91,7 @@ Single source of truth for project status. Update at the end of every task and b
 - [x] Chart actor (`ChartActor`/`ChartSpec`: grid, bands, dashed lines, dots, markers), score chart on the results screen, wanted-gain chart on the accel analysis screen (no results tab, see DESIGN.md)
 - [x] History screen (menu H): per-session recommendation (refit on the rounds up to that session, background), chart, table of the newest sessions, game filter; accel A/B sessions listed without a recommendation
 - [x] i18n en/de (I18NBundle, 250+ keys, language select in Settings, `BundlesTest`, `:app:screenshotsDe`); diagnostics and exception texts stay English
-- [ ] jpackage installer
+- [x] Packaging: `:app:jpackage` (JDK jpackage with a trimmed runtime, app image by default, installer with `-PinstallerType`; ADR 0005 explains why not the Badass plugin); the app image runs the screenshot tour, CI zips it on tags. Raw input and database from the packaged build are untested
 - [ ] README screenshots, CONTRIBUTING "add a game"
 
 ## Last session

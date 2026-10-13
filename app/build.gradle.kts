@@ -41,3 +41,35 @@ tasks.register<JavaExec>("screenshotsDe") {
 tasks.processResources {
     from(rootProject.file("docs/design/tokens.json")) { into("assets/ui") }
 }
+
+// Windows app image or installer with its own trimmed Java runtime, built with the JDK's jpackage (see ADR 0005).
+// `./gradlew :app:jpackage` makes build/jpackage/AimTune/AimTune.exe; `-PinstallerType=exe` or `msi` needs the WiX toolset.
+val jpackageRuntimeModules = "java.base,java.desktop,java.logging,java.management,java.naming,java.sql,jdk.unsupported"
+
+tasks.register<Exec>("jpackage") {
+    group = "distribution"
+    description = "Packages AimTune with a bundled runtime using jpackage."
+    val install = tasks.installDist
+    dependsOn(install)
+    val launcher = javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) }
+    val outDir = layout.buildDirectory.dir("jpackage")
+    val type = providers.gradleProperty("installerType").orElse("app-image")
+    val appVersion = "0.1.0"
+    doFirst { delete(outDir) }
+    executable(launcher.map { it.metadata.installationPath.file("bin/jpackage.exe").asFile.path }.get())
+    args(
+        "--type", type.get(),
+        "--name", "AimTune",
+        "--app-version", appVersion,
+        "--vendor", "AimTune contributors",
+        "--description", "Finds the mouse sensitivity you aim best with",
+        "--input", install.get().destinationDir.resolve("lib").path,
+        "--main-jar", tasks.jar.get().archiveFileName.get(),
+        "--main-class", application.mainClass.get(),
+        "--add-modules", jpackageRuntimeModules,
+        "--java-options", "--enable-native-access=ALL-UNNAMED",
+        "--java-options", "-Dfile.encoding=UTF-8",
+        "--dest", outDir.get().asFile.path,
+    )
+    if (type.get() != "app-image") args("--win-menu", "--win-shortcut", "--win-dir-chooser")
+}
