@@ -6,6 +6,7 @@ import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.scenario.TargetEvent
 import de.yuuto.aimtune.storage.Database
+import de.yuuto.aimtune.storage.RoundLogFile
 import de.yuuto.aimtune.storage.RoundRepository
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
@@ -45,6 +46,18 @@ class RoundProcessorTest {
             assertEquals(listOf("valorant", "cs2"), repo.sessions().map { it.gameId })
             assertEquals(listOf(1L, 2L, 3L), repo.rounds().map { it.seed })
         }
+    }
+
+    @Test
+    fun `rounds are exported as raw event logs when an export folder is set`() {
+        val exports = dir.resolve("logs")
+        val processor = RoundProcessor(database = null, exportDir = exports)
+        processor.submit(recording(7), startedAtMs = 42, blind = false, gameId = null)
+        processor.close()
+
+        val back = RoundLogFile.read(exports.resolve("round-42-seed7.json"))
+        assertEquals(7L, back.seed)
+        assertEquals(1, back.mouseEvents.size)
     }
 
     @Test

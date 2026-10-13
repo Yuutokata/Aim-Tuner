@@ -20,6 +20,15 @@ application {
     mainClass.set("de.yuuto.aimtune.app.MainKt")
 }
 
+// Renders every screen with sample data into app/build/screenshots (hidden window, no user data touched).
+tasks.register<JavaExec>("screenshots") {
+    group = "verification"
+    description = "Saves a PNG of every UI screen to build/screenshots for comparison with docs/design."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set(application.mainClass)
+    args("--screenshots", layout.buildDirectory.dir("screenshots").get().asFile.path)
+}
+
 // The UI tokens live once in docs/design and are bundled into the app from there.
 tasks.processResources {
     from(rootProject.file("docs/design/tokens.json")) { into("assets/ui") }

@@ -25,7 +25,9 @@ fun main(args: Array<String>) {
     val config = Lwjgl3ApplicationConfiguration().apply {
         setTitle("AimTune")
         setWindowedMode(if (screenshots) SCREENSHOT_WIDTH else WINDOW_WIDTH, if (screenshots) SCREENSHOT_HEIGHT else WINDOW_HEIGHT)
-        useVsync(options.vsync)
+        // The screenshot tour renders in a hidden window and does not wait for vertical sync.
+        useVsync(options.vsync && !screenshots)
+        setInitialVisible(!screenshots)
         setIdleFPS(IDLE_FPS)
         setBackBufferConfig(8, 8, 8, 8, DEPTH_BITS, 0, MSAA_SAMPLES)
         setInitialBackgroundColor(Tokens.load().bg)

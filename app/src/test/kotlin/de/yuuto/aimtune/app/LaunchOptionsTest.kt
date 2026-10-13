@@ -18,15 +18,17 @@ class LaunchOptionsTest {
         assertEquals(SourceKind.AUTO, o.source)
         assertTrue(o.vsync)
         assertNull(o.screenshotDir)
+        assertNull(o.recordDir)
     }
 
     @Test
     fun `all options are parsed`() {
-        val o = parse("--seed", "9", "--source", "glfw", "--no-vsync", "--screenshots", "out")
+        val o = parse("--seed", "9", "--source", "glfw", "--no-vsync", "--screenshots", "out", "--record", "logs")
         assertEquals(9L, o.seed)
         assertEquals(SourceKind.GLFW, o.source)
         assertFalse(o.vsync)
         assertEquals(Paths.get("out"), o.screenshotDir)
+        assertEquals(Paths.get("logs"), o.recordDir)
     }
 
     @Test

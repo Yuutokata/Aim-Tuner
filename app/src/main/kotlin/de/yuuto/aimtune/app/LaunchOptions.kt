@@ -18,17 +18,20 @@ data class LaunchOptions(
     val vsync: Boolean,
     /** When set, the app walks through its screens with sample data, saves a PNG of each here and exits. */
     val screenshotDir: Path?,
+    /** When set, every finished round is also written here as a raw event log (see `RoundLogFile`). */
+    val recordDir: Path? = null,
 ) {
     companion object {
         const val USAGE = """Usage: aimtune [options]
   --seed <n>           scenario seed of the first round, default random
   --source <s>         auto (default), raw (Windows Raw Input) or glfw
   --no-vsync           disable vertical sync
-  --screenshots <dir>  save a PNG of every screen into <dir> using sample data, then exit"""
+  --screenshots <dir>  save a PNG of every screen into <dir> using sample data, then exit
+  --record <dir>       also save every finished round into <dir> as a raw event log (regression fixture)"""
     }
 }
 
-private val VALUE_OPTIONS = setOf("--seed", "--source", "--screenshots")
+private val VALUE_OPTIONS = setOf("--seed", "--source", "--screenshots", "--record")
 
 fun parseLaunchOptions(args: Array<String>): LaunchOptions {
     val values = mutableMapOf<String, String>()
@@ -51,5 +54,5 @@ fun parseLaunchOptions(args: Array<String>): LaunchOptions {
         else -> throw LaunchOptionsException("--source must be auto, raw or glfw, was '$raw'")
     }
     val seed = values["--seed"]?.let { it.toLongOrNull() ?: throw LaunchOptionsException("--seed must be an integer, was '$it'") }
-    return LaunchOptions(seed, source, vsync, values["--screenshots"]?.let { Paths.get(it) })
+    return LaunchOptions(seed, source, vsync, values["--screenshots"]?.let { Paths.get(it) }, values["--record"]?.let { Paths.get(it) })
 }

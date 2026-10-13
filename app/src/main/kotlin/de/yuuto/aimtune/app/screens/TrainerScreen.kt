@@ -27,6 +27,9 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
     /** Exposed for the screenshot tour. */
     val roundPhase: Phase get() = trainer.phase
 
+    /** Starts a round without a click, for the screenshot tour. */
+    fun startRoundForTour() = trainer.startRound()
+
     override fun show() {
         ctx.gate.setAllowed(true)
         Gdx.input.inputProcessor = object : InputAdapter() {

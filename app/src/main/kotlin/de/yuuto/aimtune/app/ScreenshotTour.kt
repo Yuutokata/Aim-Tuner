@@ -5,6 +5,7 @@ import com.badlogic.gdx.graphics.Pixmap
 import com.badlogic.gdx.graphics.PixmapIO
 import com.badlogic.gdx.utils.BufferUtils
 import com.badlogic.gdx.utils.ScreenUtils
+import de.yuuto.aimtune.app.screens.TrainerScreen
 import de.yuuto.aimtune.app.setup.SetupStep
 import java.nio.file.Files
 import java.nio.file.Path
@@ -31,6 +32,7 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("pretest") { ctx.showPreTest() },
         Step("settings") { ctx.showSettings() },
         Step("trainer-ready") { ctx.showTrainer() },
+        Step("trainer-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
     )
     private var index = -1
     private var frames = 0

@@ -57,7 +57,7 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
             ui = UiHolder(tokens, Gdx.graphics.backBufferHeight),
             profiles = profiles,
             settings = settings,
-            processor = RoundProcessor(database),
+            processor = RoundProcessor(database, options.recordDir),
             source = source,
             gate = gate,
             startupProblems = problems,

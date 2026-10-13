@@ -4,8 +4,10 @@ import de.yuuto.aimtune.core.metrics.RoundMetrics
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
 import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.storage.Database
+import de.yuuto.aimtune.storage.RoundLogFile
 import de.yuuto.aimtune.storage.RoundRepository
 import de.yuuto.aimtune.storage.SessionKind
+import java.nio.file.Path
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -23,8 +25,10 @@ sealed interface RoundReport {
  * Computes metrics and stores finished rounds on a background thread so the render thread never
  * waits for segmentation or disk. A session is created on the first finished round and a new one
  * whenever DPI or game change. Without a [database] rounds are still analysed but not stored.
+ * With an [exportDir] every round is also written there as a raw event log, so real sessions can
+ * become regression fixtures; a failing export is logged and never affects the round.
  */
-class RoundProcessor(private val database: Database?) : AutoCloseable {
+class RoundProcessor(private val database: Database?, private val exportDir: Path? = null) : AutoCloseable {
     private val log = System.getLogger("aimtune.rounds")
     private val executor = Executors.newSingleThreadExecutor { Thread(it, "aimtune-round-processor").apply { isDaemon = true } }
     private val repository = database?.let(::RoundRepository)
@@ -40,6 +44,7 @@ class RoundProcessor(private val database: Database?) : AutoCloseable {
     fun submit(recording: RoundRecording, startedAtMs: Long, blind: Boolean, gameId: String?) {
         report = RoundReport.Pending
         executor.execute {
+            export(recording, startedAtMs)
             report = try {
                 val metrics = computeRoundMetrics(recording)
                 RoundReport.Done(metrics, store(recording, metrics, startedAtMs, blind, gameId))
@@ -47,6 +52,15 @@ class RoundProcessor(private val database: Database?) : AutoCloseable {
                 log.log(System.Logger.Level.ERROR, "round analysis failed", e)
                 RoundReport.Failed(e.message ?: e.javaClass.simpleName)
             }
+        }
+    }
+
+    private fun export(recording: RoundRecording, startedAtMs: Long) {
+        val dir = exportDir ?: return
+        try {
+            RoundLogFile.write(recording, dir.resolve("round-$startedAtMs-seed${recording.seed}.json"))
+        } catch (e: Exception) {
+            log.log(System.Logger.Level.ERROR, "exporting round log failed: ${e.message}", e)
         }
     }
 
