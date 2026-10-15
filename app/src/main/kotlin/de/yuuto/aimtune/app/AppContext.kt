@@ -20,6 +20,8 @@ import de.yuuto.aimtune.app.i18n.Language
 import de.yuuto.aimtune.app.history.buildHistory
 import de.yuuto.aimtune.app.screens.BetweenRoundsScreen
 import de.yuuto.aimtune.app.screens.HistoryScreen
+import de.yuuto.aimtune.app.screens.ShareDataScreen
+import de.yuuto.aimtune.app.screens.StoredCounts
 import de.yuuto.aimtune.app.screens.MainMenuScreen
 import de.yuuto.aimtune.app.screens.OnboardingScreen
 import de.yuuto.aimtune.app.screens.PreTestScreen
@@ -40,6 +42,7 @@ import de.yuuto.aimtune.core.units.searchRange
 import de.yuuto.aimtune.games.GameProfiles
 import de.yuuto.aimtune.input.RawMouseSource
 import de.yuuto.aimtune.storage.RawAccelExport
+import de.yuuto.aimtune.storage.ResearchExportResult
 import de.yuuto.aimtune.storage.SettingsException
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
@@ -61,6 +64,8 @@ class AppContext(
     val startupProblems: List<String>,
     /** Where exported Raw Accel files go; null without a data folder. */
     val exportDir: Path? = null,
+    /** Where research exports go; null without a data folder. */
+    val researchDir: Path? = null,
 ) {
     private var nextSeed = options.seed ?: System.nanoTime()
     private var loadedI18n: I18n? = null
@@ -177,6 +182,17 @@ class AppContext(
 
     fun showAccel() = switchTo(AccelIntroScreen(this))
 
+    /** The screen that exports the stored rounds for a researcher; the counts are read in the background. */
+    fun showShareData() = switchTo(
+        ShareDataScreen(this, CompletableFuture.supplyAsync { processor.storedHistory().let { StoredCounts(it.sessions.size, it.rounds.size) } }),
+    )
+
+    /** Writes the research file; fails with the reason when there is no data folder. */
+    fun exportResearch(): CompletableFuture<Result<ResearchExportResult>> {
+        val dir = researchDir ?: return CompletableFuture.completedFuture(Result.failure(IllegalStateException("no data folder to write to")))
+        return processor.exportResearch(dir, APP_VERSION)
+    }
+
     /** The history of stored sessions; the recommendation after each one is computed in the background. */
     fun showHistory() = switchTo(HistoryScreen(this, loadHistory()))
 
@@ -255,3 +271,6 @@ class AppContext(
 
 /** The sensitivity the acceleration steps start from, with how sure the optimizer is about it. */
 data class AccelBaseline(val cm360: Double, val confidencePercent: Int, val rounds: Int)
+
+/** Written into research exports; keep in step with `appVersion` in app/build.gradle.kts. */
+private const val APP_VERSION = "0.1.0"

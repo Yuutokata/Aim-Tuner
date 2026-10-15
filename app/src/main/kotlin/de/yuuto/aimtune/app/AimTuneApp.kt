@@ -61,6 +61,7 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
             gate = gate,
             startupProblems = problems,
             exportDir = paths?.dataDir?.resolve("exports")?.resolve("rawaccel"),
+            researchDir = paths?.dataDir?.resolve("exports")?.resolve("research"),
         )
         context = ctx
         val screenshotDir = options.screenshotDir

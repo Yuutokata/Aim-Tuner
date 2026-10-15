@@ -10,6 +10,8 @@ import de.yuuto.aimtune.app.accel.sampleAccelRun
 import de.yuuto.aimtune.app.blind.sampleBlindRun
 import de.yuuto.aimtune.app.history.HistoryEntry
 import de.yuuto.aimtune.app.screens.HistoryScreen
+import de.yuuto.aimtune.app.screens.ShareDataScreen
+import de.yuuto.aimtune.app.screens.StoredCounts
 import de.yuuto.aimtune.app.screens.TrainerScreen
 import de.yuuto.aimtune.app.setup.SetupStep
 import de.yuuto.aimtune.core.scenario.ScenarioKind
@@ -57,6 +59,7 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("between-rounds") { sample?.let(ctx::showBetweenRounds) },
         Step("results") { sample?.let(ctx::stopBlindTest) },
         Step("history") { ctx.switchTo(HistoryScreen(ctx, CompletableFuture.completedFuture(sampleHistory()))) },
+        Step("share-data") { ctx.switchTo(ShareDataScreen(ctx, CompletableFuture.completedFuture(StoredCounts(3, 42)))) },
     )
     private val sample by lazy { ctx.trainerConfig()?.let(::sampleBlindRun) }
     private var index = -1

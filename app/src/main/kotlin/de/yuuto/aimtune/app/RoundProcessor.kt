@@ -7,11 +7,14 @@ import de.yuuto.aimtune.core.recording.RoundRecording
 import de.yuuto.aimtune.storage.Database
 import de.yuuto.aimtune.storage.RoundLogFile
 import de.yuuto.aimtune.storage.RoundRepository
+import de.yuuto.aimtune.storage.ResearchExport
+import de.yuuto.aimtune.storage.ResearchExportResult
 import de.yuuto.aimtune.storage.RoundRow
 import de.yuuto.aimtune.storage.SessionKind
 import de.yuuto.aimtune.storage.SessionRow
 import de.yuuto.aimtune.storage.scoreInputs
 import java.nio.file.Path
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -112,6 +115,16 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
             log.log(System.Logger.Level.ERROR, "reading the history failed: ${e.message}", e)
             StoredHistory(emptyList(), emptyList())
         }
+    }
+
+    /** Writes all stored rounds as one research file into [dir] on the storage thread; the result says what was written or why not. */
+    fun exportResearch(dir: Path, appVersion: String): CompletableFuture<Result<ResearchExportResult>> {
+        val repo = repository ?: return CompletableFuture.completedFuture(Result.failure(IllegalStateException("storage unavailable")))
+        val future = CompletableFuture<Result<ResearchExportResult>>()
+        executor.execute {
+            future.complete(runCatching { ResearchExport.write(dir, repo, appVersion) }.onFailure { log.log(System.Logger.Level.ERROR, "research export failed: ${it.message}", it) })
+        }
+        return future
     }
 
     private fun export(recording: RoundRecording, startedAtMs: Long) {
