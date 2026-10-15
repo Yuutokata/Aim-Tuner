@@ -39,6 +39,8 @@ private const val SCENARIO_WIDTH = 300f
 private const val SCENARIOS_GAP = 40f
 private const val FOOTER_BUTTON_HEIGHT = 64f
 private val ROUND_LENGTHS = listOf(30, 45, 60, 90)
+private const val FLASH_SEGMENT_WIDTH = 150f
+private const val FLASH_HELP_WIDTH = 760f
 
 private val METRIC_KEYS = mapOf(
     ScoreMetric.ACCURACY to "metric.accuracy",
@@ -68,6 +70,8 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         addRow(left, t("settings.sensitivity"), sensitivityControl())
         addRow(left, t("settings.round_length"), roundLengthButtons())
         addRow(left, t("settings.language"), languageSelect())
+        addRow(left, t("settings.flash"), flashImportanceButtons(draft.flashImportance) { draft = draft.copy(flashImportance = it); message = null; rebuild() })
+        left.add(ui.label(t("settings.flash_help"), Styles.CAPTION_MUTED, wrap = true)).colspan(2).left().width(FLASH_HELP_WIDTH).padBottom(ROW_GAP).row()
         val runSetup = ui.button(t("settings.run_setup"), Styles.SECONDARY) { ctx.showOnboarding(SetupStep.DPI, afterFinish = ctx::showSettings) }
         addRow(left, t("settings.style_pad"), Table().also { it.add(runSetup).height(CONTROL_HEIGHT) })
 
@@ -210,10 +214,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
             grid.add(button).width(SCENARIO_WIDTH).height(CONTROL_HEIGHT).padRight(SEGMENT_GAP).padBottom(SEGMENT_GAP)
             if (index % 2 == 1) grid.row()
         }
-        block.add(grid).left().row()
-        block.add(ui.label(t("settings.flash"), Styles.BODY)).left().padTop(SCENARIOS_GAP / 2).padBottom(4f).row()
-        block.add(ui.label(t("settings.flash_help"), Styles.CAPTION_MUTED, wrap = true)).left().width(WEIGHTS_WIDTH).padBottom(12f).row()
-        block.add(flashImportanceButtons(draft.flashImportance) { draft = draft.copy(flashImportance = it); message = null; rebuild() }).left()
+        block.add(grid).left()
         return block
     }
 
@@ -228,7 +229,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
     }
 
     private fun flashImportanceButtons(selected: FlashImportance, onPick: (FlashImportance) -> Unit): Table =
-        ui.flashImportanceButtons(flashImportanceLabels(), selected, onPick)
+        ui.flashImportanceButtons(flashImportanceLabels(), selected, onPick, segmentWidth = FLASH_SEGMENT_WIDTH)
 
     private fun flashImportanceLabels() = FlashImportance.entries.associateWith { t("flash.importance.${it.name.lowercase()}") }
 

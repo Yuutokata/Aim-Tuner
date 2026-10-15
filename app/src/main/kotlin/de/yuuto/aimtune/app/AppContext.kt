@@ -35,6 +35,7 @@ import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.setup.SetupStep
 import de.yuuto.aimtune.app.ui.UiHolder
 import de.yuuto.aimtune.core.scenario.ScenarioKind
+import de.yuuto.aimtune.core.score.FlashImportance
 import de.yuuto.aimtune.core.scenario.ScenarioSchedule
 import de.yuuto.aimtune.core.optimizer.OptimizationResult
 import de.yuuto.aimtune.core.score.MetricWeights
@@ -215,7 +216,7 @@ class AppContext(
         if (!source.hasReportTimestamps) return showAccel()
         val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
         val result = stored.result ?: return showAccel()
-        val run = AccelRun(stored.config.copy(cm360 = result.optimumCm360), stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, startWithSearch = search)
+        val run = AccelRun(stored.config.copy(cm360 = result.optimumCm360), stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, startWithSearch = search, flash = settings.current.flashImportance() != FlashImportance.NEVER)
         showAccelStep(run)
     }
 

@@ -310,7 +310,7 @@ class OnboardingScreen(
         content.add(ui.label(t("onboarding.flash.title"), Styles.TITLE)).left().padBottom(TILE_GAP / 2).row()
         content.add(ui.label(t("onboarding.flash.description"), Styles.BODY_MUTED, wrap = true)).left().width(DESCRIPTION_WIDTH).padBottom(TILE_GAP).row()
         val labels = FlashImportance.entries.associateWith { t("flash.importance.${it.name.lowercase()}") }
-        content.add(ui.flashImportanceButtons(labels, draft.flashImportance) { draft = draft.copy(flashImportance = it); rebuild() }).left()
+        content.add(ui.flashImportanceButtons(labels, draft.flashImportance, onPick = { draft = draft.copy(flashImportance = it); rebuild() })).left()
         return content
     }
 

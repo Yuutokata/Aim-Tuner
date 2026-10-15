@@ -48,6 +48,11 @@ enum class AccelPhase {
  * sensitivity, the analysis and fit, and the blind A/B test. [baseConfig] holds the sensitivity to
  * start from (the optimizer's recommendation). All click scenarios are played, because flicks alone
  * cover too narrow a range of hand speeds to judge a curve; tracking has no first movements.
+ * With [flash] the blind search and the blind test also play flash turn-away rounds in half of their rounds:
+ * the fast turns back are where a curve matters most, and in simulations they made the search settle at "no
+ * curve" for players without a preference and the test confirm real curves more often (docs/ALGORITHMS.md
+ * "Flash turn-away"). The error analysis does not use them: pooled with the other scenarios they only move the
+ * measured speed range (docs/ALGORITHMS.md).
  * Nothing here reveals which condition a test round has.
  */
 class AccelRun(
@@ -59,6 +64,8 @@ class AccelRun(
     maxPairs: Int = AccelAbPlan.DEFAULT_MAX_PAIRS,
     /** Skip the calibration and begin with the blind search of the curve strength. */
     startWithSearch: Boolean = false,
+    /** Play flash turn-away rounds in the strength search and the blind test. */
+    flash: Boolean = false,
 ) {
     var phase = if (startWithSearch) AccelPhase.SEARCH else AccelPhase.CALIBRATION
         private set
@@ -70,7 +77,8 @@ class AccelRun(
         private set
 
     private val calibration = mutableListOf<RoundMetrics>()
-    private val plan = AccelAbPlan(CLICK_SCENARIOS, seed, maxPairs)
+    private val testScenarios = if (flash) SCENARIOS_WITH_FLASH else CLICK_SCENARIOS
+    private val plan = AccelAbPlan(testScenarios, seed, maxPairs)
     private val outcomes = mutableListOf<AbOutcome>()
 
     val baseCm360: Double get() = baseConfig.cm360
@@ -153,7 +161,7 @@ class AccelRun(
         AccelPhase.SEARCH -> {
             currentStrength = search.nextStrength()
             baseConfig.copy(
-                scenario = CLICK_SCENARIOS[search.roundsPlayed % CLICK_SCENARIOS.size],
+                scenario = testScenarios[search.roundsPlayed % testScenarios.size],
                 seed = seed * SEARCH_SEED_MIX + search.roundsPlayed,
                 accel = CurveStrength.curve(currentStrength),
             )
@@ -175,7 +183,7 @@ class AccelRun(
                 if (outcomes.size % 2 == 0) decide()
             }
             AccelPhase.SEARCH -> {
-                search.record(currentStrength, CLICK_SCENARIOS[search.roundsPlayed % CLICK_SCENARIOS.size], metrics)
+                search.record(currentStrength, testScenarios[search.roundsPlayed % testScenarios.size], metrics)
                 if (search.roundsPlayed >= search.plannedRounds) finishSearch()
             }
             AccelPhase.ANALYSIS, AccelPhase.SEARCH_RESULT, AccelPhase.DONE -> error("no round is due in phase $phase")
@@ -260,5 +268,10 @@ class AccelRun(
 
         /** Scenarios with a first movement per target; micro-adjust is slow, flicks and switching fast. */
         val CLICK_SCENARIOS = listOf(ScenarioKind.FLICK, ScenarioKind.SWITCHING, ScenarioKind.MICRO)
+
+        /** The click scenarios with a flash round between each of them: half of the rounds. */
+        val SCENARIOS_WITH_FLASH = listOf(
+            ScenarioKind.FLICK, ScenarioKind.FLASH, ScenarioKind.SWITCHING, ScenarioKind.FLASH, ScenarioKind.MICRO, ScenarioKind.FLASH,
+        )
     }
 }

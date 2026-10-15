@@ -127,6 +127,18 @@ class AccelRunTest {
     }
 
     @Test
+    fun `with flash on, half of the search and test rounds are flash rounds and the calibration stays on the click scenarios`() {
+        val run = AccelRun(base, MetricWeights.DEFAULT, runKey = 1, seed = 5, startWithSearch = true, flash = true)
+        val searchConfigs = (0 until 12).map { run.nextRoundConfig().also { _ -> play(run, SimulatedPlayer()) } }
+        assertEquals(6, searchConfigs.count { it.scenario == ScenarioKind.FLASH })
+        assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.SWITCHING, ScenarioKind.MICRO, ScenarioKind.FLASH), searchConfigs.map { it.scenario }.toSet())
+
+        val calibrating = AccelRun(base, MetricWeights.DEFAULT, runKey = 1, seed = 5, flash = true)
+        val calibration = (0 until calibrating.calibrationRounds).map { calibrating.nextRoundConfig().also { _ -> play(calibrating, SimulatedPlayer()) } }
+        assertTrue(calibration.none { it.scenario == ScenarioKind.FLASH })
+    }
+
+    @Test
     fun `a falling trial curve lowers the gain with speed and a found curve cannot be replaced by a trial`() {
         val falling = trialAccel(rising = false)
         assertTrue(falling.curve.multiplier(30.0) < 0.9 && falling.gainRange in 1.1..1.2)
