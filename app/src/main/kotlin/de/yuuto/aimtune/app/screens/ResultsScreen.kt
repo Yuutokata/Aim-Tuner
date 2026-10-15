@@ -55,7 +55,10 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
         } else {
             val columns = Table()
             columns.add(recommendation(result, recommendedSensitivity)).top().left()
-            columns.add(confidenceCard(result)).top().left().width(CARD_WIDTH).padLeft(COLUMN_GAP)
+            val right = Table()
+            right.add(confidenceCard(result)).top().left().width(CARD_WIDTH).row()
+            right.add(equivalentText(result)).left().padTop(24f)
+            columns.add(right).top().left().padLeft(COLUMN_GAP)
             content.add(columns).left().padBottom(32f).row()
             content.add(chartBlock(result)).left().grow()
         }
@@ -83,13 +86,17 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
             "results.range", "%.1f".format(Locale.ROOT, result.intervalLowCm360), "%.1f".format(Locale.ROOT, result.intervalHighCm360),
             "%.1f".format(Locale.ROOT, data.currentCm360), "%+d".format(Locale.ROOT, change),
         )
-        block.add(ui.label(range, Styles.MONO_MUTED)).left().padBottom(16f).row()
+        block.add(ui.label(range, Styles.MONO_MUTED)).left().row()
+        return block
+    }
+
+    /** What "equal scores" means in cm/360°; under the confidence card so the left column stays short enough for the footer. */
+    private fun equivalentText(result: OptimizationResult): Table {
         val equivalent = t(
             if (result.isFlat) "results.equivalent_flat" else "results.equivalent",
             "%.0f".format(Locale.ROOT, result.equivalentLowCm360), "%.0f".format(Locale.ROOT, result.equivalentHighCm360),
         )
-        block.add(ui.label(equivalent, Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH)
-        return block
+        return Table().also { it.add(ui.label(equivalent, Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH) }
     }
 
     private fun chartBlock(result: OptimizationResult): Table {
