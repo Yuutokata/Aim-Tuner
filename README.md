@@ -43,6 +43,7 @@ Settings and your rounds are stored in `%APPDATA%\AimTune` (set `AIMTUNE_DATA_DI
 - Runs short **blind** aim rounds in a built-in 3D trainer (flick, micro-adjust, tracking, target switching) at sensitivities chosen by a Bayesian optimizer, so you never see which one you are playing.
 - Reports a recommended sensitivity as your game's value and as cm/360° with the range in which your scores were equal and a confidence, and keeps a history of sessions.
 - Optionally (experimental) looks for a speed-dependent curve in how your first movements miss, or lets you try a mild rising or falling one, tests it blind against plain sensitivity, and exports a [Raw Accel](https://github.com/RawAccelOfficial/rawaccel) `settings.json` only if the curve is clearly better.
+- **Share data for research** (History): writes your stored rounds into one file (no name, paths or clock times) that you can send to someone who is checking the method; nothing is uploaded ([format](docs/RESEARCH-EXPORT.md)).
 - English and German.
 
 | Menu | Acceleration analysis |
