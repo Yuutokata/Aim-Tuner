@@ -40,9 +40,12 @@ Games are JSON profiles and need no code changes. Bundled profiles live in `game
   "trackingDistanceMeters": 14.0,
   "strafeSpeedMetersPerSecond": { "min": 3.0, "max": 6.0 },
   "stopProbability": 0.25,
+  "flash": { "popDelaySeconds": { "min": 0.45, "max": 0.9 }, "blindSeconds": 1.5, "exitMarginDegrees": 10.0, "verified": false },
   "verified": false
 }
 ```
+
+The `flash` block (also optional, same fallback) describes the flash turn-away scenario: how long a flash is visible before it pops, where it appears (`cueOffsetDegrees`, `cueElevationDegrees`, `distanceMeters`), the pause between flashes (`gapSeconds`), how long a player who looks at it is blind, where the enemy shows up afterwards (`returnSpreadDegrees`, `returnMinDegrees`) and how far past the edge of the screen the flash must be (`exitMarginDegrees`). The half field of view comes from `fov`. `sources` and `notes` may list where the values come from; mark them `verified` only when measured.
 
 Sizes are angles (degrees at the game's FOV), never meters or pixels; the distance only gives the scene depth. `flickAngles` is the distance of the next target from the previous one (where the crosshair is after a hit): buckets by upper limit and weight. How to measure a head in the game's shooting range is described in [docs/REVIEW.md](docs/REVIEW.md) ("Realism").
 

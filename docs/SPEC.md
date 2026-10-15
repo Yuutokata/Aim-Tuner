@@ -29,15 +29,19 @@ Kotlin, JDK 21, Gradle Kotlin DSL; LibGDX (LWJGL3) with Scene2D; Raw Input via J
 - Notice (not enforced) that Windows "Enhance pointer precision" and active Raw Accel curves distort measurements.
 
 ### Scenarios
-Rounds of about 30-60 s (configurable) in a plain 3D room with targets of a head's angular size, defined per game in its profile: Flick, Micro-adjust, Tracking, Target switching. Plugin-style `Scenario` interface; seeded for reproducibility.
+Rounds of about 30-60 s (configurable) in a plain 3D room with targets of a head's angular size, defined per game in its profile: Flick, Micro-adjust, Tracking, Target switching, Flash turn-away. Plugin-style `Scenario` interface; seeded for reproducibility.
+
+**Flash turn-away.** Turning away from a flash and coming back quickly is a key use case in Valorant. A flash orb becomes visible inside the field of view and pops after a short delay; the player has to turn so far that the flash is beyond the edge of the screen (half the profile's horizontal FOV plus a margin) when it pops, then turn back and hit the head-sized enemy that appears near the original view direction. A player who still sees the flash is blinded (white screen) for its blind duration and sees the enemy only afterwards. Times, positions and the blind duration are in the `flash` block of the profile's `trainer` block (windups of the real abilities, 0.3-0.6 s; sources and what is assumed are listed in the profile and in docs/ALGORITHMS.md). A setting in onboarding (aim style step) and in the settings says how much flash dodging matters to the player (never / sometimes / often); it is the weight of the dodge metric and decides how often flash rounds are played.
 
 ### Measurement and metrics
-Store raw events (counts + timestamps) and target events per round. Compute hit rate, time-to-target, signed endpoint error per movement, corrective movements, path efficiency, tracking time-on-target ratio and mean distance. Segment into submovements (also used for accel analysis). Combine accuracy (first shot), time to hit and tracking into a normalized, weighted, per-user-baselined score; the spread of the first-movement error is shown as a diagnostic only because it cannot have an optimum of its own.
+Store raw events (counts + timestamps) and target events per round. Compute hit rate, time-to-target, signed endpoint error per movement, corrective movements, path efficiency, tracking time-on-target ratio and mean distance. Segment into submovements (also used for accel analysis). For flash rounds also the share of flashes the player had turned away from when they popped, the time to turn away and its peak speed. Combine accuracy (first shot), time to hit, tracking and the flash dodge rate into a normalized, weighted, per-user-baselined score; the spread of the first-movement error is shown as a diagnostic only because it cannot have an optimum of its own.
 
 ### Sensitivity optimization (phase 1)
 Bayesian optimization over log(cm360) in the range; GP with noise model; EI or UCB; blind testing; repeated points for noise; session offsets and a per-session trend (learning, fatigue) are part of the model, a detected trend lowers the confidence; stop at any time with confidence value and recommendation whether more rounds are worthwhile; sessions merge into one result.
 
 ### Acceleration curve (phase 2, optional)
+The blind search of the curve strength and its blind test also play flash turn-away rounds (half of their rounds) when flash dodging matters to the player; the error analysis of phase 1 plain rounds does not use them (docs/ALGORITHMS.md "Flash turn-away").
+
 Base sensitivity is the found optimum. Signed endpoint error vs input speed from submovements gives a desired gain g(v). Fit the supported Raw Accel modes (verify list) with a weighted least squares fit on the median error per speed bin, pick the mode by an information criterion (BIC) against "no acceleration", constrain with caps. Verify via in-app blind A/B; export only if measurably better, else recommend no accel. Export Raw Accel `settings.json` (verify schema in a1xd/rawaccel) with the sens multiplier set so in-game sensitivity stays unchanged.
 
 ### Results view
