@@ -72,5 +72,22 @@ data class SimulatedPlayer(
          * The tolerance of that test is the accuracy of this constant.
          */
         const val BASE_OPTIMUM_CM360 = 50.0
+
+        /**
+         * Optimum of the default parameters with the head-sized targets of the game profiles (0.4-1.9 degrees, flick
+         * scenario), measured on a 40-640 cm/360 sweep (docs/ASSESSMENT.md C). The default hand was calibrated on
+         * large targets and wants about 156 cm/360 there, far outside what people use (pros 33-65 cm/360, controlled
+         * study 20-80); see [forHeadSizedTargets].
+         */
+        const val BASE_OPTIMUM_HEAD_TARGETS_CM360 = 156.0
+
+        /**
+         * A hand whose optimum with the profile's head-sized targets lies at [optimumCm360] (about where people are).
+         * All effects depend on `cm360 / optimumScale` only, so scaling the default hand is exact.
+         */
+        fun forHeadSizedTargets(optimumCm360: Double = 50.0): SimulatedPlayer {
+            require(optimumCm360 > 0.0) { "cm360 must be positive" }
+            return SimulatedPlayer(optimumScale = optimumCm360 / BASE_OPTIMUM_HEAD_TARGETS_CM360)
+        }
     }
 }

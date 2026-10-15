@@ -44,7 +44,20 @@ data class OptimizationResult(
     val hyper: GpHyperParams,
     val rounds: Int,
     val sessions: Int,
-)
+    /**
+     * The stretch of cm/360 around [optimumCm360] in which the model's mean score is within [negligibleDifference]
+     * of the best: sensitivities in it are equivalent as far as this test can tell (docs/ASSESSMENT.md A2).
+     */
+    val equivalentLowCm360: Double = optimumCm360,
+    val equivalentHighCm360: Double = optimumCm360,
+) {
+    /** True when the equivalent stretch is wide, so any value in it is as good as another. */
+    val isFlat: Boolean get() = equivalentHighCm360 / equivalentLowCm360 >= FLAT_RATIO
+
+    companion object {
+        const val FLAT_RATIO = 1.8
+    }
+}
 
 data class OptimizerConfig(
     /** Rounds placed by a randomized space-filling design before the model chooses. */
@@ -149,7 +162,16 @@ class SensitivityOptimizer(
             hyper = gp.hyper,
             rounds = history.size,
             sessions = history.map { it.sessionId }.distinct().size,
+            equivalentLowCm360 = exp(grid[equivalentEdge(posterior, best, negligible, -1)]),
+            equivalentHighCm360 = exp(grid[equivalentEdge(posterior, best, negligible, +1)]),
         )
+    }
+
+    /** Grid index of the end of the stretch around [bestIndex] (in direction [step]) that scores within [negligible] of the best. */
+    private fun equivalentEdge(posterior: Posterior, bestIndex: Int, negligible: Double, step: Int): Int {
+        var i = bestIndex
+        while (i + step in grid.indices && posterior.mean[i + step] >= posterior.mean[bestIndex] - negligible) i += step
+        return i
     }
 
     /** The i-th point of a seeded, shuffled, stratified design over the log range. */

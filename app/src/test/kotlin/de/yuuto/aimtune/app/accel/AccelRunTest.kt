@@ -39,7 +39,7 @@ class AccelRunTest {
     }
 
     @Test
-    fun `a player who expects a rising gain gets a curve that the blind test confirms`() {
+    fun `a player who expects a falling gain gets a curve that the blind test confirms`() {
         val run = sampleAccelRun(base, AccelPhase.DONE)
         assertNotNull(run.candidate)
         assertEquals(AbStatus.ACCEL_BETTER, run.verdict?.status)
@@ -87,8 +87,8 @@ class AccelRunTest {
         val candidate = checkNotNull(run.candidate)
         run.startTest()
         repeat(6) { pair ->
-            val first = run.nextRoundConfig().also { play(run, risingGainPlayer) }
-            val second = run.nextRoundConfig().also { play(run, risingGainPlayer) }
+            val first = run.nextRoundConfig().also { play(run, fallingGainPlayer) }
+            val second = run.nextRoundConfig().also { play(run, fallingGainPlayer) }
             assertEquals(first.seed, second.seed, "pair $pair")
             assertEquals(first.scenario, second.scenario)
             assertTrue((first.accel == null) != (second.accel == null), "one plain, one with the curve")
@@ -108,17 +108,17 @@ class AccelRunTest {
         repeat(3) {
             assertEquals("accel.label.test", run.label.key)
             assertEquals(1, run.label.args.size, "only the number of the round")
-            play(run, risingGainPlayer)
+            play(run, fallingGainPlayer)
         }
     }
 
     @Test
     fun `the analysis can start early from five rounds and says if they were enough`() {
         val run = newRun()
-        repeat(AccelRun.MIN_CALIBRATION_ROUNDS - 1) { play(run, risingGainPlayer) }
+        repeat(AccelRun.MIN_CALIBRATION_ROUNDS - 1) { play(run, fallingGainPlayer) }
         assertTrue(!run.canAnalyseNow)
         assertFailsWith<IllegalStateException> { run.analyseNow() }
-        play(run, risingGainPlayer)
+        play(run, fallingGainPlayer)
         assertTrue(run.canAnalyseNow)
         run.analyseNow()
         assertEquals(AccelPhase.ANALYSIS, run.phase)

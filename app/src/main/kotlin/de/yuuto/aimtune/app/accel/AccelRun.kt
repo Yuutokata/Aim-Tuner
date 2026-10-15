@@ -173,10 +173,10 @@ class AccelRun(
     }
 
     companion object {
-        const val DEFAULT_CALIBRATION_ROUNDS = 8
+        const val DEFAULT_CALIBRATION_ROUNDS = 15
 
-        /** From this many rounds on the analysis can be started early; simulated players were found with 5, real data is weaker. */
-        const val MIN_CALIBRATION_ROUNDS = 5
+        /** From this many rounds on the analysis can be started early; 8 rounds found rising curves far less often than 15 (docs/ASSESSMENT.md B3). */
+        const val MIN_CALIBRATION_ROUNDS = 8
         private const val CALIBRATION_SEED_MIX = 1_000L
 
         /** Scenarios with a first movement per target; micro-adjust is slow, flicks and switching fast. */

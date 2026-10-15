@@ -34,7 +34,8 @@ class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
         content.add(ui.label(t("accel.title"), Styles.HEADING)).left().padBottom(24f).row()
         content.add(
             ui.label(t("accel.intro", AccelRun.DEFAULT_CALIBRATION_ROUNDS), Styles.BODY_MUTED, wrap = true),
-        ).left().width(TEXT_WIDTH).padBottom(40f).row()
+        ).left().width(TEXT_WIDTH).padBottom(16f).row()
+        content.add(ui.label(t("accel.experimental"), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padBottom(40f).row()
         content.add(baselineCard()).left().width(CARD_WIDTH).padBottom(24f).row()
         content.add(rawAccelCheck()).left().row()
         if (!ctx.source.hasReportTimestamps) {

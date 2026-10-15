@@ -31,9 +31,18 @@ data class GainPoint(val speed: Double, val logGain: Double, val standardError: 
  * invented a speed dependence for players who have none (docs/REVIEW.md M3): it says how the wanted gain changes with speed, not what the
  * sensitivity should be (that is the optimizer's job). See docs/ALGORITHMS.md ("Acceleration").
  */
-class AccelAnalysis(samples: List<MovementSample>, private val minPerBin: Int = MIN_PER_BIN) {
-    /** Samples used: movements with a plausible ratio (the first movement went toward the target). */
-    val used: List<MovementSample> = samples.filter { it.speed > 0.0 && (1.0 + it.errorRatio) in MIN_RATIO..MAX_RATIO }
+class AccelAnalysis(
+    samples: List<MovementSample>,
+    private val minPerBin: Int = MIN_PER_BIN,
+    minSpeed: Double = MIN_SPEED,
+) {
+    /**
+     * Samples used: movements with a plausible ratio (the first movement went toward the target) and a hand
+     * speed of at least [minSpeed]. Slower reaches are small ones, and their error depends on their size even
+     * with a constant gain; on simulated players without any preference it looked like a falling gain of
+     * the size of a 15 % preference (docs/ASSESSMENT.md B1), and Raw Accel curves start at gain 1 there anyway.
+     */
+    val used: List<MovementSample> = samples.filter { it.speed >= minSpeed && (1.0 + it.errorRatio) in MIN_RATIO..MAX_RATIO }
 
     val points: List<GainPoint>
 
@@ -71,6 +80,9 @@ class AccelAnalysis(samples: List<MovementSample>, private val minPerBin: Int = 
     companion object {
         private val MEDIAN_SE_FACTOR = sqrt(Math.PI / 2.0)
         const val MIN_PER_BIN = 20
+
+        /** Hand speed in inches per second below which a reach is not used to judge a gain preference. */
+        const val MIN_SPEED = 3.0
         const val MIN_BINS = 4
         const val MAX_BINS = 10
 

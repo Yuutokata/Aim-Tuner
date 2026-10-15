@@ -83,7 +83,12 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
             "results.range", "%.1f".format(Locale.ROOT, result.intervalLowCm360), "%.1f".format(Locale.ROOT, result.intervalHighCm360),
             "%.1f".format(Locale.ROOT, data.currentCm360), "%+d".format(Locale.ROOT, change),
         )
-        block.add(ui.label(range, Styles.MONO_MUTED)).left()
+        block.add(ui.label(range, Styles.MONO_MUTED)).left().padBottom(16f).row()
+        val equivalent = t(
+            if (result.isFlat) "results.equivalent_flat" else "results.equivalent",
+            "%.0f".format(Locale.ROOT, result.equivalentLowCm360), "%.0f".format(Locale.ROOT, result.equivalentHighCm360),
+        )
+        block.add(ui.label(equivalent, Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH)
         return block
     }
 

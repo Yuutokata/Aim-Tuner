@@ -37,7 +37,8 @@ class AccelAnalysisScreen(ctx: AppContext, private val run: AccelRun) : UiScreen
         val content = Table()
         content.add(ui.label(if (candidate == null) t("accel.analysis.no_curve") else t("accel.analysis.curve_found"), Styles.HEADING)).left().padBottom(32f).row()
         val fit = checkNotNull(run.fit)
-        content.add(ui.label(reasonText(fit), Styles.BODY_MUTED, wrap = true)).left().width(TEXT_WIDTH).padBottom(32f).row()
+        content.add(ui.label(reasonText(fit), Styles.BODY_MUTED, wrap = true)).left().width(TEXT_WIDTH).padBottom(16f).row()
+        content.add(ui.label(t("accel.experimental"), Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).padBottom(32f).row()
         if (candidate != null) content.add(curveCard(candidate)).left().width(CARD_WIDTH).padBottom(24f).row()
         if (candidate == null && fit.points.size >= 2) {
             content.add(ui.caps(t("accel.analysis.chart_plain"))).left().padBottom(8f).row()
@@ -55,7 +56,8 @@ class AccelAnalysisScreen(ctx: AppContext, private val run: AccelRun) : UiScreen
         if (candidate != null) {
             footer.addButton(ui.button(t("accel.analysis.test_blind"), Styles.PRIMARY) { start() }, minWidth = 260f)
         } else if (fit.points.size >= 2) {
-            footer.addButton(ui.button(t("accel.analysis.try_anyway"), Styles.SECONDARY) { startTrial() }, minWidth = 260f)
+            footer.addButton(ui.button(t("accel.analysis.try_falling"), Styles.SECONDARY) { startTrial(rising = false) }, minWidth = 260f).padRight(16f)
+            footer.addButton(ui.button(t("accel.analysis.try_rising"), Styles.SECONDARY) { startTrial(rising = true) }, minWidth = 260f)
         }
         return ui.frame(null, content, footer)
     }
@@ -66,8 +68,8 @@ class AccelAnalysisScreen(ctx: AppContext, private val run: AccelRun) : UiScreen
         if (candidate != null) start()
     }
 
-    private fun startTrial() {
-        run.startTrial()
+    private fun startTrial(rising: Boolean) {
+        run.startTrial(rising)
         ctx.showAccelStep(run)
     }
 

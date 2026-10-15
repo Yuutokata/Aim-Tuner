@@ -62,8 +62,8 @@ fun runAccelPipeline(player: SimulatedPlayer, baseCm360: Double, seed: Long, ana
 class AccelPipelineTest {
     private val seeds = 1L..10L
 
-    /** Expects a gain that rises from 1 toward 1.5 with the hand speed, which Raw Accel's natural curve can deliver. */
-    private val wantsRisingGain = SimulatedPlayer(gainPreference = { v -> 1.0 + 0.5 * (1.0 - exp(-v / 6.0)) })
+    /** Expects a gain that falls from 1 toward 0.7; the analysis finds these reliably, rising ones rarely (docs/ASSESSMENT.md B3). */
+    private val wantsFallingGain = SimulatedPlayer(gainPreference = { v -> 1.0 - 0.3 * (1.0 - exp(-v / 6.0)) })
 
     private fun summary(label: String, runs: List<AccelRun>) = buildString {
         val offered = runs.filter { it.fit.recommended != null }
@@ -82,10 +82,10 @@ class AccelPipelineTest {
     }
 
     @Test
-    fun `a player who wants a rising gain is offered a curve that the blind test confirms, a player who does not is left alone`() {
-        val wants = seeds.map { runAccelPipeline(wantsRisingGain, 55.0, it) }
+    fun `a player who wants a falling gain is offered a curve that the blind test confirms, a player who does not is left alone`() {
+        val wants = seeds.map { runAccelPipeline(wantsFallingGain, 55.0, it) }
         val flat = seeds.map { runAccelPipeline(SimulatedPlayer(), 55.0, it) }
-        publishReport("accel-pipeline.txt", summary("Expects a rising gain", wants) + summary("Flat expectation", flat))
+        publishReport("accel-pipeline.txt", summary("Expects a falling gain", wants) + summary("Flat expectation", flat))
 
         val wantsOffered = wants.filter { it.fit.recommended != null }
         assertTrue(wantsOffered.size >= 8, "curve offered to ${wantsOffered.size} of ${wants.size}")
@@ -150,7 +150,7 @@ class AccelPipelineTest {
         var confirmedAll = 0
         var offeredAll = 0
         for (base in listOf(43.295, 55.37)) {
-            val runs = (1L..30L).map { runAccelPipeline(wantsRisingGain, base, it) }
+            val runs = (1L..30L).map { runAccelPipeline(wantsFallingGain, base, it) }
             val offered = runs.filter { it.fit.recommended != null }
             val confirmed = offered.filter { it.verdict?.status == AbStatus.ACCEL_BETTER }
             val pairs = confirmed.mapNotNull { it.verdict?.pairs }.sorted()

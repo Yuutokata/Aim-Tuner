@@ -34,6 +34,22 @@ class SensitivityOptimizerTest {
     }
 
     @Test
+    fun `the equivalent range surrounds the optimum and is wider for a flatter curve`() {
+        val (optimizer, history) = run(24, seed = 11)
+        val sharp = checkNotNull(optimizer.analyze(history))
+        assertTrue(sharp.equivalentLowCm360 <= sharp.optimumCm360 + 1e-6 && sharp.optimumCm360 <= sharp.equivalentHighCm360 + 1e-6)
+
+        // The same data with the score differences shrunk to a fifth: everything is "about equal".
+        val mean = history.map { it.score }.average()
+        val flatHistory = history.map { it.copy(score = mean + (it.score - mean) / 5.0) }
+        val flat = checkNotNull(optimizer.analyze(flatHistory))
+        assertTrue(
+            flat.equivalentHighCm360 / flat.equivalentLowCm360 >= sharp.equivalentHighCm360 / sharp.equivalentLowCm360,
+            "flat ${flat.equivalentLowCm360}-${flat.equivalentHighCm360}, sharp ${sharp.equivalentLowCm360}-${sharp.equivalentHighCm360}",
+        )
+    }
+
+    @Test
     fun `suggestions are deterministic for a history and seed`() {
         val (optimizer, history) = run(9, seed = 3)
         assertEquals(optimizer.suggestNext(history), optimizer.suggestNext(history))

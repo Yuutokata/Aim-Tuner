@@ -46,7 +46,7 @@ data class AccelFitResult(
  * [minBicGain] BIC points and changes the gain by at least [minGainRange] across the measured speeds.
  * Synchronous, jump and lookup modes are not fitted. See docs/ALGORITHMS.md ("Acceleration").
  */
-fun fitAccel(analysis: AccelAnalysis, minBicGain: Double = 10.0, minGainRange: Double = 1.08): AccelFitResult {
+fun fitAccel(analysis: AccelAnalysis, minBicGain: Double = MIN_BIC_GAIN, minGainRange: Double = MIN_GAIN_RANGE): AccelFitResult {
     val points = analysis.points
     if (points.size < AccelAnalysis.MIN_BINS) {
         val needed = AccelAnalysis.MIN_BINS * AccelAnalysis.MIN_PER_BIN
@@ -89,7 +89,16 @@ fun fitAccel(analysis: AccelAnalysis, minBicGain: Double = 10.0, minGainRange: D
     }
 }
 
-private const val MIN_SPEED_RANGE = 2.0
+/** Slowest to fastest bin; a rising preference slows the hand, and the slowest reaches are not used (AccelAnalysis.MIN_SPEED). */
+/**
+ * Without the lowest speeds the best BIC gain of 400 simulated players without any preference was at most -1.6
+ * (noise x0.7 to x1.6, docs/ASSESSMENT.md B1), and their gain range at most 1.04 in nine of ten; 5 leaves a margin
+ * for real data, and the blind test stays the final judge.
+ */
+const val MIN_BIC_GAIN = 5.0
+const val MIN_GAIN_RANGE = 1.04
+
+private const val MIN_SPEED_RANGE = 1.5
 
 /** A bin's wanted gain is never trusted to better than this (log scale), however many movements it has. */
 private const val FLOOR = 0.02
@@ -122,13 +131,15 @@ private val FAMILIES = listOf(
 private fun objective(family: Family, params: DoubleArray, points: List<GainPoint>, weights: List<Double>, ys: List<Double>): Pair<Double, Double> {
     val curve = family.build(params)
     val residual = points.indices.map { ys[it] - ln(max(curve.multiplier(points[it].speed), MIN_MULTIPLIER)) }
-    val logK = weights.indices.sumOf { weights[it] * residual[it] } / weights.sum()
+    // The overall factor is bounded: the curve under test must not smuggle in a different sensitivity (ASSESSMENT.md B2).
+    val logK = (weights.indices.sumOf { weights[it] * residual[it] } / weights.sum()).coerceIn(-MAX_LOG_FACTOR, MAX_LOG_FACTOR)
     val chi = weights.indices.sumOf { weights[it] * (residual[it] - logK).let { d -> d * d } }
-    return chi to min(max(logK, -MAX_LOG_FACTOR), MAX_LOG_FACTOR)
+    return chi to logK
 }
 
 private const val MIN_MULTIPLIER = 1e-3
-private const val MAX_LOG_FACTOR = 2.0
+/** The fitted sensitivity factor stays within about +-10 %. */
+private val MAX_LOG_FACTOR = ln(1.1)
 
 /**
  * A mild curve for a player who wants to try one although the analysis found none: the gain moves by

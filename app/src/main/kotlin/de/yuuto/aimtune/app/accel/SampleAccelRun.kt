@@ -11,11 +11,11 @@ private const val SAMPLE_SEED = 3L
 private const val CALIBRATION_ROUNDS_SHOWN = 6
 private const val TEST_ROUNDS_SHOWN = 3
 
-/** A simulated player who expects the gain to rise with the hand speed; Raw Accel's natural curve can deliver it. */
-val risingGainPlayer = SimulatedPlayer(gainPreference = { speed -> 1.0 + 0.5 * (1.0 - exp(-speed / 6.0)) })
+/** A simulated player who expects the gain to fall with the hand speed (the case the analysis finds reliably); Raw Accel's natural curve can deliver it. */
+val fallingGainPlayer = SimulatedPlayer(gainPreference = { speed -> 1.0 - 0.3 * (1.0 - exp(-speed / 6.0)) })
 
 /**
- * An acceleration run played by the simulated [risingGainPlayer] up to [until], for the screenshot
+ * An acceleration run played by the simulated [fallingGainPlayer] up to [until], for the screenshot
  * tour and tests only: the analysis and verdict screens need a real fit to show. Never user data.
  */
 fun sampleAccelRun(config: TrainerConfig, until: AccelPhase): AccelRun {
@@ -24,7 +24,7 @@ fun sampleAccelRun(config: TrainerConfig, until: AccelPhase): AccelRun {
     fun playRound() {
         val next = run.nextRoundConfig()
         run.recordRound(
-            HeadlessRound.of(next.scenario, risingGainPlayer, next.dpi, next.cm360, next.seed, next.roundSeconds, accel = next.accel),
+            HeadlessRound.of(next.scenario, fallingGainPlayer, next.dpi, next.cm360, next.seed, next.roundSeconds, accel = next.accel),
         )
     }
     when (until) {
