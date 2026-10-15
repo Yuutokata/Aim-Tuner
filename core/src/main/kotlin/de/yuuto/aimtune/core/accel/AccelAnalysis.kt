@@ -35,6 +35,8 @@ class AccelAnalysis(
     samples: List<MovementSample>,
     private val minPerBin: Int = MIN_PER_BIN,
     minSpeed: Double = MIN_SPEED,
+    /** Upper limit of the number of speed bins; more, smaller bins approach a fit on every single movement. */
+    private val maxBins: Int = MAX_BINS,
 ) {
     /**
      * Samples used: movements with a plausible ratio (the first movement went toward the target) and a hand
@@ -75,7 +77,7 @@ class AccelAnalysis(
         return if (sorted.size % 2 == 1) sorted[mid] else (sorted[mid - 1] + sorted[mid]) / 2.0
     }
 
-    private fun binCount(count: Int): Int = (count / minPerBin).coerceAtMost(MAX_BINS).let { if (it < MIN_BINS) 0 else it }
+    private fun binCount(count: Int): Int = (count / minPerBin).coerceAtMost(maxBins).let { if (it < MIN_BINS) 0 else it }
 
     companion object {
         private val MEDIAN_SE_FACTOR = sqrt(Math.PI / 2.0)

@@ -46,7 +46,12 @@ data class AccelFitResult(
  * [minBicGain] BIC points and changes the gain by at least [minGainRange] across the measured speeds.
  * Synchronous, jump and lookup modes are not fitted. See docs/ALGORITHMS.md ("Acceleration").
  */
-fun fitAccel(analysis: AccelAnalysis, minBicGain: Double = MIN_BIC_GAIN, minGainRange: Double = MIN_GAIN_RANGE): AccelFitResult {
+fun fitAccel(
+    analysis: AccelAnalysis,
+    minBicGain: Double = MIN_BIC_GAIN,
+    minGainRange: Double = MIN_GAIN_RANGE,
+    floor: Double = FLOOR,
+): AccelFitResult {
     val points = analysis.points
     if (points.size < AccelAnalysis.MIN_BINS) {
         val needed = AccelAnalysis.MIN_BINS * AccelAnalysis.MIN_PER_BIN
@@ -55,7 +60,7 @@ fun fitAccel(analysis: AccelAnalysis, minBicGain: Double = MIN_BIC_GAIN, minGain
     if (analysis.speedRange < MIN_SPEED_RANGE) {
         return AccelFitResult(points, emptyList(), null, "The movements were all at about the same speed, so no curve can be judged.", AccelReason.NARROW_SPEED_RANGE)
     }
-    val weights = points.map { 1.0 / (it.standardError * it.standardError + FLOOR * FLOOR) }
+    val weights = points.map { 1.0 / (it.standardError * it.standardError + floor * floor) }
     val ys = points.map { it.logGain }
     val nullChi = weights.indices.sumOf { weights[it] * ys[it] * ys[it] }
     val bicPenalty = ln(points.size.toDouble())
@@ -89,19 +94,25 @@ fun fitAccel(analysis: AccelAnalysis, minBicGain: Double = MIN_BIC_GAIN, minGain
     }
 }
 
-/** Slowest to fastest bin; a rising preference slows the hand, and the slowest reaches are not used (AccelAnalysis.MIN_SPEED). */
 /**
- * Without the lowest speeds the best BIC gain of 400 simulated players without any preference was at most -1.6
- * (noise x0.7 to x1.6, docs/ASSESSMENT.md B1), and their gain range at most 1.04 in nine of ten; 5 leaves a margin
- * for real data, and the blind test stays the final judge.
+ * Thresholds for recommending a curve (docs/ASSESSMENT.md B1, ALGORITHMS.md "Detection power"). With the slow reaches
+ * left out and a trust floor of 0.005 per bin, the best BIC gain of 1 600 simulated players without any preference
+ * was at most 9.4 (99th percentile 5.6, only with noise x1.6); 8 leaves a margin, and the blind test stays the final
+ * judge. The gain range of such players is up to 1.04, so the BIC gain carries the decision and the range only
+ * excludes curves that would change nothing.
  */
-const val MIN_BIC_GAIN = 5.0
-const val MIN_GAIN_RANGE = 1.04
+const val MIN_BIC_GAIN = 8.0
+const val MIN_GAIN_RANGE = 1.02
 
+/** Slowest to fastest bin; a rising preference slows the hand, and the slowest reaches are not used (AccelAnalysis.MIN_SPEED). */
 private const val MIN_SPEED_RANGE = 1.5
 
-/** A bin's wanted gain is never trusted to better than this (log scale), however many movements it has. */
-private const val FLOOR = 0.02
+/**
+ * A bin's wanted gain is never trusted to better than this (log scale), however many movements it has. It was 0.02 until the
+ * assessment: that hid every effect under about 3 % (a 15 % preference moves the bins by 0.03-0.05); at 0.005 the
+ * number of bins matters, since bins of fewer than about 20 movements have unreliable standard errors and the null grows heavy tails.
+ */
+private const val FLOOR = 0.005
 private const val START_STEP = 0.5
 
 private class Family(val name: String, val parameters: Int, val starts: List<DoubleArray>, val build: (DoubleArray) -> AccelCurve)

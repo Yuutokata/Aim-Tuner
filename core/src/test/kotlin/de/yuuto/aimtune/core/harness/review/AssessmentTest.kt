@@ -16,6 +16,7 @@ import de.yuuto.aimtune.core.accel.trialAccel
 import de.yuuto.aimtune.core.harness.TEST_DPI
 import de.yuuto.aimtune.core.harness.geometricGrid
 import de.yuuto.aimtune.core.harness.parabolicOptimum
+import de.yuuto.aimtune.core.scenario.ScenarioSchedule
 import de.yuuto.aimtune.core.harness.playBlindTest
 import de.yuuto.aimtune.core.harness.runAccelPipeline
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
@@ -301,6 +302,111 @@ class AssessmentTest {
             )
         }
         write("assess-headtargets.txt", out.toString())
+    }
+
+    /** Finer bins and a smaller trust floor: how much more is found, and how much worse is the null? */
+    @Test
+    fun finerBins() {
+        val nNull = 300
+        val nEffect = 60
+        val rounds = (System.getenv("AIMTUNE_ROUNDS") ?: "15").toInt()
+        data class Config(val label: String, val maxBins: Int, val minPerBin: Int, val floor: Double)
+        val configs = listOf(
+            Config("10 bins, floor 0.02 (now)", 10, 20, 0.02), Config("10 bins, floor 0.005", 10, 20, 0.005),
+            Config("20 bins, floor 0.01", 20, 15, 0.01), Config("40 bins, floor 0.005", 40, 8, 0.005), Config("80 bins, floor 0.002", 80, 4, 0.002),
+        )
+        fun samplesOf(player: SimulatedPlayer, seed: Long): List<MovementSample> {
+            val metrics = (0 until rounds).map { computeRoundMetrics(HeadlessRound.of(clickKinds[it % 3], player, TEST_DPI, 55.0, seed * 100 + it, 45)) }
+            return movementSamples(metrics, TEST_DPI)
+        }
+        fun bicOf(c: Config, samples: List<MovementSample>): Double {
+            val fit = fitAccel(AccelAnalysis(samples, c.minPerBin, maxBins = c.maxBins), minBicGain = -1e9, minGainRange = 0.0, floor = c.floor)
+            return fit.fits.maxOfOrNull { it.bicGain } ?: Double.NEGATIVE_INFINITY
+        }
+        val nullPlayers = listOf(SimulatedPlayer(noiseLevel = 0.7), SimulatedPlayer(), SimulatedPlayer(noiseLevel = 1.6))
+        val nullSamples = parallelList(nNull) { i -> samplesOf(nullPlayers[i % 3], 200_000L + i) }
+        val out = StringBuilder("== Finer bins, $rounds calibration rounds. Null: $nNull flat players (noise x0.7, x1.0, x1.6); effects: $nEffect players each ==\n")
+        val nullBic = configs.associateWith { c -> parallelList(nNull) { bicOf(c, nullSamples[it]) } }
+        val effects = listOf(-0.5, -0.25, -0.15, 0.15, 0.25, 0.5)
+        val effectSamples = effects.associateWith { change -> parallelList(nEffect) { i -> samplesOf(gainPlayer(change), 300_000L + i) } }
+        for (c in configs) {
+            val nb = nullBic.getValue(c)
+            val threshold = maxOf(nb.max() + 2.0, 0.0)
+            out.appendLine("-- ${c.label}: null BIC gain p50 %.1f / p99 %.1f / max %.1f -> threshold (max + 2) %.1f".format(percentile(nb, 0.5), percentile(nb, 0.99), nb.max(), threshold))
+            for (change in effects) {
+                val bics = parallelList(nEffect) { bicOf(c, effectSamples.getValue(change)[it]) }
+                out.appendLine("     gain change %+4.0f%%: BIC gain median %.1f; above threshold %2d of %d; above 5 %2d".format(change * 100, percentile(bics, 0.5), bics.count { it > threshold }, nEffect, bics.count { it > 5.0 }))
+            }
+        }
+        write("assess-finerbins.txt", out.toString())
+    }
+
+    /** One-shot fit against a second calibration played with the first curve on, refitting the total wanted gain. */
+    @Test
+    fun iterativeFit() {
+        val n = 20
+        val out = StringBuilder("== One-shot fit vs. refit after 15 more rounds with the first curve on ($n players per row; true score difference curve minus plain over 60 pairs, median) ==\n")
+        for (change in listOf(0.15, 0.25, 0.5, -0.15, -0.25)) {
+            val player = gainPlayer(change)
+            val rows = parallelList(n) { s ->
+                val plain = (0 until 15).map { computeRoundMetrics(HeadlessRound.of(clickKinds[it % 3], player, TEST_DPI, 55.0, 400_000L + s * 100 + it, 45)) }
+                val first = fitAccel(AccelAnalysis(movementSamples(plain, TEST_DPI)))
+                val curve1 = first.recommended ?: return@parallelList null
+                val withCurve = (0 until 15).map {
+                    computeRoundMetrics(HeadlessRound.of(clickKinds[it % 3], player, TEST_DPI, 55.0 / curve1.sensitivityFactor, 410_000L + s * 100 + it, 45, accel = curve1.curve))
+                }
+                // The total gain the player wanted at each speed, as if the rounds had been played plain.
+                val transformed = movementSamples(withCurve, TEST_DPI).map { sample ->
+                    sample.copy(errorRatio = (1.0 + sample.errorRatio) / curve1.totalGain(sample.speed) - 1.0)
+                }
+                val second = fitAccel(AccelAnalysis(transformed), minBicGain = -1e9, minGainRange = 0.0)
+                val curve2 = second.fits.maxByOrNull { it.bicGain } ?: return@parallelList null
+                val d1 = pairedDifference(player, 55.0, curve1.curve, curve1.sensitivityFactor, 60, 700L + s).first
+                val d2 = pairedDifference(player, 55.0, curve2.curve, curve2.sensitivityFactor, 60, 700L + s).first
+                val v2 = abVerdict(player, 55.0, curve2.curve, curve2.sensitivityFactor, 800L + s)
+                listOf(d1, d2, curve2.gainRange, if (v2.status == AbStatus.ACCEL_BETTER) 1.0 else 0.0)
+            }
+            val ok = rows.filterNotNull()
+            val oracle = pairedDifference(player, 55.0, oracleCurve(change), 1.0, 60, 700L).first
+            out.appendLine(
+                "gain change %+4.0f%%: first fit offered %2d of %d | first curve +%.2f pts, refit curve +%.2f pts (oracle +%.2f) | refit gain range median x%.2f | blind test confirms the refit curve in %d of %d".format(
+                    change * 100, ok.size, n, percentile(ok.map { it[0] }, 0.5), percentile(ok.map { it[1] }, 0.5), oracle, percentile(ok.map { it[2] }, 0.5), ok.count { it[3] > 0.5 }, ok.size,
+                ),
+            )
+            write("assess-iterative.txt", out.toString())
+        }
+    }
+
+    /** The curve strength found like the sensitivity: the optimizer over a pseudo cm/360 that stands for the gain ratio fast/slow (100 = no curve). */
+    @Test
+    fun strengthSearch() {
+        val n = 16
+        val rounds = (System.getenv("AIMTUNE_ROUNDS") ?: "24").toInt()
+        val out = StringBuilder("== Blind search over the curve strength (gain at high speed relative to low speed, 0.7-1.45), $rounds rounds, $n players per row ==\n")
+        val range = SearchRange(70.0, 145.0)
+        val kinds = ScenarioSchedule(clickKinds.toSet(), MetricWeights.DEFAULT)
+        fun curveOf(pseudo: Double): AccelCurve? {
+            val r = pseudo / 100.0
+            return if (abs(r - 1.0) < 0.02) null else NaturalCurve(0.05, r)
+        }
+        for (change in listOf(0.0, 0.15, 0.25, 0.5, -0.15, -0.25)) {
+            val player = gainPlayer(change)
+            val rows = parallelList(n) { s ->
+                val test = playBlindTest(player, range, rounds, 600L + s, scenarioFor = { clickKinds[it % 3] }, accelOf = ::curveOf, playedCm360 = 55.0)
+                val result = checkNotNull(test.result)
+                val r = result.optimumCm360 / 100.0
+                val diff = if (abs(r - 1.0) < 0.02) 0.0 else pairedDifference(player, 55.0, NaturalCurve(0.05, r), 1.0, 40, 900L + s).first
+                listOf(r, diff, if (result.intervalLowCm360 > 100.0 || result.intervalHighCm360 < 100.0) 1.0 else 0.0, result.confidencePercent.toDouble())
+            }
+            val oracle = if (change == 0.0) 0.0 else pairedDifference(player, 55.0, oracleCurve(change), 1.0, 40, 900L).first
+            out.appendLine(
+                "true gain change %+4.0f%%: found strength median x%.2f (p25 x%.2f, p75 x%.2f) | true gain over plain at that strength median %+.2f pts (oracle %+.2f) | interval excludes 'no curve' in %d of %d | confidence mean %.0f%%".format(
+                    change * 100, percentile(rows.map { it[0] }, 0.5), percentile(rows.map { it[0] }, 0.25), percentile(rows.map { it[0] }, 0.75), percentile(rows.map { it[1] }, 0.5), oracle,
+                    rows.count { it[2] > 0.5 }, n, rows.map { it[3] }.average(),
+                ),
+            )
+            write("assess-strength.txt", out.toString())
+        }
     }
 
     // ---------------------------------------------------------------- B3: power
