@@ -60,7 +60,11 @@ class AccelResultScreen(ctx: AppContext, private val run: AccelRun) : UiScreen(c
         val numbers = t(
             "accel.result.numbers", v.pairs, "%+.1f".format(Locale.ROOT, v.meanDifference), "%+.1f".format(Locale.ROOT, v.lowerBound), "%+.1f".format(Locale.ROOT, v.upperBound),
         )
-        val trial = if (run.isTrial) " " + t("accel.result.trial_note") else ""
+        val trial = when {
+            run.isTrial -> " " + t("accel.result.trial_note")
+            run.isSearch -> " " + t("accel.result.search_note")
+            else -> ""
+        }
         return when (v.status) {
             AbStatus.ACCEL_BETTER -> "$numbers " + t("accel.result.better_note") + trial
             AbStatus.ACCEL_WORSE -> "$numbers " + t("accel.result.worse_note")

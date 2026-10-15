@@ -14,6 +14,7 @@ import de.yuuto.aimtune.app.screens.AccelAnalysisScreen
 import de.yuuto.aimtune.app.screens.AccelBetweenScreen
 import de.yuuto.aimtune.app.screens.AccelIntroScreen
 import de.yuuto.aimtune.app.screens.AccelResultScreen
+import de.yuuto.aimtune.app.screens.AccelSearchResultScreen
 import de.yuuto.aimtune.app.history.HistoryEntry
 import de.yuuto.aimtune.app.i18n.I18n
 import de.yuuto.aimtune.app.i18n.Language
@@ -210,19 +211,20 @@ class AppContext(
     }
 
     /** Starts the acceleration steps at the recommended sensitivity; back to the intro if there is none yet. */
-    fun startAccelRun() {
+    fun startAccelRun(search: Boolean = false) {
         if (!source.hasReportTimestamps) return showAccel()
         val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
         val result = stored.result ?: return showAccel()
-        val run = AccelRun(stored.config.copy(cm360 = result.optimumCm360), stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++)
+        val run = AccelRun(stored.config.copy(cm360 = result.optimumCm360), stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, startWithSearch = search)
         showAccelStep(run)
     }
 
     /** The screen that fits the run: a round while one is due, otherwise the analysis or the verdict. */
     fun showAccelStep(run: AccelRun) = switchTo(
         when (run.phase) {
-            AccelPhase.CALIBRATION, AccelPhase.TEST -> AccelBetweenScreen(this, run)
+            AccelPhase.CALIBRATION, AccelPhase.SEARCH, AccelPhase.TEST -> AccelBetweenScreen(this, run)
             AccelPhase.ANALYSIS -> AccelAnalysisScreen(this, run)
+            AccelPhase.SEARCH_RESULT -> AccelSearchResultScreen(this, run)
             AccelPhase.DONE -> AccelResultScreen(this, run)
         },
     )

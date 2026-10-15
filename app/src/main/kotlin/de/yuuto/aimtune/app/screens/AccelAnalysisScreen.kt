@@ -53,11 +53,13 @@ class AccelAnalysisScreen(ctx: AppContext, private val run: AccelRun) : UiScreen
         val footer = Table()
         footer.add(ui.button(if (candidate == null) t("common.back") else t("accel.analysis.not_now"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
-        if (candidate != null) {
-            footer.addButton(ui.button(t("accel.analysis.test_blind"), Styles.PRIMARY) { start() }, minWidth = 260f)
-        } else if (fit.points.size >= 2) {
+        if (candidate == null && fit.points.size >= 2) {
             footer.addButton(ui.button(t("accel.analysis.try_falling"), Styles.SECONDARY) { startTrial(rising = false) }, minWidth = 260f).padRight(16f)
-            footer.addButton(ui.button(t("accel.analysis.try_rising"), Styles.SECONDARY) { startTrial(rising = true) }, minWidth = 260f)
+            footer.addButton(ui.button(t("accel.analysis.try_rising"), Styles.SECONDARY) { startTrial(rising = true) }, minWidth = 260f).padRight(16f)
+        }
+        footer.addButton(ui.button(t("accel.analysis.search"), if (candidate == null) Styles.PRIMARY else Styles.SECONDARY) { startSearch() }, minWidth = 300f)
+        if (candidate != null) {
+            footer.addButton(ui.button(t("accel.analysis.test_blind"), Styles.PRIMARY) { start() }, minWidth = 260f).padLeft(16f)
         }
         return ui.frame(null, content, footer)
     }
@@ -66,6 +68,11 @@ class AccelAnalysisScreen(ctx: AppContext, private val run: AccelRun) : UiScreen
 
     override fun onEnter() {
         if (candidate != null) start()
+    }
+
+    private fun startSearch() {
+        run.startSearch()
+        ctx.showAccelStep(run)
     }
 
     private fun startTrial(rising: Boolean) {

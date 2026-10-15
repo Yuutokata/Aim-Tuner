@@ -11,6 +11,7 @@ import de.yuuto.aimtune.games.GameProfiles
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -71,6 +72,58 @@ class AccelRunTest {
         val configs = (0 until 2).map { run.nextRoundConfig().also { _ -> play(run, SimulatedPlayer()) } }
         assertEquals(1, configs.count { it.accel != null }, "one round of a pair has the curve")
         assertTrue(configs.all { it.cm360 == 55.0 })
+    }
+
+    private fun searchRun() = AccelRun(base, MetricWeights.DEFAULT, runKey = 1, seed = 5, startWithSearch = true)
+
+    @Test
+    fun `the blind search finds the strength a falling player wants and the blind test confirms it`() {
+        val run = searchRun()
+        assertEquals(AccelPhase.SEARCH, run.phase)
+        while (run.phase == AccelPhase.SEARCH) {
+            assertEquals("accel.label.search", run.label.key, "the label never shows a strength")
+            play(run, fallingGainPlayer)
+        }
+        assertEquals(AccelPhase.SEARCH_RESULT, run.phase)
+        assertEquals(run.searchRounds, run.searchDone)
+        val result = assertNotNull(run.searchResult)
+        assertTrue(result.strength < 1.0, "strength ${result.strength}")
+        assertNotNull(run.searchOffer, "a falling player is offered a curve: $result")
+
+        run.startSearchTest()
+        assertTrue(run.isSearch)
+        assertFalse(run.isTrial)
+        while (run.phase == AccelPhase.TEST) play(run, fallingGainPlayer)
+        assertEquals(AbStatus.ACCEL_BETTER, run.verdict?.status)
+    }
+
+    @Test
+    fun `a flat player ends the search without a confirmed curve`() {
+        val run = searchRun()
+        while (run.phase == AccelPhase.SEARCH) play(run, SimulatedPlayer())
+        if (run.searchOffer != null) {
+            run.startSearchTest()
+            while (run.phase == AccelPhase.TEST) play(run, SimulatedPlayer())
+            assertTrue(run.verdict?.status != AbStatus.ACCEL_BETTER, "a flat player must not be shown a better curve")
+        } else {
+            assertFailsWith<IllegalStateException> { run.startSearchTest() }
+        }
+    }
+
+    @Test
+    fun `the search can be finished early only from the minimum rounds and also starts after the calibration`() {
+        val early = searchRun()
+        assertFalse(early.canFinishSearchNow)
+        repeat(StrengthSearch.MIN_ROUNDS) { play(early, fallingGainPlayer) }
+        assertTrue(early.canFinishSearchNow)
+        early.finishSearchNow()
+        assertEquals(AccelPhase.SEARCH_RESULT, early.phase)
+
+        val afterCalibration = newRun()
+        while (afterCalibration.phase == AccelPhase.CALIBRATION) play(afterCalibration, SimulatedPlayer())
+        afterCalibration.startSearch()
+        assertEquals(AccelPhase.SEARCH, afterCalibration.phase)
+        assertFailsWith<IllegalStateException> { searchRun().startSearch() }
     }
 
     @Test

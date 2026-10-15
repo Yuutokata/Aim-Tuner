@@ -29,6 +29,11 @@ fun sampleAccelRun(config: TrainerConfig, until: AccelPhase): AccelRun {
     }
     when (until) {
         AccelPhase.CALIBRATION -> repeat(CALIBRATION_ROUNDS_SHOWN) { playRound() }
+        AccelPhase.SEARCH, AccelPhase.SEARCH_RESULT -> {
+            while (run.phase == AccelPhase.CALIBRATION) playRound()
+            run.startSearch()
+            if (until == AccelPhase.SEARCH) repeat(CALIBRATION_ROUNDS_SHOWN) { playRound() } else while (run.phase == AccelPhase.SEARCH) playRound()
+        }
         AccelPhase.ANALYSIS, AccelPhase.TEST, AccelPhase.DONE -> {
             while (run.phase == AccelPhase.CALIBRATION) playRound()
             if (until == AccelPhase.ANALYSIS || run.candidate == null) return run

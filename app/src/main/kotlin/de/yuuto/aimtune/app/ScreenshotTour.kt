@@ -52,6 +52,8 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("accel-intro") { ctx.showAccel() },
         Step("accel-calibration") { accelSample(AccelPhase.CALIBRATION)?.let(ctx::showAccelStep) },
         Step("accel-analysis") { accelSample(AccelPhase.ANALYSIS)?.let(ctx::showAccelStep) },
+        Step("accel-search") { accelSample(AccelPhase.SEARCH)?.let(ctx::showAccelStep) },
+        Step("accel-search-result") { accelSample(AccelPhase.SEARCH_RESULT)?.let(ctx::showAccelStep) },
         Step("accel-test") { accelSample(AccelPhase.TEST)?.let(ctx::showAccelStep) },
         Step("accel-result") { accelSample(AccelPhase.DONE)?.let(ctx::showAccelStep) },
         Step("blind-ready") { sample?.let(ctx::showBlindRound) },

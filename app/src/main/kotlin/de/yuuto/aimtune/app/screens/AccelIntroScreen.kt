@@ -6,6 +6,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table
 import de.yuuto.aimtune.app.AccelBaseline
 import de.yuuto.aimtune.app.AppContext
 import de.yuuto.aimtune.app.accel.AccelRun
+import de.yuuto.aimtune.app.accel.StrengthSearch
 import de.yuuto.aimtune.app.ui.Styles
 import de.yuuto.aimtune.app.ui.addButton
 import de.yuuto.aimtune.app.ui.button
@@ -33,7 +34,7 @@ class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
         val content = Table()
         content.add(ui.label(t("accel.title"), Styles.HEADING)).left().padBottom(24f).row()
         content.add(
-            ui.label(t("accel.intro", AccelRun.DEFAULT_CALIBRATION_ROUNDS), Styles.BODY_MUTED, wrap = true),
+            ui.label(t("accel.intro", StrengthSearch.DEFAULT_ROUNDS, AccelRun.DEFAULT_CALIBRATION_ROUNDS), Styles.BODY_MUTED, wrap = true),
         ).left().width(TEXT_WIDTH).padBottom(16f).row()
         content.add(ui.label(t("accel.experimental"), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padBottom(40f).row()
         content.add(baselineCard()).left().width(CARD_WIDTH).padBottom(24f).row()
@@ -45,16 +46,19 @@ class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
         val footer = Table()
         footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
-        val start = ui.button(t("accel.start_calibration"), Styles.PRIMARY) { if (canStart()) ctx.startAccelRun() }
-        start.isDisabled = !canStart()
-        footer.addButton(start, minWidth = 280f)
+        val calibrate = ui.button(t("accel.start_calibration"), Styles.SECONDARY) { if (canStart()) ctx.startAccelRun() }
+        calibrate.isDisabled = !canStart()
+        footer.addButton(calibrate, minWidth = 340f).padRight(16f)
+        val search = ui.button(t("accel.start_search"), Styles.PRIMARY) { if (canStart()) ctx.startAccelRun(search = true) }
+        search.isDisabled = !canStart()
+        footer.addButton(search, minWidth = 340f)
         return ui.frame(null, content, footer)
     }
 
     override fun onEscape() = ctx.showMenu()
 
     override fun onEnter() {
-        if (canStart()) ctx.startAccelRun()
+        if (canStart()) ctx.startAccelRun(search = true)
     }
 
     private fun canStart() = baseline != null && ctx.rawAccelConfirmed && ctx.source.hasReportTimestamps

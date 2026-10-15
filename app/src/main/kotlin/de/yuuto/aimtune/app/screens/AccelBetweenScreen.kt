@@ -5,6 +5,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table
 import de.yuuto.aimtune.app.AppContext
 import de.yuuto.aimtune.app.accel.AccelPhase
 import de.yuuto.aimtune.app.accel.AccelRun
+import de.yuuto.aimtune.app.accel.StrengthSearch
 import de.yuuto.aimtune.app.ui.Styles
 import de.yuuto.aimtune.app.ui.addButton
 import de.yuuto.aimtune.app.ui.button
@@ -23,13 +24,22 @@ private const val FOOTER_BUTTON_HEIGHT = 64f
  */
 class AccelBetweenScreen(ctx: AppContext, private val run: AccelRun) : UiScreen(ctx) {
     private val calibrating = run.phase == AccelPhase.CALIBRATION
-    private val done = if (calibrating) run.calibrationDone else run.testRoundsDone
-    private val total = if (calibrating) run.calibrationRounds else run.maxTestRounds
+    private val searching = run.phase == AccelPhase.SEARCH
+    private val done = when {
+        calibrating -> run.calibrationDone
+        searching -> run.searchDone
+        else -> run.testRoundsDone
+    }
+    private val total = when {
+        calibrating -> run.calibrationRounds
+        searching -> run.searchRounds
+        else -> run.maxTestRounds
+    }
 
     override fun build(): Actor {
         val content = Table()
         content.add(ui.label(heading(), Styles.HEADING)).left().padBottom(40f).row()
-        content.add(ui.caps(if (calibrating) t("accel.between.calibration") else t("accel.between.test"))).left().padBottom(12f).row()
+        content.add(ui.caps(phaseName())).left().padBottom(12f).row()
         content.add(ui.progressBar(done.toFloat() / total, BAR_WIDTH)).left().padBottom(12f).row()
         content.add(ui.label(progressText(), Styles.BODY_MUTED)).left().padBottom(40f).row()
         content.add(ui.label(explanation(), Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH)
@@ -40,8 +50,22 @@ class AccelBetweenScreen(ctx: AppContext, private val run: AccelRun) : UiScreen(
         if (run.canAnalyseNow) {
             footer.addButton(ui.button(t("accel.between.analyse_now"), Styles.SECONDARY) { analyseNow() }, minWidth = 220f).padRight(16f)
         }
+        if (run.canFinishSearchNow) {
+            footer.addButton(ui.button(t("accel.between.finish_search"), Styles.SECONDARY) { finishSearchNow() }, minWidth = 220f).padRight(16f)
+        }
         footer.addButton(ui.button(if (done == 0) t("common.start") else t("common.next_round"), Styles.PRIMARY) { ctx.showAccelRound(run) }, minWidth = 220f)
         return ui.frame(null, content, footer)
+    }
+
+    private fun finishSearchNow() {
+        run.finishSearchNow()
+        ctx.showAccelStep(run)
+    }
+
+    private fun phaseName() = when {
+        calibrating -> t("accel.between.calibration")
+        searching -> t("accel.between.search")
+        else -> t("accel.between.test")
     }
 
     private fun analyseNow() {
@@ -54,17 +78,19 @@ class AccelBetweenScreen(ctx: AppContext, private val run: AccelRun) : UiScreen(
     override fun onEscape() = ctx.showMenu()
 
     private fun heading() = when {
-        done == 0 && calibrating -> t("accel.between.calibration")
-        done == 0 -> t("accel.between.test")
+        done == 0 -> phaseName()
         else -> t("accel.between.round_done", done)
     }
 
-    private fun progressText() =
-        if (calibrating) t("accel.between.progress_calibration", done, total) else t("accel.between.progress_test", done, total)
+    private fun progressText() = when {
+        calibrating -> t("accel.between.progress_calibration", done, total)
+        searching -> t("accel.between.progress_search", done, total)
+        else -> t("accel.between.progress_test", done, total)
+    }
 
-    private fun explanation() = if (calibrating) {
-        t("accel.between.explain_calibration", AccelRun.MIN_CALIBRATION_ROUNDS)
-    } else {
-        t("accel.between.explain_test", run.maxTestRounds / 2)
+    private fun explanation() = when {
+        calibrating -> t("accel.between.explain_calibration", AccelRun.MIN_CALIBRATION_ROUNDS)
+        searching -> t("accel.between.explain_search", StrengthSearch.MIN_ROUNDS)
+        else -> t("accel.between.explain_test", run.maxTestRounds / 2)
     }
 }
