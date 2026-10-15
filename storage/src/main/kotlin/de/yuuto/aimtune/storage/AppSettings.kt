@@ -31,6 +31,8 @@ data class AppSettings(
     val metricWeights: Map<String, Double> = DEFAULT_WEIGHTS,
     /** Ids of the scenarios a blind test plays ([ScenarioKind.id]); how often each is played follows [metricWeights]. */
     val scenarios: List<String> = DEFAULT_SCENARIOS,
+    /** Play the cue sounds of the flash scenario (alert, whine, pop, ringing). */
+    val flashSound: Boolean = true,
 ) {
     /** @throws SettingsException describing the first invalid field. */
     fun validate() {

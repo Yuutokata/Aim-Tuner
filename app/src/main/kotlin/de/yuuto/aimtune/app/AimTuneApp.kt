@@ -83,6 +83,7 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
         super.dispose()
         screen?.dispose()
         context?.let {
+            it.disposeAudio()
             it.ui.dispose()
             it.source.close()
             it.processor.close()

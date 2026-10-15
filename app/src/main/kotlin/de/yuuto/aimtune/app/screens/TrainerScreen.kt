@@ -13,6 +13,8 @@ import de.yuuto.aimtune.app.Phase
 import de.yuuto.aimtune.app.Trainer
 import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.app.TrainerScene
+import de.yuuto.aimtune.app.audio.FlashCueTracker
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 
 private const val MILLIS_PER_SECOND = 1000L
 
@@ -36,6 +38,7 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
         }
     }
     private val scene = TrainerScene(config.profile.verticalFovDegrees.toFloat(), config.profile.trainerAspectRatio)
+    private val cueTracker = FlashCueTracker()
     private val hud = Hud(config, ctx.ui.tokens, ctx.i18n, roundLabel = session?.label?.let { ctx.i18n.t(it) })
 
     /** Exposed for the screenshot tour. */
@@ -84,8 +87,16 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
         val bg = ctx.ui.tokens.bg
         Gdx.gl.glClearColor(bg.r, bg.g, bg.b, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
+        playFlashSounds()
         scene.render(trainer.view, trainer.activeTargets, trainer.activeFlash)
         hud.render(trainer, ctx.source, ctx.processor.report, Gdx.graphics.framesPerSecond, ctx.ui.skin.fonts)
+    }
+
+    /** The cue sounds of a flash round: when to turn away and, with the pop, when it is safe to turn back. */
+    private fun playFlashSounds() {
+        if (config.scenario != ScenarioKind.FLASH || !ctx.settings.current.flashSound) return
+        if (trainer.phase != Phase.RUNNING) return cueTracker.reset()
+        cueTracker.update(trainer.activeFlash, trainer.nowNanos()).forEach(ctx.flashSounds::play)
     }
 
     override fun resize(width: Int, height: Int) {
