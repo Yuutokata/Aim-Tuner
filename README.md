@@ -1,6 +1,6 @@
 # AimTune
 
-Find your optimal mouse sensitivity (and optionally an acceleration curve) in a built-in 3D aim trainer, then convert it to your game's sensitivity and cm/360°. Open source, MIT licensed, Windows.
+Find a mouse sensitivity range you aim equally well in (and optionally test an acceleration curve) in a built-in 3D aim trainer, then convert it to your game's sensitivity and cm/360°. Open source, MIT licensed, Windows.
 
 > Status: early development. See [docs/PROGRESS.md](docs/PROGRESS.md).
 
@@ -32,16 +32,17 @@ Settings and your rounds are stored in `%APPDATA%\AimTune` (set `AIMTUNE_DATA_DI
 ## Limitations
 
 - **The target sizes are estimates.** Riot publishes no head size or movement speeds, so the Valorant profile uses a head of about 0.2 m seen from 6 to 30 m. The pre-test notice says so until the values are measured in the game (see [docs/REVIEW.md](docs/REVIEW.md)). The recommended sensitivity depends on target size.
-- **Checked against a simulated player, not against many people.** The method recovers the best sensitivity of a simulated player in most runs, but how well real people behave like it is not measured yet.
-- **A result is a good starting point, not a proof.** Two sensitivities close to each other are practically equal; the range is part of the answer. Fatigue and learning can move the result; play on more than one day.
-- **Acceleration is experimental.** The exported Raw Accel file follows the 1.7.1 settings format but has not been loaded into Raw Accel by the author yet. The analysis needs a mouse report rate of 1000 Hz or more and Windows Raw Input.
+- **Checked against a simulated player, not against many people.** The method recovers the best sensitivity of a simulated player to within about 10-20 % at 15 rounds, but how well real people behave like it is not measured yet (see [docs/ASSESSMENT.md](docs/ASSESSMENT.md)).
+- **The result is a range, not an exact value.** Controlled studies and the simulations agree that scores are flat around the best sensitivity: a difference of 15 % is below what a 45-second round can measure. The app shows the stretch in which your scores were equal, and says so when they were equal almost everywhere. Fatigue and learning can move the result; play on more than one day.
+- **A clean aim test is not a game.** Nothing shows yet that the best sensitivity in a trainer is the best one in a match (movement, peeking, pressure); no study of that was found.
+- **Acceleration is experimental.** In simulations it reliably finds only large effects (a falling gain of 25 % or more; rising gains hardly at all), and a result of "no curve" does not mean that no curve could help. No study of acceleration for first-person aiming was found, so how large real preferences are is unknown. A trial curve you ask for is tested blind, but right after switching any new curve scores worse than a familiar one. The exported Raw Accel file follows the 1.7.1 settings format but has not been loaded into Raw Accel by the author yet. The analysis needs a mouse report rate of 1000 Hz or more and Windows Raw Input.
 - **Windows only**, and the window should be 16:9 or will be letterboxed to it (the FOV of the game at other shapes is unknown).
 
 ## What it does
 
 - Runs short **blind** aim rounds in a built-in 3D trainer (flick, micro-adjust, tracking, target switching) at sensitivities chosen by a Bayesian optimizer, so you never see which one you are playing.
-- Reports the best sensitivity as your game's value and as cm/360° with a credible range and a confidence, and keeps a history of sessions.
-- Optionally looks for a speed-dependent curve in how your first movements miss, lets you test it blind against plain sensitivity, and exports a [Raw Accel](https://github.com/RawAccelOfficial/rawaccel) `settings.json` only if the curve is clearly better.
+- Reports a recommended sensitivity as your game's value and as cm/360° with the range in which your scores were equal and a confidence, and keeps a history of sessions.
+- Optionally (experimental) looks for a speed-dependent curve in how your first movements miss, or lets you try a mild rising or falling one, tests it blind against plain sensitivity, and exports a [Raw Accel](https://github.com/RawAccelOfficial/rawaccel) `settings.json` only if the curve is clearly better.
 - English and German.
 
 | Menu | Acceleration analysis |
