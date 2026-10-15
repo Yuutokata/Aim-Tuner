@@ -2,6 +2,7 @@ package de.yuuto.aimtune.input
 
 import de.yuuto.aimtune.core.accel.AccelCurve
 import de.yuuto.aimtune.core.input.MouseEvent
+import de.yuuto.aimtune.core.scenario.FlashState
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.sim.AIMER_SEED_MIX
@@ -25,6 +26,7 @@ class SimulatedMouseSource(
     override val clock: ManualClock,
     kind: ScenarioKind = ScenarioKind.FLICK,
     accel: AccelCurve? = null,
+    private val activeFlash: () -> FlashState? = { null },
     private val activeTargets: () -> List<Target>,
 ) : RawMouseSource {
     private val aimer = SimulatedAimer(player, dpi, cm360, seed xor AIMER_SEED_MIX, kind, accel)
@@ -57,7 +59,7 @@ class SimulatedMouseSource(
     fun tick() {
         if (!started || !focused) return
         val now = clock.nowNanos()
-        val step = aimer.step(now, activeTargets())
+        val step = aimer.step(now, activeTargets(), activeFlash())
         if (step.dx != 0 || step.dy != 0) {
             queue.add(MouseEvent(now, step.dx, step.dy))
             eventsReceived++

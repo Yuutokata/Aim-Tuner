@@ -29,9 +29,9 @@ class MixedScenarioConvergenceTest {
     @Test
     fun `mixed scenarios recover the weighted blend of the scenario optima`() {
         val weights = MetricWeights.DEFAULT
-        val enabled = ScenarioKind.entries.toSet()
+        val enabled = ScenarioKind.entries.toSet() - ScenarioKind.FLASH
         val schedule = ScenarioSchedule(enabled, weights)
-        val references = ScenarioKind.entries.associateWith { singleOptimum(it) }
+        val references = (ScenarioKind.entries - ScenarioKind.FLASH).associateWith { singleOptimum(it) }
         val blend = grid.indices.map { gi -> references.entries.sumOf { (kind, ref) -> schedule.shares.getValue(kind) * ref.second[gi] } }
         val blendedTruth = parabolicOptimum(grid, blend)
 

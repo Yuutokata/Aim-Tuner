@@ -21,6 +21,7 @@ import de.yuuto.aimtune.app.ui.frame
 import de.yuuto.aimtune.app.ui.label
 import de.yuuto.aimtune.app.ui.onChange
 import de.yuuto.aimtune.core.scenario.ScenarioKind
+import de.yuuto.aimtune.core.score.FlashImportance
 import de.yuuto.aimtune.core.score.ScoreMetric
 import de.yuuto.aimtune.storage.AppSettings
 import java.util.Locale
@@ -201,14 +202,18 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         block.add(ui.caps(t("settings.scenarios"))).left().padBottom(8f).row()
         block.add(ui.label(t("settings.scenarios_help"), Styles.CAPTION_MUTED)).left().padBottom(24f).row()
         val grid = Table()
-        ScenarioKind.entries.forEachIndexed { index, kind ->
+        // The flash scenario is switched by the importance control below, not by a tile.
+        ScenarioKind.entries.filter { it != ScenarioKind.FLASH }.forEachIndexed { index, kind ->
             val button: TextButton = ui.button(ctx.i18n.scenarioName(kind), Styles.TILE) { toggleScenario(kind) }
             button.setProgrammaticChangeEvents(false)
             button.isChecked = kind.id in scenarios
             grid.add(button).width(SCENARIO_WIDTH).height(CONTROL_HEIGHT).padRight(SEGMENT_GAP).padBottom(SEGMENT_GAP)
             if (index % 2 == 1) grid.row()
         }
-        block.add(grid).left()
+        block.add(grid).left().row()
+        block.add(ui.label(t("settings.flash"), Styles.BODY)).left().padTop(SCENARIOS_GAP / 2).padBottom(4f).row()
+        block.add(ui.label(t("settings.flash_help"), Styles.CAPTION_MUTED, wrap = true)).left().width(WEIGHTS_WIDTH).padBottom(12f).row()
+        block.add(flashImportanceButtons(draft.flashImportance) { draft = draft.copy(flashImportance = it); message = null; rebuild() }).left()
         return block
     }
 
@@ -222,9 +227,14 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         rebuild()
     }
 
+    private fun flashImportanceButtons(selected: FlashImportance, onPick: (FlashImportance) -> Unit): Table =
+        ui.flashImportanceButtons(flashImportanceLabels(), selected, onPick)
+
+    private fun flashImportanceLabels() = FlashImportance.entries.associateWith { t("flash.importance.${it.name.lowercase()}") }
+
     private fun percentText(metric: ScoreMetric) = "%.0f %%".format(Locale.ROOT, weights[metric.name] ?: 0.0)
 
-    private fun totalText() = t("settings.total", "%.0f".format(Locale.ROOT, weights.values.sum()))
+    private fun totalText() = t("settings.total", "%.0f".format(Locale.ROOT, METRIC_KEYS.keys.sumOf { weights[it.name] ?: 0.0 }))
 
     private fun save() {
         val problem = listOf(SetupStep.DPI, SetupStep.GAME).firstNotNullOfOrNull { draft.issue(it, ctx.profiles) }
@@ -250,6 +260,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         weights.putAll(AppSettings.DEFAULT_WEIGHTS)
         scenarios.clear()
         scenarios.addAll(AppSettings.DEFAULT_SCENARIOS)
+        draft = draft.copy(flashImportance = FlashImportance.SOMETIMES)
         message = t("settings.reset_done") to true
         rebuild()
     }

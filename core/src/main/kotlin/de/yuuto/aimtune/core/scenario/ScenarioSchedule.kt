@@ -7,6 +7,8 @@ import de.yuuto.aimtune.core.score.ScoreMetric
 val ScenarioKind.producedMetrics: Set<ScoreMetric>
     get() = when (this) {
         ScenarioKind.TRACKING -> setOf(ScoreMetric.TRACKING)
+        // Accuracy and time to hit of the return hit also score a flash round, but they do not make it play more often.
+        ScenarioKind.FLASH -> setOf(ScoreMetric.FLASH_DODGE)
         ScenarioKind.FLICK, ScenarioKind.MICRO, ScenarioKind.SWITCHING ->
             setOf(ScoreMetric.ACCURACY, ScoreMetric.TIME_TO_HIT)
     }

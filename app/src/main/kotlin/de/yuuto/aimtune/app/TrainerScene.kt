@@ -1,5 +1,7 @@
 package de.yuuto.aimtune.app
 
+import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.PerspectiveCamera
 import com.badlogic.gdx.graphics.VertexAttributes.Usage
@@ -15,7 +17,9 @@ import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.graphics.glutils.HdpiUtils
 import com.badlogic.gdx.utils.Disposable
 import de.yuuto.aimtune.core.math.ViewAngles
+import de.yuuto.aimtune.core.scenario.FlashState
 import de.yuuto.aimtune.core.scenario.Target
+import kotlin.math.sin
 
 /**
  * Plain 3D room with one sphere per target. The camera sits at the origin and uses the vertical
@@ -55,6 +59,14 @@ class TrainerScene(
     )
     private val targetInstance = ModelInstance(targetModel)
 
+    /** The flash orb: a bright sphere that is not shaded, so it cannot be missed. */
+    private val flashModel: Model = ModelBuilder().createSphere(
+        modelRadius.toFloat() * 2, modelRadius.toFloat() * 2, modelRadius.toFloat() * 2, SPHERE_DIVISIONS, SPHERE_DIVISIONS,
+        Material(ColorAttribute.createDiffuse(Color.WHITE), ColorAttribute.createEmissive(Color.WHITE)),
+        (Usage.Position or Usage.Normal).toLong(),
+    )
+    private val flashInstance = ModelInstance(flashModel)
+
     fun resize(width: Int, height: Int) {
         windowWidth = width
         windowHeight = height
@@ -63,7 +75,11 @@ class TrainerScene(
         camera.viewportHeight = box.height.toFloat()
     }
 
-    fun render(view: ViewAngles, targets: List<Target>) {
+    /**
+     * Draws the room, the [targets] and the [flash] orb while it has not popped. A popped flash that blinded the
+     * player ([FlashState.popped]) replaces the picture with white.
+     */
+    fun render(view: ViewAngles, targets: List<Target>, flash: FlashState? = null) {
         val direction = view.direction()
         camera.position.set(0f, 0f, 0f)
         camera.direction.set(direction.x.toFloat(), direction.y.toFloat(), direction.z.toFloat())
@@ -72,8 +88,19 @@ class TrainerScene(
 
         val box = letterbox(windowWidth, windowHeight, aspectRatio)
         HdpiUtils.glViewport(box.x, box.y, box.width, box.height)
+        if (flash?.popped == true) {
+            whiteOut(box)
+            HdpiUtils.glViewport(0, 0, windowWidth, windowHeight)
+            return
+        }
         batch.begin(camera)
         batch.render(room, environment)
+        if (flash != null) {
+            val orb = ViewAngles.directionOf(flash.yawDegrees, flash.pitchDegrees) * flash.distanceMeters
+            val scale = (flash.distanceMeters * sin(Math.toRadians(FLASH_ORB_DEGREES / 2.0)) / modelRadius).toFloat()
+            flashInstance.transform.setToTranslation(orb.x.toFloat(), orb.y.toFloat(), orb.z.toFloat()).scale(scale, scale, scale)
+            batch.render(flashInstance, environment)
+        }
         for (target in targets) {
             val scale = (target.radius / modelRadius).toFloat()
             targetInstance.transform.setToTranslation(target.center.x.toFloat(), target.center.y.toFloat(), target.center.z.toFloat()).scale(scale, scale, scale)
@@ -83,7 +110,17 @@ class TrainerScene(
         HdpiUtils.glViewport(0, 0, windowWidth, windowHeight)
     }
 
+    /** Fills the picture with white, the way a flash does. */
+    private fun whiteOut(box: PixelBox) {
+        Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST)
+        HdpiUtils.glScissor(box.x, box.y, box.width, box.height)
+        Gdx.gl.glClearColor(1f, 1f, 1f, 1f)
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
+        Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST)
+    }
+
     override fun dispose() {
+        flashModel.dispose()
         batch.dispose()
         roomModel.dispose()
         targetModel.dispose()
@@ -99,6 +136,9 @@ class TrainerScene(
         const val ROOM_DEPTH = 70f
         const val ROOM_CENTER_Z = -10f
         const val SPHERE_DIVISIONS = 24
+
+        /** Apparent size of the flash orb, about a grenade seen from a few meters. */
+        const val FLASH_ORB_DEGREES = 4.0
     }
 }
 

@@ -51,6 +51,12 @@ data class SimulatedPlayer(
     val trackingMaxHandSpeedCmPerS: Double = 4.0,
     /** Hand noise per control step as a multiple of the flick hand noise (smooth pursuit is less precise than a flick). */
     val trackingNoiseShare: Double = 2.0,
+    /** How far beyond the minimum the player turns away from a flash, in degrees; people do not turn just enough. */
+    val flashTurnMarginDegrees: Double = 10.0,
+    /** Reaction to the enemy that appears when a flash pops; the pop is expected, so this is quicker than a surprise. */
+    val flashReturnReactionMs: Double = 170.0,
+    /** Reaction to a flash that becomes visible: the player expects flashes and is ready to turn, so this is quicker than a surprise. */
+    val flashTurnReactionMs: Double = 180.0,
 ) {
     init {
         require(noiseLevel >= 0.0 && fatiguePerMinute >= 0.0 && optimumScale > 0.0) { "invalid player parameters" }

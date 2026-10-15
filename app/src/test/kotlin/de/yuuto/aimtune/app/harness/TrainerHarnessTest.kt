@@ -45,7 +45,7 @@ class TrainerHarnessTest {
         val clock = ManualClock(CLOCK_ORIGIN)
         var finished: RoundRecording? = null
         lateinit var trainer: Trainer
-        val source = SimulatedMouseSource(playerFor(accel), dpi, cm360, seed, clock, kind, accel) { trainer.activeTargets }
+        val source = SimulatedMouseSource(playerFor(accel), dpi, cm360, seed, clock, kind, accel, activeFlash = { trainer.activeFlash }) { trainer.activeTargets }
         trainer = Trainer(config(seed).copy(scenario = kind, accel = accel), source) { finished = it }
         source.start()
         source.beginRound()

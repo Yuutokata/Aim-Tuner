@@ -95,6 +95,7 @@ class Hud(private val config: TrainerConfig, private val tokens: Tokens, private
         ScenarioKind.MICRO -> i18n.t("hud.instruction.micro")
         ScenarioKind.TRACKING -> i18n.t("hud.instruction.tracking")
         ScenarioKind.SWITCHING -> i18n.t("hud.instruction.switching")
+        ScenarioKind.FLASH -> i18n.t("hud.instruction.flash")
     }
 
     private fun drawRunning(trainer: Trainer, fonts: Fonts) {

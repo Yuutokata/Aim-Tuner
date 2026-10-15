@@ -1,6 +1,7 @@
 package de.yuuto.aimtune.core.scenario
 
 import de.yuuto.aimtune.core.math.Vec3
+import de.yuuto.aimtune.core.math.ViewAngles
 import kotlin.math.sqrt
 
 data class Target(val id: Int, val center: Vec3, val radius: Double) {
@@ -26,9 +27,41 @@ sealed interface TargetEvent {
      * moves on the path [TargetPath] defines; the [Spawned] event is its first waypoint.
      */
     data class Waypoint(override val timeNanos: Long, val targetId: Int, val center: Vec3) : TargetEvent
+
+    /**
+     * A flash became visible at [yawDegrees]/[pitchDegrees] and will pop at [popNanos]; it only reaches the
+     * player's eyes while the view is within [safeAngleDegrees] of it at that moment.
+     */
+    data class FlashCue(
+        override val timeNanos: Long,
+        val flashId: Int,
+        val yawDegrees: Double,
+        val pitchDegrees: Double,
+        val popNanos: Long,
+        val safeAngleDegrees: Double,
+    ) : TargetEvent
+
+    /** The flash popped. [dodged] says the player had turned away; otherwise the target stays hidden until [blindUntilNanos]. */
+    data class FlashPop(override val timeNanos: Long, val flashId: Int, val dodged: Boolean, val blindUntilNanos: Long) : TargetEvent
 }
 
 enum class ShotResult { HIT, MISS, IGNORED }
+
+/**
+ * A flash as the renderer and the simulated player see it: while it has not popped it is a visible
+ * orb the player must turn away from; once it has popped and the player looked, [blindUntilNanos] is the
+ * end of the white-out (0 when nobody was blinded).
+ */
+data class FlashState(
+    val id: Int,
+    val yawDegrees: Double,
+    val pitchDegrees: Double,
+    val distanceMeters: Double,
+    val popNanos: Long,
+    val safeAngleDegrees: Double,
+    val popped: Boolean,
+    val blindUntilNanos: Long,
+)
 
 /**
  * A short aim round. Implementations are deterministic for a given seed and never read a clock;
@@ -47,6 +80,12 @@ interface Scenario {
      * stamped with their scheduled time, so the log does not depend on how often this is called.
      */
     fun update(nowNanos: Long) = Unit
+
+    /** [update] for scenarios that react to where the player looks; every runner calls this one with the current view. */
+    fun update(nowNanos: Long, view: ViewAngles) = update(nowNanos)
+
+    /** The flash the player has to deal with right now (visible, or blinding), or null; only the flash scenario has one. */
+    val flash: FlashState? get() = null
 
     fun isFinished(nowNanos: Long): Boolean
     fun fire(origin: Vec3, direction: Vec3, nowNanos: Long): ShotResult

@@ -67,6 +67,37 @@
       "max": 6.0
     },
     "stopProbability": 0.25,
+    "flash": {
+      "popDelaySeconds": {
+        "min": 0.45,
+        "max": 0.9
+      },
+      "cueOffsetDegrees": {
+        "min": 10.0,
+        "max": 40.0
+      },
+      "cueElevationDegrees": 30.0,
+      "distanceMeters": {
+        "min": 6.0,
+        "max": 20.0
+      },
+      "gapSeconds": {
+        "min": 0.4,
+        "max": 1.0
+      },
+      "blindSeconds": 1.5,
+      "returnSpreadDegrees": 8.0,
+      "returnMinDegrees": 1.5,
+      "exitMarginDegrees": 10.0,
+      "verified": false,
+      "sources": [
+        "https://valorant.fandom.com/wiki/Curveball",
+        "https://valorant.fandom.com/wiki/Blindside",
+        "https://valorant.fandom.com/wiki/Guiding_Light",
+        "https://valorant.fandom.com/wiki/FLASH-drive"
+      ],
+      "notes": "Documented windups (PC): Curveball 0.6 s, Blindside 0.6 s, Breach Flashpoint about 0.5 s, Guiding Light 0.3 s, FLASH/drive telegraph 0.3 s; maximum blind 1.5 s (Curveball, Blindside) to 2.25 s. Players who look away are blinded only briefly (secondary sources). The time a flash is visible before it pops also contains part of its flight, which no source gives: popDelaySeconds 0.45-0.9 is an assumption, chosen so that the simulated hand neither always nor never turns away in time. The exit margin of 10 degrees past the edge of the screen is an assumption for the glare. Measure both in the shooting range and set verified to true."
+    },
     "verified": false
   }
 }

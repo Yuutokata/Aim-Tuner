@@ -121,6 +121,8 @@ object ResearchExport {
             is TargetEvent.Spawned -> out.append("{\"type\":\"spawn\",\"tNanos\":$t,\"id\":${event.target.id},\"x\":${number(event.target.center.x)},\"y\":${number(event.target.center.y)},\"z\":${number(event.target.center.z)},\"radius\":${number(event.target.radius)}}")
             is TargetEvent.Hit -> out.append("{\"type\":\"hit\",\"tNanos\":$t,\"id\":${event.targetId}}")
             is TargetEvent.Miss -> out.append("{\"type\":\"miss\",\"tNanos\":$t}")
+            is TargetEvent.FlashCue -> out.append("{\"type\":\"flashCue\",\"tNanos\":$t,\"id\":${event.flashId},\"yaw\":${number(event.yawDegrees)},\"pitch\":${number(event.pitchDegrees)},\"popTNanos\":${event.popNanos - origin},\"safeAngle\":${number(event.safeAngleDegrees)}}")
+            is TargetEvent.FlashPop -> out.append("{\"type\":\"flashPop\",\"tNanos\":$t,\"id\":${event.flashId},\"dodged\":${event.dodged},\"blindUntilTNanos\":${if (event.blindUntilNanos > 0L) event.blindUntilNanos - origin else 0L}}")
             is TargetEvent.Waypoint -> out.append("{\"type\":\"waypoint\",\"tNanos\":$t,\"id\":${event.targetId},\"x\":${number(event.center.x)},\"y\":${number(event.center.y)},\"z\":${number(event.center.z)}}")
         }
     }

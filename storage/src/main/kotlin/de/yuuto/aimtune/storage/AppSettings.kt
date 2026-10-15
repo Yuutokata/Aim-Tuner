@@ -1,6 +1,7 @@
 package de.yuuto.aimtune.storage
 
 import de.yuuto.aimtune.core.scenario.ScenarioKind
+import de.yuuto.aimtune.core.score.FlashImportance
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.score.ScoreMetric
 import de.yuuto.aimtune.core.units.AimStyle
@@ -54,6 +55,23 @@ data class AppSettings(
         return scenarios.map { id -> ScenarioKind.fromId(id) ?: throw SettingsException("unknown scenario '$id'") }.toSet()
     }
 
+    /**
+     * How much the player cares about flashes: the flash scenario is off, or its weight is the nearest level.
+     * The weight is what makes the scenario play (see [de.yuuto.aimtune.core.scenario.ScenarioSchedule]).
+     */
+    fun flashImportance(): FlashImportance =
+        if (ScenarioKind.FLASH.id !in scenarios) FlashImportance.NEVER else FlashImportance.of(metricWeights[ScoreMetric.FLASH_DODGE.name])
+
+    /** These settings with the flash scenario switched on or off and its weight set for [importance]; the other scenarios stay. */
+    fun withFlashImportance(importance: FlashImportance): AppSettings {
+        val others = scenarios.filter { it != ScenarioKind.FLASH.id }
+        val flash = if (importance == FlashImportance.NEVER) emptyList() else listOf(ScenarioKind.FLASH.id)
+        return copy(
+            metricWeights = metricWeights + (ScoreMetric.FLASH_DODGE.name to importance.weight),
+            scenarios = (others + flash).ifEmpty { listOf(ScenarioKind.FLICK.id) },
+        )
+    }
+
     /** @throws SettingsException if [aimStyle] is set to something that is not an aim style. */
     fun aimStyleOrNull(): AimStyle? = aimStyle?.let { name ->
         AimStyle.entries.firstOrNull { it.name == name } ?: throw SettingsException("unknown aim style '$name'")
@@ -74,7 +92,8 @@ data class AppSettings(
     companion object {
         const val CURRENT_VERSION = 1
         const val DEFAULT_ROUND_SECONDS = 45
-        val DEFAULT_WEIGHTS: Map<String, Double> = MetricWeights.DEFAULT.values.mapKeys { it.key.name }
-        val DEFAULT_SCENARIOS: List<String> = listOf(ScenarioKind.FLICK.id)
+        val DEFAULT_WEIGHTS: Map<String, Double> =
+            MetricWeights.DEFAULT.values.mapKeys { it.key.name } + (ScoreMetric.FLASH_DODGE.name to FlashImportance.SOMETIMES.weight)
+        val DEFAULT_SCENARIOS: List<String> = listOf(ScenarioKind.FLICK.id, ScenarioKind.FLASH.id)
     }
 }

@@ -16,6 +16,9 @@ enum class ScoreMetric(val higherIsBetter: Boolean, val scoresRounds: Boolean = 
     ACCURACY(true),
     TIME_TO_HIT(false),
     TRACKING(true),
+
+    /** Share of flashes the player had turned away from when they popped; saturates, so turning faster than needed earns nothing. */
+    FLASH_DODGE(true),
     CONSISTENCY(false, scoresRounds = false),
 }
 
@@ -48,6 +51,7 @@ fun RoundMetrics.scoreInputs(): Map<ScoreMetric, Double> = buildMap {
     meanTimeToHitMs?.let { put(ScoreMetric.TIME_TO_HIT, it) }
     errorSpread?.let { put(ScoreMetric.CONSISTENCY, it) }
     trackingOnTargetRatio?.let { put(ScoreMetric.TRACKING, it) }
+    flashDodgeRate?.let { put(ScoreMetric.FLASH_DODGE, it) }
 }
 
 /**

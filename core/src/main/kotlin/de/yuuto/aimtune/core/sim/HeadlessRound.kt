@@ -70,14 +70,14 @@ object HeadlessRound {
         while (now < end) {
             now += NANOS_PER_MS
             // Same order as the trainer: the player sees the targets as of the last update, then the frame advances them.
-            val step = aimer.step(now, scenario.targets)
+            val step = aimer.step(now, scenario.targets, scenario.flash)
             if (step.dx != 0 || step.dy != 0) {
                 val event = MouseEvent(now, step.dx, step.dy)
                 mouse += event
                 val scale = processor?.scaleFor(event) ?: 1.0
                 view = view.rotatedByCounts(step.dx * scale, step.dy * scale, degPerCount)
             }
-            scenario.update(now)
+            scenario.update(now, view)
             if (step.click) scenario.fire(Vec3.ZERO, view.direction(), now)
         }
         return RoundRecording(

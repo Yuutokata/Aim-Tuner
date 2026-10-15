@@ -1,6 +1,7 @@
 package de.yuuto.aimtune.games
 
 import de.yuuto.aimtune.core.scenario.AngleBucket
+import de.yuuto.aimtune.core.scenario.FlashGeometry
 import de.yuuto.aimtune.core.scenario.PositiveRange
 import de.yuuto.aimtune.core.scenario.TrainerGeometry
 import de.yuuto.aimtune.core.units.Fov
@@ -43,6 +44,40 @@ private data class RangeDto(val min: Double, val max: Double)
 @Serializable
 private data class AngleBucketDto(val maxDegrees: Double, val weight: Double)
 
+/** The `flash` block of the `trainer` block; `sources` and `notes` are for people reading the profile and are not used. */
+@Serializable
+private data class FlashDto(
+    val popDelaySeconds: RangeDto? = null,
+    val cueOffsetDegrees: RangeDto? = null,
+    val cueElevationDegrees: Double? = null,
+    val distanceMeters: RangeDto? = null,
+    val gapSeconds: RangeDto? = null,
+    val blindSeconds: Double? = null,
+    val returnSpreadDegrees: Double? = null,
+    val returnMinDegrees: Double? = null,
+    val exitMarginDegrees: Double? = null,
+    val verified: Boolean = false,
+    val sources: List<String> = emptyList(),
+    val notes: String? = null,
+) {
+    fun toGeometry(horizontalFovDegrees: Double): FlashGeometry {
+        val d = FlashGeometry()
+        fun RangeDto.range() = PositiveRange(min, max)
+        return FlashGeometry(
+            popDelaySeconds = popDelaySeconds?.range() ?: d.popDelaySeconds,
+            cueOffsetDegrees = cueOffsetDegrees?.range() ?: d.cueOffsetDegrees,
+            cueElevationDegrees = cueElevationDegrees ?: d.cueElevationDegrees,
+            distanceMeters = distanceMeters?.range() ?: d.distanceMeters,
+            gapSeconds = gapSeconds?.range() ?: d.gapSeconds,
+            blindSeconds = blindSeconds ?: d.blindSeconds,
+            returnSpreadDegrees = returnSpreadDegrees ?: d.returnSpreadDegrees,
+            returnMinDegrees = returnMinDegrees ?: d.returnMinDegrees,
+            exitMarginDegrees = exitMarginDegrees ?: d.exitMarginDegrees,
+            verified = verified,
+        ).forHorizontalFov(horizontalFovDegrees)
+    }
+}
+
 /** The `trainer` block of a profile; every field is optional and falls back to [TrainerGeometry.DEFAULT]. */
 @Serializable
 private data class TrainerDto(
@@ -57,9 +92,10 @@ private data class TrainerDto(
     val trackingDistanceMeters: Double? = null,
     val strafeSpeedMetersPerSecond: RangeDto? = null,
     val stopProbability: Double? = null,
+    val flash: FlashDto? = null,
     val verified: Boolean = false,
 ) {
-    fun toGeometry(): TrainerGeometry {
+    fun toGeometry(horizontalFovDegrees: Double): TrainerGeometry {
         val d = TrainerGeometry.DEFAULT
         fun RangeDto.range() = PositiveRange(min, max)
         return TrainerGeometry(
@@ -74,6 +110,7 @@ private data class TrainerDto(
             trackingDistanceMeters = trackingDistanceMeters ?: d.trackingDistanceMeters,
             strafeSpeedMetersPerSecond = strafeSpeedMetersPerSecond?.range() ?: d.strafeSpeedMetersPerSecond,
             stopProbability = stopProbability ?: d.stopProbability,
+            flash = flash?.toGeometry(horizontalFovDegrees) ?: d.flash.forHorizontalFov(horizontalFovDegrees),
             verified = verified,
         )
     }
@@ -98,17 +135,20 @@ fun parseGameProfile(text: String): GameProfile {
         require(dto.fov.aspect.width > 0 && dto.fov.aspect.height > 0) { "fov.aspect must be positive" }
         val type = FovType.entries.firstOrNull { it.name.equals(dto.fov.type, ignoreCase = true) }
             ?: throw IllegalArgumentException("fov.type '${dto.fov.type}' must be horizontal or vertical")
+        val fov = Fov(dto.fov.degrees, type)
+        val fovAspect = dto.fov.aspect.width.toDouble() / dto.fov.aspect.height
+        val trainerAspect = dto.fov.trainerAspect?.let { it.width.toDouble() / it.height } ?: (16.0 / 9.0)
         return GameProfile(
             id = dto.id,
             name = dto.name,
             yawDegreesPerCount = dto.yaw,
-            fov = Fov(dto.fov.degrees, type),
-            fovAspectRatio = dto.fov.aspect.width.toDouble() / dto.fov.aspect.height,
+            fov = fov,
+            fovAspectRatio = fovAspect,
             sensitivityDecimals = dto.sensitivity.decimals,
             sources = dto.sources,
             notes = dto.notes,
-            geometry = dto.trainer.toGeometry(),
-            trainerAspectRatio = dto.fov.trainerAspect?.let { it.width.toDouble() / it.height } ?: (16.0 / 9.0),
+            geometry = dto.trainer.toGeometry(horizontalFovAt(fov, fovAspect, trainerAspect)),
+            trainerAspectRatio = trainerAspect,
         )
     } catch (e: IllegalArgumentException) {
         throw GameProfileException("invalid game profile '${dto.id}': ${e.message}", e)

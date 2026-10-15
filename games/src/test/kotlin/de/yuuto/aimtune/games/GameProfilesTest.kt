@@ -103,7 +103,7 @@ class GameProfilesTest {
         assertEquals(1.9, valorant.geometry.clickTargetDiameterDegrees.max)
         assertEquals(false, valorant.geometry.verified)
         val plain = parseGameProfile(valid)
-        assertEquals(de.yuuto.aimtune.core.scenario.TrainerGeometry.DEFAULT, plain.geometry)
+        assertEquals(de.yuuto.aimtune.core.scenario.TrainerGeometry.DEFAULT.copy(flash = plain.geometry.flash), plain.geometry)
         val custom = parseGameProfile(valid.replace("\"sensitivity\"", "\"trainer\":{\"clickTargetDiameterDegrees\":{\"min\":1.0,\"max\":2.0},\"verified\":true},\"sensitivity\""))
         assertEquals(1.0, custom.geometry.clickTargetDiameterDegrees.min)
         assertEquals(true, custom.geometry.verified)
@@ -111,5 +111,21 @@ class GameProfilesTest {
         assertFailsWith<GameProfileException> {
             parseGameProfile(valid.replace("\"sensitivity\"", "\"trainer\":{\"clickTargetDiameterDegrees\":{\"min\":3.0,\"max\":2.0}},\"sensitivity\""))
         }
+    }
+
+    @Test
+    fun `the flash geometry follows the profile's field of view and can be overridden`() {
+        val valorant = assertNotNull(bundled.find("valorant"))
+        assertEquals(51.5, valorant.geometry.flash.halfFovDegrees, 0.1)
+        assertEquals(61.5, valorant.geometry.flash.safeAngleDegrees, 0.1)
+        assertEquals(0.45, valorant.geometry.flash.popDelaySeconds.min)
+        assertEquals(false, valorant.geometry.flash.verified)
+        assertEquals(50.0, parseGameProfile(valid).geometry.flash.halfFovDegrees, 0.1)
+        val custom = parseGameProfile(valid.replace("\"sensitivity\"", "\"trainer\":{\"flash\":{\"blindSeconds\":2.0,\"popDelaySeconds\":{\"min\":0.3,\"max\":0.6},\"verified\":true}},\"sensitivity\""))
+        assertEquals(2.0, custom.geometry.flash.blindSeconds)
+        assertEquals(0.6, custom.geometry.flash.popDelaySeconds.max)
+        assertEquals(true, custom.geometry.flash.verified)
+        assertEquals(50.0, custom.geometry.flash.halfFovDegrees, 0.1)
+        assertEquals(45.0, de.yuuto.aimtune.games.GameProfile.custom(0.07, 90.0).geometry.flash.halfFovDegrees, 0.1)
     }
 }

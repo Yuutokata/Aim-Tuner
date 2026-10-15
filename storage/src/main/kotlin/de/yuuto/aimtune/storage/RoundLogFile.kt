@@ -108,12 +108,18 @@ private const val SPAWNED = "spawned"
 private const val HIT = "hit"
 private const val MISS = "miss"
 private const val WAYPOINT = "waypoint"
+private const val FLASH_CUE = "flash_cue"
+private const val FLASH_POP = "flash_pop"
 
 private fun TargetEvent.toDto(origin: Long): TargetEventDto = when (this) {
     is TargetEvent.Spawned -> TargetEventDto(SPAWNED, timeNanos - origin, target.id, target.center.x, target.center.y, target.center.z, target.radius)
     is TargetEvent.Hit -> TargetEventDto(HIT, timeNanos - origin, targetId)
     is TargetEvent.Miss -> TargetEventDto(MISS, timeNanos - origin)
     is TargetEvent.Waypoint -> TargetEventDto(WAYPOINT, timeNanos - origin, targetId, center.x, center.y, center.z)
+    // A flash reuses the numeric fields: id = flash id, x/y = yaw/pitch, z = pop time, radius = safe angle.
+    is TargetEvent.FlashCue -> TargetEventDto(FLASH_CUE, timeNanos - origin, flashId, yawDegrees, pitchDegrees, (popNanos - origin).toDouble(), safeAngleDegrees)
+    // x = 1 when dodged, y = end of the white-out (0 for none).
+    is TargetEvent.FlashPop -> TargetEventDto(FLASH_POP, timeNanos - origin, flashId, if (dodged) 1.0 else 0.0, if (blindUntilNanos > 0L) (blindUntilNanos - origin).toDouble() else 0.0)
 }
 
 private fun TargetEventDto.toEvent(): TargetEvent = when (type) {
@@ -121,6 +127,8 @@ private fun TargetEventDto.toEvent(): TargetEvent = when (type) {
     HIT -> TargetEvent.Hit(t, requireField(id, "id"))
     MISS -> TargetEvent.Miss(t)
     WAYPOINT -> TargetEvent.Waypoint(t, requireField(id, "id"), Vec3(requireField(x, "x"), requireField(y, "y"), requireField(z, "z")))
+    FLASH_CUE -> TargetEvent.FlashCue(t, requireField(id, "id"), requireField(x, "x"), requireField(y, "y"), requireField(z, "z").toLong(), requireField(radius, "radius"))
+    FLASH_POP -> TargetEvent.FlashPop(t, requireField(id, "id"), requireField(x, "x") > 0.5, requireField(y, "y").toLong())
     else -> throw IllegalArgumentException("unknown target event type '$type'")
 }
 

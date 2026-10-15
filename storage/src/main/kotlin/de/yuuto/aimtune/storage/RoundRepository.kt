@@ -44,6 +44,7 @@ data class RoundRow(
  * Rounds with an older version are recomputed from their stored raw events ([RoundRepository.refreshMetrics]).
  * 2: the first reach of a movement must come after a reaction time and cover a share of the distance (REVIEW.md C2);
  *    the accuracy the score uses is the first-shot accuracy (REVIEW.md M6).
+ * 3: flash turn-away rounds (the dodge rate); rounds of the other scenarios are unchanged.
  */
 const val METRICS_VERSION = 2
 
@@ -218,6 +219,22 @@ class RoundRepository(private val database: Database) {
                         s.setDouble(7, event.center.y)
                         s.setDouble(8, event.center.z)
                     }
+                    // A flash reuses the numeric columns: target_id = flash id, x/y = yaw/pitch, z = pop time offset, radius = safe angle.
+                    is TargetEvent.FlashCue -> {
+                        s.setString(3, FLASH_CUE)
+                        s.setInt(5, event.flashId)
+                        s.setDouble(6, event.yawDegrees)
+                        s.setDouble(7, event.pitchDegrees)
+                        s.setDouble(8, (event.popNanos - r.startNanos).toDouble())
+                        s.setDouble(9, event.safeAngleDegrees)
+                    }
+                    // x = 1 when dodged, y = end of the white-out as an offset (0 for none).
+                    is TargetEvent.FlashPop -> {
+                        s.setString(3, FLASH_POP)
+                        s.setInt(5, event.flashId)
+                        s.setDouble(6, if (event.dodged) 1.0 else 0.0)
+                        s.setDouble(7, if (event.blindUntilNanos > 0L) (event.blindUntilNanos - r.startNanos).toDouble() else 0.0)
+                    }
                 }
                 s.addBatch()
             }
@@ -252,6 +269,8 @@ class RoundRepository(private val database: Database) {
                                 HIT -> TargetEvent.Hit(time, rs.getInt(3))
                                 MISS -> TargetEvent.Miss(time)
                                 WAYPOINT -> TargetEvent.Waypoint(time, rs.getInt(3), Vec3(rs.getDouble(4), rs.getDouble(5), rs.getDouble(6)))
+                                FLASH_CUE -> TargetEvent.FlashCue(time, rs.getInt(3), rs.getDouble(4), rs.getDouble(5), startNanos + rs.getDouble(6).toLong(), rs.getDouble(7))
+                                FLASH_POP -> TargetEvent.FlashPop(time, rs.getInt(3), rs.getDouble(4) > 0.5, rs.getDouble(5).toLong().let { if (it > 0L) startNanos + it else 0L })
                                 else -> error("unknown target event type '$type'")
                             },
                         )
@@ -286,6 +305,8 @@ class RoundRepository(private val database: Database) {
         const val HIT = "hit"
         const val MISS = "miss"
         const val WAYPOINT = "waypoint"
+        const val FLASH_CUE = "flash_cue"
+        const val FLASH_POP = "flash_pop"
     }
 }
 
@@ -303,6 +324,9 @@ fun RoundMetrics.toNamedValues(): Map<String, Double> = buildMap {
     meanPathEfficiency?.let { put("mean_path_efficiency", it) }
     trackingOnTargetRatio?.let { put("tracking_on_target_ratio", it) }
     trackingMeanDistanceDegrees?.let { put("tracking_mean_distance_deg", it) }
+    flashDodgeRate?.let { put("flash_dodge_rate", it) }
+    flashMeanTurnMs?.let { put("flash_mean_turn_ms", it) }
+    flashTurnPeakSpeed?.let { put("flash_turn_peak_speed", it) }
 }
 
 /** The stored metrics a round's score is computed from, as [de.yuuto.aimtune.core.metrics.RoundMetrics.scoreInputs] would give them. */
@@ -312,4 +336,5 @@ fun RoundRow.scoreInputs(): Map<ScoreMetric, Double> = buildMap {
     metrics["mean_time_to_hit_ms"]?.let { put(ScoreMetric.TIME_TO_HIT, it) }
     metrics["error_spread"]?.let { put(ScoreMetric.CONSISTENCY, it) }
     metrics["tracking_on_target_ratio"]?.let { put(ScoreMetric.TRACKING, it) }
+    metrics["flash_dodge_rate"]?.let { put(ScoreMetric.FLASH_DODGE, it) }
 }

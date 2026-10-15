@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.app.setup
 
+import de.yuuto.aimtune.core.score.FlashImportance
 import de.yuuto.aimtune.core.units.AimStyle
 import de.yuuto.aimtune.games.GameProfile
 import de.yuuto.aimtune.games.GameProfiles
@@ -58,6 +59,8 @@ data class SetupDraft(
     val padPreset: PadPreset? = null,
     val customPadWidthText: String = "",
     val customPadHeightText: String = "",
+    /** How much flashes matter to the player; applied to the weights and scenarios on save. */
+    val flashImportance: FlashImportance = FlashImportance.SOMETIMES,
 ) {
     val dpi: Double? get() = parsePositive(dpiText)?.takeIf { it <= MAX_DPI }
     val sensitivity: Double? get() = parsePositive(sensitivityText)
@@ -121,7 +124,7 @@ data class SetupDraft(
         SetupStep.entries.forEach { step -> issue(step, profiles)?.let { check(false) { "setup incomplete: $it" } } }
         val (padWidth, padHeight) = checkNotNull(padSizeCm())
         val custom = gameId == GAME_CUSTOM
-        return base.copy(
+        return base.withFlashImportance(flashImportance).copy(
             dpi = dpi,
             gameId = gameId,
             inGameSensitivity = sensitivity,
@@ -148,6 +151,7 @@ data class SetupDraft(
                 sensitivityText = settings.inGameSensitivity?.let(::formatNumber).orEmpty(),
                 aimStyle = runCatching { settings.aimStyleOrNull() }.getOrNull(),
                 padPreset = preset,
+                flashImportance = settings.flashImportance(),
                 customPadWidthText = if (preset == PadPreset.CUSTOM) formatNumber(checkNotNull(width)) else "",
                 customPadHeightText = if (preset == PadPreset.CUSTOM) formatNumber(checkNotNull(height)) else "",
             )

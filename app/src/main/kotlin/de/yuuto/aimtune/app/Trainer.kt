@@ -5,6 +5,7 @@ import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.math.ViewAngles
 import de.yuuto.aimtune.core.recording.RoundRecording
+import de.yuuto.aimtune.core.scenario.FlashState
 import de.yuuto.aimtune.core.scenario.RoundSummary
 import de.yuuto.aimtune.core.scenario.Scenario
 import de.yuuto.aimtune.core.scenario.ShotResult
@@ -49,6 +50,7 @@ class Trainer(
 
     val degreesPerCountValue: Double get() = degreesPerCount
     val activeTargets: List<Target> get() = if (phase == Phase.RUNNING) scenario?.targets.orEmpty() else emptyList()
+    val activeFlash: FlashState? get() = if (phase == Phase.RUNNING) scenario?.flash else null
     val hits: Int get() = scenario?.let { summarize(it.events).hits } ?: 0
     val misses: Int get() = scenario?.let { summarize(it.events).misses } ?: 0
 
@@ -86,7 +88,7 @@ class Trainer(
         val s = scenario ?: return
         if (phase != Phase.RUNNING) return
         val now = nowNanos()
-        s.update(now)
+        s.update(now, view)
         if (s.isFinished(now)) finishRound(s)
     }
 
@@ -140,7 +142,7 @@ class Trainer(
     }
 
     private fun shoot(s: Scenario, nowNanos: Long): ShotResult {
-        s.update(nowNanos)
+        s.update(nowNanos, view)
         return s.fire(Vec3.ZERO, view.direction(), nowNanos)
     }
 

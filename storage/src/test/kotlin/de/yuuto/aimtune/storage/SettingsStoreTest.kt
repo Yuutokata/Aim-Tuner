@@ -2,6 +2,7 @@ package de.yuuto.aimtune.storage
 
 import de.yuuto.aimtune.core.units.AimStyle
 import de.yuuto.aimtune.core.scenario.ScenarioKind
+import de.yuuto.aimtune.core.score.FlashImportance
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.score.ScoreMetric
 import org.junit.jupiter.api.io.TempDir
@@ -75,15 +76,15 @@ class SettingsStoreTest {
     fun `metric weights convert to core weights`() {
         val w: MetricWeights = AppSettings(metricWeights = mapOf("ACCURACY" to 3.0, "CONSISTENCY" to 1.0)).toMetricWeights()
         assertEquals(setOf(ScoreMetric.ACCURACY, ScoreMetric.CONSISTENCY), w.values.keys)
-        assertEquals(MetricWeights.DEFAULT, AppSettings().toMetricWeights())
+        assertEquals(MetricWeights(MetricWeights.DEFAULT.values + (ScoreMetric.FLASH_DODGE to 15.0)), AppSettings().toMetricWeights())
     }
 
     @Test
-    fun `enabled scenarios default to flick only, survive a round trip and reject bad selections`() {
-        assertEquals(setOf(ScenarioKind.FLICK), AppSettings().enabledScenarios())
+    fun `enabled scenarios default to flick and flash, survive a round trip and reject bad selections`() {
+        assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.FLASH), AppSettings().enabledScenarios())
         val file = dir.resolve("old.json")
         Files.writeString(file, """{"version":1,"dpi":800.0}""")
-        assertEquals(setOf(ScenarioKind.FLICK), SettingsStore(file).load().enabledScenarios())
+        assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.FLASH), SettingsStore(file).load().enabledScenarios())
 
         val store = store()
         store.save(AppSettings(scenarios = listOf("flick", "tracking")))
@@ -99,5 +100,23 @@ class SettingsStoreTest {
         store.save(AppSettings(dpi = 1600.0))
         assertEquals(1600.0, store.load().dpi)
         Files.list(dir.resolve("nested")).use { files -> assertEquals(listOf("settings.json"), files.map { it.fileName.toString() }.toList()) }
+    }
+
+    @Test
+    fun `the flash importance switches the scenario and sets its weight, and reads back from the settings`() {
+        val base = AppSettings(scenarios = listOf("flick", "tracking"))
+        assertEquals(FlashImportance.NEVER, base.flashImportance())
+        val often = base.withFlashImportance(FlashImportance.OFTEN)
+        assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.TRACKING, ScenarioKind.FLASH), often.enabledScenarios())
+        assertEquals(35.0, often.toMetricWeights().values.getValue(ScoreMetric.FLASH_DODGE))
+        assertEquals(FlashImportance.OFTEN, often.flashImportance())
+        val never = often.withFlashImportance(FlashImportance.NEVER)
+        assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.TRACKING), never.enabledScenarios())
+        assertEquals(FlashImportance.NEVER, never.flashImportance())
+        assertEquals(setOf(ScenarioKind.FLICK), AppSettings(scenarios = listOf("flash")).withFlashImportance(FlashImportance.NEVER).enabledScenarios(), "never leaves at least one scenario")
+        assertEquals(FlashImportance.SOMETIMES, AppSettings().flashImportance())
+        val store = store()
+        store.save(often)
+        assertEquals(FlashImportance.OFTEN, store.load().flashImportance())
     }
 }

@@ -9,6 +9,7 @@ enum class ScenarioKind(val id: String, val displayName: String, val usesClicks:
     MICRO("micro", "Micro-adjust", true),
     TRACKING("tracking", "Tracking", false),
     SWITCHING("switching", "Target switching", true),
+    FLASH("flash", "Flash turn-away", true),
     ;
 
     /**
@@ -21,6 +22,7 @@ enum class ScenarioKind(val id: String, val displayName: String, val usesClicks:
         MICRO -> MicroScenario(MicroConfig(durationNanos = durationNanos, geometry = geometry), seed)
         TRACKING -> TrackingScenario(geometry?.let { TrackingConfig.from(it, durationNanos) } ?: TrackingConfig(durationNanos = durationNanos), seed)
         SWITCHING -> SwitchingScenario(SwitchingConfig(durationNanos = durationNanos, geometry = geometry), seed)
+        FLASH -> FlashScenario(durationNanos, geometry ?: TrainerGeometry.DEFAULT, seed)
     }
 
     companion object {

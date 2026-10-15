@@ -56,6 +56,8 @@ data class TrainerGeometry(
     val strafeSpeedMetersPerSecond: PositiveRange = PositiveRange(3.0, 6.0),
     /** Share of tracking segments in which the target stops (a counter-strafe) before the next move. */
     val stopProbability: Double = 0.25,
+    /** The flash turn-away scenario: popping time, positions, blind duration and the enemy that appears afterwards. */
+    val flash: FlashGeometry = FlashGeometry(),
     val verified: Boolean = false,
 ) {
     init {

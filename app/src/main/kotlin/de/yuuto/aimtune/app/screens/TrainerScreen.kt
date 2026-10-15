@@ -84,7 +84,7 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
         val bg = ctx.ui.tokens.bg
         Gdx.gl.glClearColor(bg.r, bg.g, bg.b, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
-        scene.render(trainer.view, trainer.activeTargets)
+        scene.render(trainer.view, trainer.activeTargets, trainer.activeFlash)
         hud.render(trainer, ctx.source, ctx.processor.report, Gdx.graphics.framesPerSecond, ctx.ui.skin.fonts)
     }
 

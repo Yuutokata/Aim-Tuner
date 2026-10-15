@@ -54,7 +54,7 @@ fun summarize(events: List<TargetEvent>): RoundSummary {
                 if (awaitingFirstShot) firstShots++
                 awaitingFirstShot = false
             }
-            is TargetEvent.Waypoint -> Unit
+            is TargetEvent.Waypoint, is TargetEvent.FlashCue, is TargetEvent.FlashPop -> Unit
         }
     }
     return RoundSummary(hits, misses, if (hits == 0) null else totalHitTime / hits, firstShots, firstShotHits)

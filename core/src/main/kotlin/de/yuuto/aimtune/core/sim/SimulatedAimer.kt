@@ -4,6 +4,7 @@ import de.yuuto.aimtune.core.accel.AccelCurve
 import de.yuuto.aimtune.core.accel.AccelProcessor
 import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
+import de.yuuto.aimtune.core.scenario.FlashState
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.units.degreesPerCount
@@ -89,6 +90,9 @@ class SimulatedAimer(
     private val seenTargets = HashSet<Int>()
     private val observations = ArrayDeque<Observation>()
     private var nextControlNanos = 0L
+    private var flashHandled = -1
+    private var flashTurnPlanned = false
+    private var flashWakeNanos = 0L
 
     /** Starts a round: the view is at (0, 0); [sessionOffsetNanos] is the time already spent in the session (fatigue). */
     fun reset(nowNanos: Long, sessionOffsetNanos: Long = 0L) {
@@ -109,17 +113,53 @@ class SimulatedAimer(
         seenTargets.clear()
         observations.clear()
         nextControlNanos = nowNanos
+        flashHandled = -1
+        flashTurnPlanned = false
     }
 
     fun step(nowNanos: Long, target: Target?): AimerStep = step(nowNanos, listOfNotNull(target))
 
     /** One poll with all [targets] currently visible. */
-    fun step(nowNanos: Long, targets: List<Target>): AimerStep {
+    fun step(nowNanos: Long, targets: List<Target>, flash: FlashState? = null): AimerStep {
         if (kind == ScenarioKind.TRACKING) return trackStep(nowNanos, targets.firstOrNull())
+        if (kind == ScenarioKind.FLASH && targets.isEmpty()) return flashStep(nowNanos, flash)
         val target = choose(nowNanos, targets)
         val seenBefore = target != null && target.id in seenTargets
         targets.forEach { seenTargets += it.id }
         return clickStep(nowNanos, target, seenBefore)
+    }
+
+    /**
+     * Between the hit and the enemy: reacts to a visible flash after a reaction time by turning away from it
+     * (a crude movement over the angle that takes it beyond the edge of the screen plus its own margin), then
+     * waits for the pop. While blinded or in the pause before a flash it does nothing.
+     */
+    private fun flashStep(nowNanos: Long, flash: FlashState?): AimerStep {
+        if (flash != null && !flash.popped) {
+            if (flash.id != flashHandled) {
+                flashHandled = flash.id
+                flashTurnPlanned = false
+                val reaction = player.flashTurnReactionMs + player.reactionSdMs * gaussian()
+                flashWakeNanos = nowNanos + ms(max(MIN_REACTION_MS, reaction) * fatigue(nowNanos))
+            }
+            if (!flashTurnPlanned && nowNanos >= flashWakeNanos) {
+                flashTurnPlanned = true
+                planTurnAway(nowNanos, flash)
+            }
+        }
+        return emitCounts(nowNanos, click = false)
+    }
+
+    private fun planTurnAway(nowNanos: Long, flash: FlashState) {
+        // The offset from the flash to the view on the screen plane is the direction to turn in.
+        val awayX = (trueYaw - flash.yawDegrees) * cos(Math.toRadians(truePitch))
+        val awayY = truePitch - flash.pitchDegrees
+        val now = hypot(awayX, awayY)
+        val needed = flash.safeAngleDegrees + player.flashTurnMarginDegrees - now
+        if (needed <= 0.0) return
+        val unitX = if (now > 1e-6) awayX / now else 1.0
+        val unitY = if (now > 1e-6) awayY / now else 0.0
+        planReachBy(nowNanos, Offset(unitX * needed, unitY * needed), FLASH_TURN_WIDTH_DEGREES, primary = true)
     }
 
     /** Keeps the current target while it is there, otherwise the one nearest to the aim. */
@@ -246,7 +286,11 @@ class SimulatedAimer(
         targetId = target.id
         corrections = 0
         mode = Mode.REACTING
-        val mean = if (seenBefore) player.reacquireMs else player.reactionMeanMs
+        val mean = when {
+            kind == ScenarioKind.FLASH -> player.flashReturnReactionMs
+            seenBefore -> player.reacquireMs
+            else -> player.reactionMeanMs
+        }
         val reaction = mean + player.reactionSdMs * gaussian()
         wakeNanos = nowNanos + ms(max(MIN_REACTION_MS * if (seenBefore) REACQUIRE_FLOOR else 1.0, reaction) * fatigue(nowNanos))
     }
@@ -265,10 +309,13 @@ class SimulatedAimer(
     }
 
     private fun planReach(nowNanos: Long, target: Target, primary: Boolean) {
+        planReachBy(nowNanos, errorTo(nowNanos, target), max(2.0 * angularRadius(target), MIN_WIDTH_DEGREES), primary)
+    }
+
+    /** A reach over [error] degrees (screen plane) to something [width] degrees wide. */
+    private fun planReachBy(nowNanos: Long, error: Offset, width: Double, primary: Boolean) {
         foldFinished(nowNanos)
-        val error = errorTo(nowNanos, target)
         val amplitude = hypot(error.x, error.y)
-        val width = max(2.0 * angularRadius(target), MIN_WIDTH_DEGREES)
         val fatigue = fatigue(nowNanos)
         val fitts = (player.fittsInterceptMs + player.fittsSlopeMs * log2(1.0 + amplitude / width)) *
             (if (primary) 1.0 else CORRECTION_SPEEDUP)
@@ -398,6 +445,9 @@ class SimulatedAimer(
         const val PEAK_TO_MEAN_SPEED = 1.875
         const val MIN_REACH_MS = 60.0
         const val MIN_WIDTH_DEGREES = 0.3
+
+        /** A turn away from a flash does not aim at anything; it only has to get far enough, so it is as sloppy as a wide target. */
+        const val FLASH_TURN_WIDTH_DEGREES = 25.0
         const val CORRECTION_SPEEDUP = 0.6
         const val MISS_RECHECK_MS = 100.0
         const val TWITCH_FRACTION = 0.25

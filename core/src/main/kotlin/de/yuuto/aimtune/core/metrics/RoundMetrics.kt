@@ -65,6 +65,12 @@ data class RoundMetrics(
     val trackingOnTargetRatio: Double? = null,
     /** Mean angle between crosshair and the moving target's center in degrees; only for tracking rounds. */
     val trackingMeanDistanceDegrees: Double? = null,
+    /** Share of flashes the player had turned away from when they popped; only for flash rounds. */
+    val flashDodgeRate: Double? = null,
+    /** Mean time from a flash becoming visible until it was beyond the safe angle, over the flashes dodged in time. */
+    val flashMeanTurnMs: Double? = null,
+    /** Mean peak speed of the turn away in counts per ms; the curve analysis uses the return movements, this one is a diagnostic. */
+    val flashTurnPeakSpeed: Double? = null,
 )
 
 /** Computes the metrics of a round from its recording, as defined in docs/ALGORITHMS.md. */
@@ -81,6 +87,7 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
         movementMetric(recording, track, submovements, spawn, from, hit, params)
     }
     val tracking = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.TRACKING) computeTrackingMetrics(recording, track) else null
+    val flash = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.FLASH) computeFlashMetrics(recording, track, submovements) else null
     val errors = movements.mapNotNull { it.firstErrorRatio }
     return RoundMetrics(
         hits = summary.hits,
@@ -96,6 +103,9 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
         meanPathEfficiency = movements.mapNotNull { it.pathEfficiency }.averageOrNull(),
         trackingOnTargetRatio = tracking?.onTargetRatio,
         trackingMeanDistanceDegrees = tracking?.meanDistanceDegrees,
+        flashDodgeRate = flash?.dodgeRate,
+        flashMeanTurnMs = flash?.meanTurnMs,
+        flashTurnPeakSpeed = flash?.meanTurnPeakSpeed,
     )
 }
 

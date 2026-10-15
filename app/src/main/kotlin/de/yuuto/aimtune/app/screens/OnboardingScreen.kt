@@ -22,6 +22,7 @@ import de.yuuto.aimtune.app.ui.caps
 import de.yuuto.aimtune.app.ui.frame
 import de.yuuto.aimtune.app.ui.label
 import de.yuuto.aimtune.app.ui.onChange
+import de.yuuto.aimtune.core.score.FlashImportance
 import de.yuuto.aimtune.core.units.AimStyle
 import de.yuuto.aimtune.core.units.SearchRangeTable
 import java.util.Locale
@@ -305,7 +306,11 @@ class OnboardingScreen(
         listOf(AimStyle.WRIST to t("onboarding.style.wrist"), AimStyle.MIXED to t("onboarding.style.mixed"), AimStyle.ARM to t("onboarding.style.arm")).forEach { (style, name) ->
             cards.add(styleCard(style, name)).width(STYLE_CARD_WIDTH).height(STYLE_CARD_HEIGHT).padRight(TILE_GAP * 2).top()
         }
-        content.add(cards).left()
+        content.add(cards).left().padBottom(SECTION_GAP).row()
+        content.add(ui.label(t("onboarding.flash.title"), Styles.TITLE)).left().padBottom(TILE_GAP / 2).row()
+        content.add(ui.label(t("onboarding.flash.description"), Styles.BODY_MUTED, wrap = true)).left().width(DESCRIPTION_WIDTH).padBottom(TILE_GAP).row()
+        val labels = FlashImportance.entries.associateWith { t("flash.importance.${it.name.lowercase()}") }
+        content.add(ui.flashImportanceButtons(labels, draft.flashImportance) { draft = draft.copy(flashImportance = it); rebuild() }).left()
         return content
     }
 

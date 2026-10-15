@@ -7,6 +7,8 @@ import de.yuuto.aimtune.core.units.cm360
 import de.yuuto.aimtune.core.units.sensitivityFor
 import java.math.BigDecimal
 import java.math.RoundingMode
+import kotlin.math.atan
+import kotlin.math.tan
 
 /**
  * What the app needs to know about a game: its yaw (degrees per count at sensitivity 1), its FOV
@@ -77,6 +79,14 @@ data class GameProfile(
             fov = Fov(horizontalFovDegrees, FovType.HORIZONTAL),
             fovAspectRatio = WIDESCREEN_ASPECT,
             sensitivityDecimals = DEFAULT_CUSTOM_DECIMALS,
+            geometry = TrainerGeometry.DEFAULT.run { copy(flash = flash.forHorizontalFov(horizontalFovDegrees)) },
         )
     }
 }
+
+/**
+ * Horizontal field of view in degrees of the picture the trainer draws: the game's vertical FOV (kept for
+ * every aspect ratio, Hor+) widened to [trainerAspect].
+ */
+fun horizontalFovAt(fov: Fov, fovAspectRatio: Double, trainerAspect: Double): Double =
+    Math.toDegrees(2.0 * atan(tan(Math.toRadians(fov.verticalDegrees(fovAspectRatio)) / 2.0) * trainerAspect))
