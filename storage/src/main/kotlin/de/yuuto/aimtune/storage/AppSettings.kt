@@ -33,6 +33,10 @@ data class AppSettings(
     val scenarios: List<String> = DEFAULT_SCENARIOS,
     /** Play the cue sounds of the flash scenario (alert, whine, pop, ringing). */
     val flashSound: Boolean = true,
+    /** The player's Valorant crosshairs, stored as profile codes; none means the default crosshair is drawn. */
+    val crosshairs: List<SavedCrosshair> = emptyList(),
+    /** Id of the selected entry of [crosshairs]; used in all scenarios. */
+    val activeCrosshair: String? = null,
 ) {
     /** @throws SettingsException describing the first invalid field. */
     fun validate() {
@@ -49,6 +53,7 @@ data class AppSettings(
         aimStyleOrNull()
         toMetricWeights()
         enabledScenarios()
+        validateCrosshairs()
     }
 
     /** @throws SettingsException for unknown scenario ids or an empty selection. */
