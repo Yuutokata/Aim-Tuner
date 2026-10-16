@@ -8,7 +8,7 @@ Find a mouse sensitivity range you aim equally well in (and optionally test an a
 
 ## Install
 
-1. Download `AimTune-windows.zip` from the latest release and unzip it anywhere.
+1. Download `AimTune-<version>-windows.zip` from the latest release and unzip it anywhere (or run the `-setup.exe` installer if the release has one).
 2. Start `AimTune\AimTune.exe`. It brings its own Java runtime; nothing else has to be installed.
 3. Windows may show a SmartScreen warning because the program is not code-signed yet: choose "More info", then "Run anyway".
 

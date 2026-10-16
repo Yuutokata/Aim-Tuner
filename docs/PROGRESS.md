@@ -143,6 +143,8 @@ Order: the four items that change the numbers first (R1-R4), then the rest.
 
 ## Last session
 
+- Release workflow (`.github/workflows/release.yml`): pushing a tag `vX.Y.Z` builds and tests, packages the app image with its own runtime (version from the tag via `-PappVersion`), smoke-tests it without Java, tries the `.exe` installer (needs WiX; the release still goes out with the zip if it fails) and publishes a GitHub release with generated notes. `ci.yml` now only builds and tests on pushes and pull requests. Not run yet: the first tag will show whether the runner has WiX. Release with `git tag v0.1.0 && git push origin v0.1.0`.
+
 - Flash timing: the pop delay is now 0.5-0.65 s (was 0.45-0.9 s), matching the windups of the common flashes (Flashpoint/Arc Rose 0.5 s, Curveball/Blindside 0.6 s) after the player found the flash too slow. KAY/O (1.0/1.6 s) and Skye (up to 2 s) are slower and not modelled; blind stays 1.5 s (flashes blind 1.5-2.25 s). The simulation numbers for the flash scenario in ALGORITHMS.md were made with the old delay and are not re-run. Open: judge the new pace in the real app.
 
 - Hit sound: every hit plays a short synthesized sound (click, glass-like ping, low thump; `HitSoundSynth`) whose pitch climbs a pentatonic scale with a streak of hits and starts over after a miss or a new round (`HitCombo`, `HitSounds`); switchable in Settings ("Hit sound", default on, `AppSettings.hitSound`); `Trainer.onShot` reports every shot, also clicks from the raw packet stream. Tests: `HitSoundTest`. Open (user): listen to it in the real app and say whether the character, volume and the climbing pitch feel right (tracking has no hits, so no sound there).

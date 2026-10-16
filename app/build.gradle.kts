@@ -54,7 +54,8 @@ tasks.register<Exec>("jpackage") {
     val launcher = javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) }
     val outDir = layout.buildDirectory.dir("jpackage")
     val type = providers.gradleProperty("installerType").orElse("app-image")
-    val appVersion = "0.1.0"
+    // The release workflow passes the tag (v1.2.3 -> 1.2.3); jpackage needs a numeric version.
+    val appVersion = providers.gradleProperty("appVersion").orElse("0.1.0").get()
     doFirst { delete(outDir) }
     executable(launcher.map { it.metadata.installationPath.file("bin/jpackage.exe").asFile.path }.get())
     args(
