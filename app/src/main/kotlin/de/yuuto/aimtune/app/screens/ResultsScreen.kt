@@ -27,6 +27,7 @@ private const val UNIT_GAP = 16f
 private const val UNIT_BASELINE_LIFT = 28f
 private const val FOOTER_BUTTON_HEIGHT = 64f
 private const val CHART_MIN_HEIGHT = 240f
+private const val AXES_WIDTH = 440f
 
 /** What the results screen shows; built by [AppContext] from a finished run or from stored rounds. */
 data class ResultsData(
@@ -62,6 +63,7 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
             right.add(confidenceCard(result)).top().left().width(CARD_WIDTH).row()
             right.add(equivalentText(result)).left().padTop(24f)
             columns.add(right).top().left().padLeft(COLUMN_GAP)
+            axesBlock()?.let { columns.add(it).top().left().padLeft(COLUMN_GAP) }
             content.add(columns).left().padBottom(32f).row()
             content.add(chartBlock(result)).left().grow()
         }
@@ -99,9 +101,15 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
             if (result.isFlat) "results.equivalent_flat" else "results.equivalent",
             "%.0f".format(Locale.ROOT, result.equivalentLowCm360), "%.0f".format(Locale.ROOT, result.equivalentHighCm360),
         )
+        return Table().also { it.add(ui.label(equivalent, Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH) }
+    }
+
+    /** Which axis the misses come from, in the free column to the right of the confidence card; null while too few rounds have movements. */
+    private fun axesBlock(): Table? {
+        val text = axesText() ?: return null
         return Table().also {
-            it.add(ui.label(equivalent, Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH).row()
-            axesText()?.let { text -> it.add(ui.label(text, Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH).padTop(16f) }
+            it.add(ui.caps(t("results.axes"))).left().padBottom(12f).row()
+            it.add(ui.label(text, Styles.BODY_MUTED, wrap = true)).left().width(AXES_WIDTH)
         }
     }
 

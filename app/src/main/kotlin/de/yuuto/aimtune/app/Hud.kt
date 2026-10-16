@@ -5,13 +5,13 @@ import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.OrthographicCamera
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.utils.Align
 import com.badlogic.gdx.utils.Disposable
 import de.yuuto.aimtune.app.i18n.I18n
 import de.yuuto.aimtune.app.i18n.scenarioName
 import de.yuuto.aimtune.app.i18n.scenarioRound
 import de.yuuto.aimtune.app.ui.Tokens
+import de.yuuto.aimtune.core.crosshair.Crosshair
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.input.RawMouseSource
 import java.util.Locale
@@ -22,9 +22,16 @@ import java.util.Locale
  * The debug overlay exists to verify raw input. With a [roundLabel] the HUD is the blind one:
  * it shows "Round 4 / 10" and never the sensitivity (no debug overlay either, it prints deg/count).
  */
-class Hud(private val config: TrainerConfig, private val tokens: Tokens, private val i18n: I18n, private val roundLabel: String? = null) : Disposable {
+class Hud(
+    private val config: TrainerConfig,
+    private val tokens: Tokens,
+    private val i18n: I18n,
+    private val roundLabel: String? = null,
+    /** The player's own Valorant crosshair, drawn in pixels on the back buffer ([CrosshairRenderer]). */
+    private val crosshair: Crosshair = Crosshair(),
+) : Disposable {
     private val batch = SpriteBatch()
-    private val shapes = ShapeRenderer()
+    private val crosshairRenderer = CrosshairRenderer()
     private val camera = OrthographicCamera()
     private var width = 0f
     private var height = tokens.screenHeight
@@ -54,18 +61,7 @@ class Hud(private val config: TrainerConfig, private val tokens: Tokens, private
         batch.end()
     }
 
-    private fun drawCrosshair() {
-        val cx = width / 2
-        val cy = height / 2
-        shapes.projectionMatrix = camera.combined
-        shapes.begin(ShapeRenderer.ShapeType.Filled)
-        shapes.color = text
-        shapes.rect(cx - CROSSHAIR_GAP - CROSSHAIR_LENGTH, cy - CROSSHAIR_THICKNESS / 2, CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS)
-        shapes.rect(cx + CROSSHAIR_GAP, cy - CROSSHAIR_THICKNESS / 2, CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS)
-        shapes.rect(cx - CROSSHAIR_THICKNESS / 2, cy - CROSSHAIR_GAP - CROSSHAIR_LENGTH, CROSSHAIR_THICKNESS, CROSSHAIR_LENGTH)
-        shapes.rect(cx - CROSSHAIR_THICKNESS / 2, cy + CROSSHAIR_GAP, CROSSHAIR_THICKNESS, CROSSHAIR_LENGTH)
-        shapes.end()
-    }
+    private fun drawCrosshair() = crosshairRenderer.drawOnScreen(crosshair)
 
     private fun drawReady(fonts: Fonts) {
         if (roundLabel != null) {
@@ -175,13 +171,10 @@ class Hud(private val config: TrainerConfig, private val tokens: Tokens, private
 
     override fun dispose() {
         batch.dispose()
-        shapes.dispose()
+        crosshairRenderer.dispose()
     }
 
     private companion object {
         const val MARGIN = 72f
-        const val CROSSHAIR_GAP = 6f
-        const val CROSSHAIR_LENGTH = 12f
-        const val CROSSHAIR_THICKNESS = 2f
     }
 }

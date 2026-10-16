@@ -6,6 +6,7 @@ import com.badlogic.gdx.InputAdapter
 import com.badlogic.gdx.Screen
 import com.badlogic.gdx.graphics.GL20
 import de.yuuto.aimtune.app.AppContext
+import de.yuuto.aimtune.storage.activeCrosshair
 import de.yuuto.aimtune.app.Hud
 import de.yuuto.aimtune.app.RoundSession
 import de.yuuto.aimtune.app.i18n.t
@@ -39,7 +40,7 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
     }
     private val scene = TrainerScene(config.profile.verticalFovDegrees.toFloat(), config.profile.trainerAspectRatio, geometry = config.profile.geometry)
     private val cueTracker = FlashCueTracker()
-    private val hud = Hud(config, ctx.ui.tokens, ctx.i18n, roundLabel = session?.label?.let { ctx.i18n.t(it) })
+    private val hud = Hud(config, ctx.ui.tokens, ctx.i18n, roundLabel = session?.label?.let { ctx.i18n.t(it) }, crosshair = ctx.settings.current.activeCrosshair())
 
     /** Exposed for the screenshot tour. */
     val roundPhase: Phase get() = trainer.phase

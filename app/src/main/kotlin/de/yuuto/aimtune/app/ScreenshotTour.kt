@@ -41,6 +41,7 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("onboarding-4-pad") { ctx.showOnboarding(SetupStep.PAD) },
         Step("pretest") { ctx.showPreTest() },
         Step("settings") { ctx.showSettings() },
+        Step("crosshair") { ctx.showCrosshair() },
         Step("trainer-ready") { ctx.showTrainer() },
         Step("trainer-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
         Step("micro-ready") { showScenario(ScenarioKind.MICRO) },

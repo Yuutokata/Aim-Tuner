@@ -22,6 +22,7 @@ import de.yuuto.aimtune.app.i18n.I18n
 import de.yuuto.aimtune.app.i18n.Language
 import de.yuuto.aimtune.app.history.buildHistory
 import de.yuuto.aimtune.app.screens.BetweenRoundsScreen
+import de.yuuto.aimtune.app.screens.CrosshairScreen
 import de.yuuto.aimtune.app.screens.HistoryScreen
 import de.yuuto.aimtune.app.screens.ShareDataScreen
 import de.yuuto.aimtune.app.screens.StoredCounts
@@ -121,6 +122,11 @@ class AppContext(
     fun showSettings() {
         languageOverride = null
         if (isSetUp) switchTo(SettingsScreen(this)) else showOnboarding(afterFinish = ::showMenu)
+    }
+
+    fun showCrosshair() {
+        languageOverride = null
+        switchTo(CrosshairScreen(this))
     }
 
     /** Starts a new blind test run, merging the stored rounds of this game and DPI; onboarding first if needed. */

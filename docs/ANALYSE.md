@@ -29,6 +29,7 @@ Grün: in der Simulation belastbar, Rest ist Validierung. Gelb: funktioniert mit
 | Blinder A/B-Test | 🟢 | 🟢 | Falschurteile ~2 %, bestätigt echte Kurven in 95–100 %, mit Flash mehr fallende −15 % |
 | „Test-Kurve“-Button | 🟡 | 🟡 | trennt jetzt besser (flach: schlechter), misst weiter eine ungewohnte Hand |
 | Zielverteilung (Höhe, Karte) | 🔴 (voll 3D) | 🟡 | Ziele auf Kopfhöhe mit kleinem Anteil anderer Ebenen und Mini-Map; Höhen und Anteile sind ungeprüfte Annahmen, die Zahlen ändern sich in der Simulation nicht messbar |
+| Crosshair (eigener Valorant-Code, pixelgenau) | 🔴 (festes Kreuz) | 🟡 | Format inoffiziell, Farben und Rundung ungerader Dicken sind Annahmen; Vergleich mit dem Spiel steht aus |
 | Simulierte Hand / Realismus | 🔴 | 🔴 | unverändert; Flash-Rückkehren erreichen nur 3–5 in/s |
 | Externe Validierung, echte Daten | 🔴 | 🔴 | unverändert |
 
@@ -292,7 +293,9 @@ Falschurteile bleiben bei etwa 2–5 % insgesamt (unverändert; der Stichprobenf
 
 ### E2. Crosshair
 
-Wird mit M12 ergänzt.
+Das Crosshair ändert **keine Zahl**: es wird nur gezeichnet, nie in Metriken, Score oder Simulation verwendet (die simulierte Hand sieht kein Fadenkreuz). Es verbessert den **Realismus der Aufgabe**: Spieler zielen mit dem eigenen Valorant-Crosshair (Code importieren oder im Editor bauen, Größen in Bildschirmpixeln der nativen Auflösung, mehrere Profile). Geprüft ist die Geometrie gegen feste Referenzmaße und Bilder (`CrosshairLayoutTest`: Pixellängen, Lücken, Dicke, Outline) und der Code über 17 echte Profil­codes (`CrosshairCodecTest`: Code → Modell → Code ist identisch). **Nicht geprüft** ist der Vergleich mit dem Spiel selbst: das Format ist inoffiziell (Community-Parser, nicht von Riot), die RGB-Werte der Farbvoreinstellungen und die Rundung ungerader Dicken auf geraden Bildschirmen sind Annahmen (docs/CROSSHAIR.md, „Open points“). Das muss der Spieler einmal selbst prüfen: eigenen Code aus Valorant importieren und das Bild in gleicher Auflösung nebeneinanderlegen.
+
+Folge für die Ampel: die neue Zeile „Zielverteilung (Höhe, Karte)“ bleibt 🟡; das Crosshair ist als eigene Zeile „Crosshair“ 🟡 (Format und Pixelgenauigkeit nicht gegen das Spiel geprüft).
 
 ## C und D: was sich nicht geändert hat
 

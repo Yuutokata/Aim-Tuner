@@ -17,7 +17,7 @@ import de.yuuto.aimtune.app.ui.onChange
 import java.util.Locale
 
 private const val MENU_WIDTH = 760f
-private const val MENU_ITEM_HEIGHT = 96f
+private const val MENU_ITEM_HEIGHT = 84f
 private const val MENU_GAP = 12f
 private const val ITEM_PADDING = 28f
 private const val HEADING_GAP = 56f
@@ -44,6 +44,8 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
         left.add(menuItem(t("menu.history"), t("menu.history_sub"), "H") { ctx.showHistory() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
+        left.add(menuItem(t("menu.crosshair"), t("menu.crosshair_sub"), "C") { ctx.showCrosshair() })
+            .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
         left.add(menuItem(t("menu.settings"), t("menu.settings_sub"), "S") { ctx.showSettings() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).left().row()
         ctx.startupProblems.forEach { left.add(ui.label(it, Styles.CAUTION, wrap = true)).width(MENU_WIDTH).left().padTop(PROBLEM_GAP).row() }
@@ -64,6 +66,7 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
         Input.Keys.R -> true.also { ctx.showStoredResults() }
         Input.Keys.A -> true.also { ctx.showAccel() }
         Input.Keys.H -> true.also { ctx.showHistory() }
+        Input.Keys.C -> true.also { ctx.showCrosshair() }
         else -> false
     }
 
