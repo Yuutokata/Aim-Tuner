@@ -36,16 +36,20 @@ jobs:
           ./gradlew :app:jpackage "-PappVersion=${{ steps.version.outputs.number }}" --console=plain
           Compress-Archive -Path app/build/jpackage/AimTune -DestinationPath app/build/AimTune-${{ github.ref_name }}-windows.zip
 
-      # The runner has no GPU and no desktop, so the app cannot open its window here: the gate is only that the bundled
-      # runtime works without Java on the path. The launch below has a hard time limit and never fails the release.
+      # The runner has no GPU and no desktop, so the app cannot open its window here. The gate is that the launcher starts
+      # the bundled runtime without Java on the path and reaches our main(): an unknown option makes it print the usage
+      # and exit with code 2 before any window is created.
       - name: Check the packaged runtime (no Java on the path)
+        timeout-minutes: 3
         shell: pwsh
         run: |
           $env:JAVA_HOME = $null
           $app = "app/build/jpackage/AimTune"
           if (-not (Test-Path "$app/AimTune.exe")) { throw "AimTune.exe is missing" }
-          & "$app/runtime/bin/java.exe" -version
-          if ($LASTEXITCODE -ne 0) { throw "the bundled runtime does not start" }
+          if (-not (Test-Path "$app/runtime")) { throw "the bundled runtime is missing" }
+          $p = Start-Process -FilePath "$app/AimTune.exe" -ArgumentList "--check-launch" -PassThru
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "the launcher did not finish within 60 s" }
+          if ($p.ExitCode -ne 2) { throw "expected exit code 2 from the option check, got $($p.ExitCode): the bundled runtime did not reach the app" }
 
       - name: Try to launch the packaged app (information only)
         continue-on-error: true
