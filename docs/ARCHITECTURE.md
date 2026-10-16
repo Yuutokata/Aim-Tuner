@@ -77,6 +77,10 @@ Rounds are analysed and saved by `RoundProcessor` on a background thread. If the
 - `app/history/buildHistory` refits the optimizer on the rounds of each game and DPI up to each stored session; `HistoryScreen` loads it in the background.
 - `app/i18n`: `I18n` wraps a LibGDX `I18NBundle` (`assets/i18n/messages.properties` English base, `messages_de.properties`), `Language` maps the stored code (`AppSettings.language`), `UiText` is a key with arguments for texts built outside screens (HUD labels). `UiScreen.t(key, args)` is the shortcut. Diagnostics (startup problems, exception messages, `AccelFitResult.reason`) stay English; `AccelFitResult.reasonCode` carries the translated reason. `BundlesTest` keeps both bundles in step and checks that every key in the code exists.
 
+## Update check (M13)
+
+`core/update/Version` parses and compares release versions. `app/update/UpdateChecker` makes one `GET /repos/<repo>/releases/latest` with the JDK `HttpClient` (3 s connect, 5 s request timeout) and returns null on anything but a valid 200 answer; `UpdateService` decides when (at most every 24 h, also after a failed try, on a daemon thread) and keeps the last find in the settings (`latestKnownVersion/Url`), `AppVersion` reads the build's version from `version.properties` (filled from `-PappVersion` by `processResources`). The result reaches the menu through `AppContext.availableUpdate`. This is the only network access of the app; the packaged runtime needs the `java.net.http` module (`jpackageRuntimeModules`).
+
 ## Verification harness
 
 Everything below runs without a human or a window (except the screenshots, which need a GPU context but a hidden window).

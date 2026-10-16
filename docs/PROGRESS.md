@@ -143,6 +143,8 @@ Order: the four items that change the numbers first (R1-R4), then the rest.
 
 ## Last session
 
+- M13 Update check: `Version` (core), `UpdateChecker` (GitHub releases/latest, every failure including 404 of a private repository gives null and shows nothing), `UpdateService` (once a day, last find kept in the settings), hint with key U in the main menu, switch in Settings and `--no-update-check`, version of the build from `version.properties` (`-PappVersion`), `java.net.http` added to the packaged runtime. Tests: `VersionTest`, `UpdateCheckerTest` (local HTTP server incl. 404/403/429/500/odd JSON/no server), `UpdateServiceTest`. Open (user): after the repo is public, tag a newer version and see the hint in an older packaged app; not tried against the real GitHub API.
+
 - Settings layout: the new hit-sound row pushed the footer (Back, Reset, Save) half out of the window; both sound switches now share one row ("Sounds": Flash sounds, Hit sound as toggle tiles), checked in the EN and DE screenshots.
 
 - Release workflow (`.github/workflows/release.yml`): pushing a tag `vX.Y.Z` builds and tests, packages the app image with its own runtime (version from the tag via `-PappVersion`), smoke-tests it without Java, tries the `.exe` installer (needs WiX; the release still goes out with the zip if it fails) and publishes a GitHub release with generated notes. `ci.yml` now only builds and tests on pushes and pull requests. Not run yet: the first tag will show whether the runner has WiX. Release with `git tag v0.1.0 && git push origin v0.1.0`.

@@ -39,6 +39,8 @@ Rounds of about 30-60 s (configurable) in a minimal map (floor at eye height, a 
 
 **Hit sound.** Every hit on a target plays a short, crisp sound (synthesized from scratch, switchable in the settings). Its pitch climbs a pentatonic scale with each hit in a row and starts again after a miss, which rewards clean streaks. Tracking has no clicks and therefore no hit sound.
 
+**Update hint.** At most once a day the app asks the GitHub API for the newest release of its repository (`app/update`, plain HTTPS GET, no account, no identifier beyond `User-Agent: AimTune/<version>`). If the release is newer than the running build, the main menu shows "Version x is available (U)"; the key or a click opens the release page in the browser. Nothing is downloaded or installed. Every failure (offline, rate limit, a private repository, which GitHub answers with 404, odd data) shows nothing at all. The check can be switched off in the settings (`checkForUpdates`) or with `--no-update-check`.
+
 ### Measurement and metrics
 Store raw events (counts + timestamps) and target events per round. Compute hit rate, time-to-target, signed endpoint error per movement, corrective movements, path efficiency, tracking time-on-target ratio and mean distance. Segment into submovements (also used for accel analysis). For flash rounds also the share of flashes the player had turned away from when they popped, the time to turn away and its peak speed. Combine accuracy (first shot), time to hit, tracking and the flash dodge rate into a normalized, weighted, per-user-baselined score; the spread of the first-movement error is shown as a diagnostic only because it cannot have an optimum of its own.
 

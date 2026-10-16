@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.Align
 import de.yuuto.aimtune.app.AppContext
 import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.ui.Styles
+import de.yuuto.aimtune.app.ui.button
 import de.yuuto.aimtune.app.ui.caps
 import de.yuuto.aimtune.app.ui.frame
 import de.yuuto.aimtune.app.ui.label
@@ -49,6 +50,9 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
         left.add(menuItem(t("menu.settings"), t("menu.settings_sub"), "S") { ctx.showSettings() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).left().row()
         ctx.startupProblems.forEach { left.add(ui.label(it, Styles.CAUTION, wrap = true)).width(MENU_WIDTH).left().padTop(PROBLEM_GAP).row() }
+        pendingUpdate()?.let { update ->
+            left.add(ui.button(t("update.available", update.version.toString()), Styles.TEXT) { openUpdate() }).left().padTop(PROBLEM_GAP).row()
+        }
         content.add(left).top().left()
         content.add(currentSettingBlock()).top().left().padLeft(COLUMN_GAP).padTop(RIGHT_BLOCK_TOP)
 
@@ -67,7 +71,15 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
         Input.Keys.A -> true.also { ctx.showAccel() }
         Input.Keys.H -> true.also { ctx.showHistory() }
         Input.Keys.C -> true.also { ctx.showCrosshair() }
+        Input.Keys.U -> (pendingUpdate() != null).also { if (it) openUpdate() }
         else -> false
+    }
+
+    /** A newer release than this build, unless the player switched the check off in the settings. */
+    private fun pendingUpdate() = ctx.availableUpdate?.takeIf { ctx.settings.current.checkForUpdates }
+
+    private fun openUpdate() {
+        pendingUpdate()?.let { Gdx.net.openURI(it.url) }
     }
 
     private val storedRounds by lazy { ctx.storedRoundCount() }

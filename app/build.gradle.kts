@@ -9,6 +9,7 @@ dependencies {
     implementation(project(":input"))
     implementation(project(":storage"))
 
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.gdx)
     implementation(libs.gdx.backend.lwjgl3)
     implementation(libs.gdx.freetype)
@@ -38,13 +39,18 @@ tasks.register<JavaExec>("screenshotsDe") {
 }
 
 // The UI tokens live once in docs/design and are bundled into the app from there.
+// The version of this build (-PappVersion from the release tag) for the update check; dev runs show the default.
+val appVersionName = providers.gradleProperty("appVersion").orElse("0.1.0")
+
 tasks.processResources {
+    inputs.property("appVersion", appVersionName)
+    filesMatching("version.properties") { expand("appVersion" to appVersionName.get()) }
     from(rootProject.file("docs/design/tokens.json")) { into("assets/ui") }
 }
 
 // Windows app image or installer with its own trimmed Java runtime, built with the JDK's jpackage (see ADR 0005).
 // `./gradlew :app:jpackage` makes build/jpackage/AimTune/AimTune.exe; `-PinstallerType=exe` or `msi` needs the WiX toolset.
-val jpackageRuntimeModules = "java.base,java.desktop,java.logging,java.management,java.naming,java.sql,jdk.unsupported"
+val jpackageRuntimeModules = "java.base,java.desktop,java.logging,java.management,java.naming,java.sql,java.net.http,jdk.unsupported"
 
 tasks.register<Exec>("jpackage") {
     group = "distribution"
@@ -55,7 +61,7 @@ tasks.register<Exec>("jpackage") {
     val outDir = layout.buildDirectory.dir("jpackage")
     val type = providers.gradleProperty("installerType").orElse("app-image")
     // The release workflow passes the tag (v1.2.3 -> 1.2.3); jpackage needs a numeric version.
-    val appVersion = providers.gradleProperty("appVersion").orElse("0.1.0").get()
+    val appVersion = appVersionName.get()
     doFirst { delete(outDir) }
     executable(launcher.map { it.metadata.installationPath.file("bin/jpackage.exe").asFile.path }.get())
     args(

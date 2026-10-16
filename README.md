@@ -12,6 +12,8 @@ Find a mouse sensitivity range you aim equally well in (and optionally test an a
 2. Start `AimTune\AimTune.exe`. It brings its own Java runtime; nothing else has to be installed.
 3. Windows may show a SmartScreen warning because the program is not code-signed yet: choose "More info", then "Run anyway".
 
+The app checks once a day whether a newer release exists on GitHub and then shows a hint in the menu (nothing is downloaded or installed; switch it off in Settings or start with `--no-update-check`).
+
 Settings and your rounds are stored in `%APPDATA%\AimTune` (set `AIMTUNE_DATA_DIR` to use another folder). Deleting that folder resets everything.
 
 ## How to use it
