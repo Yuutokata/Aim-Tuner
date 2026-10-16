@@ -41,6 +41,8 @@ private const val FOOTER_BUTTON_HEIGHT = 64f
 private val ROUND_LENGTHS = listOf(30, 45, 60, 90)
 private const val FLASH_SEGMENT_WIDTH = 150f
 private const val FLASH_HELP_WIDTH = 760f
+private const val SOUND_TILE_WIDTH = 200f
+private const val UPDATE_TILE_WIDTH = 400f
 
 private val METRIC_KEYS = mapOf(
     ScoreMetric.ACCURACY to "metric.accuracy",
@@ -58,6 +60,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
     private val scenarios = ctx.settings.current.scenarios.toMutableSet()
     private var flashSound = ctx.settings.current.flashSound
     private var hitSound = ctx.settings.current.hitSound
+    private var checkForUpdates = ctx.settings.current.checkForUpdates
     private var message: Pair<String, Boolean>? = null
     private var liveCm: Label? = null
     private var totalLabel: Label? = null
@@ -74,14 +77,14 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         addRow(left, t("settings.language"), languageSelect())
         addRow(left, t("settings.flash"), flashImportanceButtons(draft.flashImportance) { draft = draft.copy(flashImportance = it); message = null; rebuild() })
         left.add(ui.label(t("settings.flash_help"), Styles.CAPTION_MUTED, wrap = true)).colspan(2).left().width(FLASH_HELP_WIDTH).padBottom(ROW_GAP).row()
-        addRow(left, t("settings.flash_sound"), onOffButtons(flashSound) { flashSound = it })
-        addRow(left, t("settings.hit_sound"), onOffButtons(hitSound) { hitSound = it })
+        addRow(left, t("settings.sounds"), soundToggles())
         val runSetup = ui.button(t("settings.run_setup"), Styles.SECONDARY) { ctx.showOnboarding(SetupStep.DPI, afterFinish = ctx::showSettings) }
         addRow(left, t("settings.style_pad"), Table().also { it.add(runSetup).height(CONTROL_HEIGHT) })
 
         val right = Table()
         right.add(weightsBlock()).left().row()
-        right.add(scenariosBlock()).left().padTop(SCENARIOS_GAP)
+        right.add(scenariosBlock()).left().padTop(SCENARIOS_GAP).row()
+        right.add(updateToggle()).left().padTop(SCENARIOS_GAP)
         val content = Table()
         content.add(left).top().left()
         content.add(right).top().left().padLeft(COLUMN_GAP).padTop(ui.tokens.footerHeight)
@@ -205,6 +208,14 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         return row
     }
 
+    /** One toggle tile in the right column, where there is room (the left one is as tall as the window). */
+    private fun updateToggle(): Table {
+        val button: TextButton = ui.button(t("settings.update_check"), Styles.TILE) { checkForUpdates = !checkForUpdates; message = null; rebuild() }
+        button.setProgrammaticChangeEvents(false)
+        button.isChecked = checkForUpdates
+        return Table().also { it.add(button).width(UPDATE_TILE_WIDTH).height(CONTROL_HEIGHT) }
+    }
+
     private fun scenariosBlock(): Table {
         val block = Table()
         block.add(ui.caps(t("settings.scenarios"))).left().padBottom(8f).row()
@@ -237,13 +248,18 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
 
     private fun flashImportanceLabels() = FlashImportance.entries.associateWith { t("flash.importance.${it.name.lowercase()}") }
 
-    private fun onOffButtons(selected: Boolean, set: (Boolean) -> Unit): Table {
+    /** Both sound switches in one row, so the left column stays short enough for the footer. */
+    private fun soundToggles(): Table {
         val table = Table()
-        listOf(true to t("settings.on"), false to t("settings.off")).forEach { (on, name) ->
-            val button: TextButton = ui.button(name, Styles.TILE) { set(on); message = null; rebuild() }
+        listOf(t("settings.flash_sound") to flashSound, t("settings.hit_sound") to hitSound).forEachIndexed { index, (name, on) ->
+            val button: TextButton = ui.button(name, Styles.TILE) {
+                if (index == 0) flashSound = !flashSound else hitSound = !hitSound
+                message = null
+                rebuild()
+            }
             button.setProgrammaticChangeEvents(false)
-            button.isChecked = selected == on
-            table.add(button).width(FLASH_SEGMENT_WIDTH).height(CONTROL_HEIGHT).padRight(SEGMENT_GAP)
+            button.isChecked = on
+            table.add(button).width(SOUND_TILE_WIDTH).height(CONTROL_HEIGHT).padRight(SEGMENT_GAP)
         }
         return table
     }
@@ -260,7 +276,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
             return
         }
         val enabled = ScenarioKind.entries.map { it.id }.filter { it in scenarios }
-        val base: AppSettings = ctx.settings.current.copy(roundSeconds = roundSeconds, metricWeights = weights.toMap(), scenarios = enabled, language = language.code, flashSound = flashSound, hitSound = hitSound)
+        val base: AppSettings = ctx.settings.current.copy(roundSeconds = roundSeconds, metricWeights = weights.toMap(), scenarios = enabled, language = language.code, flashSound = flashSound, hitSound = hitSound, checkForUpdates = checkForUpdates)
         val error = ctx.settings.save(draft.toSettings(base, ctx.profiles))
         if (error == null) {
             ctx.showMenu()
@@ -279,6 +295,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         draft = draft.copy(flashImportance = FlashImportance.SOMETIMES)
         flashSound = true
         hitSound = true
+        checkForUpdates = true
         message = t("settings.reset_done") to true
         rebuild()
     }

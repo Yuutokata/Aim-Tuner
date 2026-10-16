@@ -5,6 +5,10 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Graphics
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3WindowAdapter
 import de.yuuto.aimtune.app.input.GlfwMouseSource
+import de.yuuto.aimtune.app.screens.MainMenuScreen
+import de.yuuto.aimtune.app.update.AppVersion
+import de.yuuto.aimtune.app.update.UpdateChecker
+import de.yuuto.aimtune.app.update.UpdateService
 import de.yuuto.aimtune.app.ui.Tokens
 import de.yuuto.aimtune.app.ui.UiHolder
 import de.yuuto.aimtune.games.GameProfiles
@@ -66,6 +70,29 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
         context = ctx
         val screenshotDir = options.screenshotDir
         if (screenshotDir == null) ctx.showMenu() else tour = ScreenshotTour(ctx, screenshotDir) { Gdx.app.exit() }
+        if (screenshotDir == null && !options.noUpdateCheck) startUpdateCheck(ctx)
+    }
+
+    /**
+     * Looks for a newer release in the background. A failed check (no network, a private repository) changes nothing the
+     * player sees. The result is only saved when the settings loaded cleanly, so a damaged file is never overwritten.
+     */
+    private fun startUpdateCheck(ctx: AppContext) {
+        val service = UpdateService(latest = { UpdateChecker().latest() }, current = AppVersion.version)
+        ctx.availableUpdate = service.known(ctx.settings.current)
+        service.checkIfDue(ctx.settings.current) { checkedAt, release ->
+            Gdx.app.postRunnable {
+                val before = ctx.settings.current
+                val after = before.copy(
+                    lastUpdateCheckEpochSeconds = checkedAt,
+                    latestKnownVersion = release?.version?.toString() ?: before.latestKnownVersion,
+                    latestKnownUrl = release?.url ?: before.latestKnownUrl,
+                )
+                if (ctx.startupProblems.isEmpty()) ctx.settings.save(after)
+                ctx.availableUpdate = service.known(after)
+                (screen as? MainMenuScreen)?.rebuild()
+            }
+        }
     }
 
     override fun resize(width: Int, height: Int) {

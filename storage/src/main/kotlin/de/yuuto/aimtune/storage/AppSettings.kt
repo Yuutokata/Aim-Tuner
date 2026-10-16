@@ -35,6 +35,13 @@ data class AppSettings(
     val flashSound: Boolean = true,
     /** Play a short sound for every hit; it rises with a streak of hits. */
     val hitSound: Boolean = true,
+    /** Ask GitHub at most once a day whether a newer release exists, and show a hint in the menu if so. */
+    val checkForUpdates: Boolean = true,
+    /** When the last check ran, successful or not (epoch seconds); a private repository would otherwise be asked at every start. */
+    val lastUpdateCheckEpochSeconds: Long = 0L,
+    /** The newest release the last successful check found (version and its page), so the hint stays on days without a check. */
+    val latestKnownVersion: String? = null,
+    val latestKnownUrl: String? = null,
     /** The player's Valorant crosshairs, stored as profile codes; none means the default crosshair is drawn. */
     val crosshairs: List<SavedCrosshair> = emptyList(),
     /** Id of the selected entry of [crosshairs]; used in all scenarios. */

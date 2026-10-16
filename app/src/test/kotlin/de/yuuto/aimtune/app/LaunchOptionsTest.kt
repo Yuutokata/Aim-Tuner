@@ -23,8 +23,9 @@ class LaunchOptionsTest {
 
     @Test
     fun `all options are parsed`() {
-        val o = parse("--seed", "9", "--source", "glfw", "--no-vsync", "--screenshots", "out", "--record", "logs")
+        val o = parse("--seed", "9", "--source", "glfw", "--no-vsync", "--no-update-check", "--screenshots", "out", "--record", "logs")
         assertEquals(9L, o.seed)
+        assertTrue(o.noUpdateCheck)
         assertEquals(SourceKind.GLFW, o.source)
         assertFalse(o.vsync)
         assertEquals(Paths.get("out"), o.screenshotDir)

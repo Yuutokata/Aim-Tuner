@@ -6,6 +6,8 @@ import com.badlogic.gdx.Screen
 import de.yuuto.aimtune.app.accel.AccelPhase
 import de.yuuto.aimtune.app.accel.AccelRun
 import de.yuuto.aimtune.app.audio.FlashSounds
+import de.yuuto.aimtune.app.update.AppVersion
+import de.yuuto.aimtune.app.update.ReleaseInfo
 import de.yuuto.aimtune.app.audio.HitSounds
 import de.yuuto.aimtune.app.accel.AccelSession
 import de.yuuto.aimtune.app.blind.AxisSummary
@@ -74,6 +76,10 @@ class AppContext(
     val researchDir: Path? = null,
 ) {
     private var nextSeed = options.seed ?: System.nanoTime()
+    /** A newer release than this build, found by the update check; null when none is known. Set on the render thread. */
+    @Volatile
+    var availableUpdate: ReleaseInfo? = null
+
     private val flashSoundsDelegate = lazy { FlashSounds() }
     private val hitSoundsDelegate = lazy { HitSounds() }
 
@@ -299,5 +305,4 @@ class AppContext(
 /** The sensitivity the acceleration steps start from, with how sure the optimizer is about it. */
 data class AccelBaseline(val cm360: Double, val confidencePercent: Int, val rounds: Int)
 
-/** Written into research exports; keep in step with `appVersion` in app/build.gradle.kts. */
-private const val APP_VERSION = "0.1.0"
+private val APP_VERSION = AppVersion.current

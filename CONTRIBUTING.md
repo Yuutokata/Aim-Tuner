@@ -3,6 +3,7 @@
 ## Workflow
 
 - Read [docs/PROGRESS.md](docs/PROGRESS.md) first and keep it updated.
+- Work on the `dev` branch and open pull requests into `dev`; `main` receives merges from `dev` for features and releases, and a tag `vX.Y.Z` on `main` publishes a release.
 - One logical change per commit, format `<type>: <description>` (feat, fix, refactor, docs, test, chore, perf, ci).
 - Logic in `core` needs tests. Run `./gradlew build` before opening a PR.
 - Respect the anti-cheat rules in [CLAUDE.md](CLAUDE.md): no game process access, no input outside the app window, no custom drivers.
