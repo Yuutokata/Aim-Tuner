@@ -1,6 +1,6 @@
-# AimTune: Analyse nach dem Flash-Szenario
+# AimTune: Analyse nach dem Flash-Szenario und den Zielhöhen
 
-Stand 2026-10-16, nach M10 (Flash turn-away). Das ist die deutsche Fortschreibung von `docs/ASSESSMENT.md` (englisch, Stand nach M9, bleibt unverändert): Teil A (Sensitivity-Finder) und Teil B (Kurvenfinder) wurden mit dem aktuellen Code neu gemessen und den Werten von vorher gegenübergestellt. Alle Zahlen kommen von simulierten Spielern; die simulierte Hand ist nicht an Menschen validiert (ASSESSMENT.md, Teil C). Zellen haben 30–40 simulierte Spieler, ein Prozentwert hat also etwa ±15 Punkte Stichprobenfehler (95 %, schlimmster Fall); **Unterschiede unter dieser Größe behaupte ich nicht.**
+Stand 2026-10-16, nach M10 (Flash turn-away) und M11 (Zielhöhen, Mini-Map; Abschnitt E). Das ist die deutsche Fortschreibung von `docs/ASSESSMENT.md` (englisch, Stand nach M9, bleibt unverändert): Teil A (Sensitivity-Finder) und Teil B (Kurvenfinder) wurden mit dem aktuellen Code neu gemessen und den Werten von vorher gegenübergestellt. Alle Zahlen kommen von simulierten Spielern; die simulierte Hand ist nicht an Menschen validiert (ASSESSMENT.md, Teil C). Zellen haben 30–40 simulierte Spieler, ein Prozentwert hat also etwa ±15 Punkte Stichprobenfehler (95 %, schlimmster Fall); **Unterschiede unter dieser Größe behaupte ich nicht.**
 
 ## Kurzfazit
 
@@ -12,12 +12,13 @@ Stand 2026-10-16, nach M10 (Flash turn-away). Das ist die deutsche Fortschreibun
 6. **Der „Test-Kurve“-Button wird strenger:** Ein flacher Spieler bekommt jetzt in 15–29 von 30 Fällen „schlechter“ (vorher 0–21), eine echte +15-%-Vorliebe „besser“ in 23–26 statt 28–29. Er bleibt ein Test mit ungewohnter Hand.
 7. **Was sich nicht geändert hat:** Es gibt weiterhin keine Validierung an Menschen, die simulierte Hand ist bei kleinen Zielen langsam (einfache Bewegungen erreichen nur 3–5 in/s), und die Flash-Zeiten sind teils Annahmen (Flug vor dem Windup, 10°-Rand). Das ist weiter der größte Posten.
 8. **Reihenfolge der nächsten Schritte:** Flash-Zeiten im Spiel prüfen, 10 echte Spieler aufnehmen (jetzt auch mit Flash-Runden; der Forschungsexport enthält sie), dann erst weitere Algorithmusarbeit (Handlungsoptionen unten).
+9. **Zielhöhen (M11, Abschnitt E):** Die Ziele stehen jetzt auf Kopfhöhe (88 % mit einer Streuung von 1,5° um Kopfhöhe, 12 % auf anderer Ebene), auf dem Boden einer Mini-Map mit Ecken und Türen, und die Ergebnisse zeigen, aus welcher Achse die Fehler kommen. In der Simulation **ändert das die Zahlen nicht messbar**: Optimum der simulierten Spieler, Median-Fehler und Konfidenz des Finders, Stärkensuche und A/B-Test bleiben im Rahmen des Rauschens gleich; einzig steigende schwache Kurvenvorlieben (+15/+25 %, 15 Runden) erkennt die Fehleranalyse seltener (6 → 0 bzw. 24 → 17 von 30). Der Gewinn ist der Realismus der Aufgabe, nicht der Zahlen; Höhen und Anteile sind Annahmen (`verified: false`).
 
 ## Ampel-Übersicht
 
 Grün: in der Simulation belastbar, Rest ist Validierung. Gelb: funktioniert mit klaren Einschränkungen. Rot: nicht tragfähig oder nicht geprüft. Die Farben der Spalte „Vorher“ sind meine nachträgliche Einordnung des damaligen Berichts, nicht dort so vergeben.
 
-| Bereich | Vorher (ASSESSMENT.md, nach M9) | Nachher (M10) | Grund der Änderung |
+| Bereich | Vorher (ASSESSMENT.md, nach M9) | Nachher (M10, M11) | Grund der Änderung |
 | --- | --- | --- | --- |
 | Sensitivity-Finder, Statistik (Median-Fehler, Intervall) | 🟡 | 🟡 | Median gleich, Ausreißer und Punktverlust bei 8–15 Runden mit Flash größer; 30 Runden unverändert gut |
 | Konfidenzangabe | 🟢 | 🟢 | konservativ gegenüber Verlust; gegenüber ±15 % leicht optimistisch (71–73 % bei 80+) |
@@ -27,6 +28,7 @@ Grün: in der Simulation belastbar, Rest ist Validierung. Gelb: funktioniert mit
 | Blinde Stärkensuche | 🟡 | 🟡 (besser) | mit realistischen Zielen und Flash 1–4/32 statt 21–23/32 falsche Ausschlüsse; weiter nur mit A/B-Abschluss |
 | Blinder A/B-Test | 🟢 | 🟢 | Falschurteile ~2 %, bestätigt echte Kurven in 95–100 %, mit Flash mehr fallende −15 % |
 | „Test-Kurve“-Button | 🟡 | 🟡 | trennt jetzt besser (flach: schlechter), misst weiter eine ungewohnte Hand |
+| Zielverteilung (Höhe, Karte) | 🔴 (voll 3D) | 🟡 | Ziele auf Kopfhöhe mit kleinem Anteil anderer Ebenen und Mini-Map; Höhen und Anteile sind ungeprüfte Annahmen, die Zahlen ändern sich in der Simulation nicht messbar |
 | Simulierte Hand / Realismus | 🔴 | 🔴 | unverändert; Flash-Rückkehren erreichen nur 3–5 in/s |
 | Externe Validierung, echte Daten | 🔴 | 🔴 | unverändert |
 
@@ -223,6 +225,74 @@ Identische Arme (160 Läufe je Zelle), danach eine Kurve in der Stärke der wahr
 | | Flash in der Hälfte | 1,9 % / 1,9 % | 100 % | 95 % |
 
 Falsche Urteile ändern sich innerhalb des Stichprobenfehlers nicht (etwa 2 %); die Trefferquote steigt dort, wo die Klick-Paare schwach waren (Standard-Hand, −25 %: 62 → 100 %).
+
+## E. Crosshair und Zielhöhen (M11, M12)
+
+### E1. Zielhöhen: vorher voll 3D, nachher Kopfhöhe
+
+**Vorher** ist die Verteilung der ersten Trainerversionen: jedes Ziel gleichverteilt im ±25°-Pitchfeld (Flick, Switching), Flash-Cues bis 30° hoch, Tracking mit halber Vertikalbewegung, keine Karte. **Nachher** ist der Profilstandard: Kamera auf Augenhöhe 1,6 m, Kopfmitte 1,65 m, 88 % der Ziele mit Standardabweichung 1,5° um Kopfhöhe, 12 % auf anderer Ebene (3–10°, 40 % davon unterhalb), Flash-Cues bis 12°, Tracking fast rein horizontal, ein Teil der Flick- und Switching-Ziele (30 %) an Ecken und Türöffnungen der Mini-Map. Die Höhen und Anteile sind **Annahmen** (Riot veröffentlicht keine Augen- oder Kopfhöhe, keine Statistik der Höhenunterschiede; `verified: false`). Kopfgroße Ziele, Standard-Hand mit Optimum 35/50/70 cm/360, Rauschen ×1,0. Reproduzierbar mit `VerticalExperimentsTest` (`AIMTUNE_REVIEW=1`, 30 Runden bzw. Spieler pro Zelle, Berichte `core/build/reports/harness/vertical-*.txt`).
+
+**Beste Sensitivity der simulierten Spieler** (Maximum einer Parabel durch 9 Gitterpunkte von 20–160 cm/360, 30 Runden je Punkt; ein Wert hat etwa ±10 % Rauschen):
+
+| Spieler | Szenario | vorher | nachher |
+| --- | --- | --- | --- |
+| 35 | Flick / Switching / Micro | 37,8 / 36,1 / 42,2 | 31,4 / 33,8 / 38,0 |
+| 50 | Flick / Switching / Micro | 45,8 / 43,7 / 65,7 | 47,3 / 49,3 / 58,6 |
+| 70 | Flick / Switching / Micro | 63,9 / 60,0 / 77,9 | 67,8 / 63,1 / 83,2 |
+| 50 | Tracking / Flash („manchmal“) | 20,0 (Rand) / 34,9 | 23,9 / 36,1 |
+| 70 | Tracking / Flash („manchmal“) | 30,2 / 41,5 | 36,0 / 45,5 |
+
+Lesart: **keine einheitliche Verschiebung der empfohlenen Sensitivity**. Bei Flick, Switching und Micro liegen die Änderungen zwischen −17 % und +13 %, in beiden Richtungen und im Rauschen der Parabelanpassung. Tracking und Flash tendieren zu höheren cm/360 (langsamer): in den gezeigten Zeilen +3 bis +19 %, bei Spieler 35 liegt beides am Gitterrand (20 cm/360) und sagt nichts. Das ist der einzige Hinweis auf einen Trend, und er ist klein gegen das Rauschen. Das Ergebnis ist **nicht stabiler geworden**: die wahre Wirkung der Höhenverteilung auf das Optimum ist in der Simulation kleiner als das Rauschen. Der Grund ist plausibel: Die simulierte Hand hat in beiden Achsen dasselbe Rauschen, die Zielhöhe ändert nur, wie viele der Bewegungen auf der vertikalen Achse stattfinden.
+
+**Woher die Fehler kommen** (Anteil des vertikalen Fehlers am Endpunktfehler der ersten Bewegung, Flick, über alle Sensitivities): vorher 43–47 %, nachher 34–43 %. Die Aufteilung ist also als Messgröße brauchbar (die Fehler eines Spielers aus Bewegungen mit größerem horizontalem Anteil sind überwiegend horizontal), aber der Absolutwert gilt nur für diese simulierte Hand und sagt nichts über Menschen.
+
+**Sensitivity-Finder (Flick + Flash „manchmal“, 15 Spieler pro Zelle, Suchbereich 20–140):**
+
+| | gemischte Wahrheit | Runden | gefunden (Median) | Fehlerfaktor Median / p90 | Konfidenz |
+| --- | --- | --- | --- | --- | --- |
+| vorher | 46,0 | 15 / 30 | 43,7 / 46,1 | 1,16 / 1,84 · 1,12 / 1,28 | 54 / 61 % |
+| nachher | 48,6 | 15 / 30 | 42,6 / 44,5 | 1,20 / 1,52 · 1,15 / 1,43 | 45 / 64 % |
+
+Median-Fehler und Konfidenz sind im Rahmen des Rauschens gleich (n = 15, ein p90 hat nur wenige Läufe). Der Finder ist nach der Änderung nicht besser und nicht schlechter.
+
+**Fehleranalyse der Kurve (Klick-Mix, 30 Spieler pro Zelle, „angeboten (davon richtige Richtung)“):**
+
+| Hand | Runden | Setup | 0 % | −15 % | +15 % | −25 % | +25 % | +50 % |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Standard | 15 | vorher / nachher | 0 / 0 | 0 / 0 | 0 / 0 | 1 / 0 | 0 / 0 | 0 / 0 |
+| Standard | 30 | vorher / nachher | 0 / 0 | 2 / 0 | 0 / 0 | 25 / 21 | 0 / 0 | 0 / 0 |
+| schnell | 15 | vorher / nachher | 0 / 0 | 30 / 30 | 6 / 0 | 30 / 30 | 24 / 17 | 30 / 29 |
+| schnell | 30 | vorher / nachher | 0 / 0 | 30 / 30 | 13 / 5 | 30 / 30 | 28 / 28 | 30 / 30 |
+
+Keine falschen Angebote bei flachen Spielern (0 von 30 in allen vier Zeilen, wie vorher). Die Erkennung fallender Kurven bleibt gleich; **steigende schwache Vorlieben (+15 %, +25 % bei 15 Runden) werden mit Kopfhöhe seltener gefunden** (6 → 0 bzw. 24 → 17 von 30). Ich habe die Ursache nicht untersucht; naheliegend ist, dass bei überwiegend horizontalen Bewegungen weniger schnelle, lange Bewegungen mit großem Fehlersignal zusammenkommen. Das ist dieselbe Richtung, in die schon die Flash-Rückkehren die Analyse verschlechtert haben, und kein neuer Grund für die schon bestehende Entscheidung, die Analyse als experimentell zu führen.
+
+**Stärkensuche (24 Runden, Flick + Flash, 15 Spieler pro Zelle, „Stärke im Median, falsch ausgeschlossen“):**
+
+| Hand | Setup | 0 % | +15 % | +25 % | −15 % | −25 % |
+| --- | --- | --- | --- | --- | --- | --- |
+| Standard | vorher | ×1,03 (1/15) | ×1,23 (14/15) | ×1,33 (15/15) | ×0,86 (10/15) | ×0,79 (15/15) |
+| Standard | nachher | ×1,03 (2/15) | ×1,20 (15/15) | ×1,36 (14/15) | ×0,89 (11/15) | ×0,78 (14/15) |
+| schnell | vorher | ×1,05 (4/15) | ×1,17 (15/15) | ×1,45 (15/15) | ×0,88 (15/15) | ×0,75 (15/15) |
+| schnell | nachher | ×1,01 (1/15) | ×1,19 (14/15) | ×1,38 (15/15) | ×0,88 (14/15) | ×0,78 (14/15) |
+
+Gleich im Rahmen des Rauschens: flache Spieler werden weiter selten ausgeschlossen (1–4 von 15), echte Vorlieben werden gefunden und fast immer als „keine 100 %“ ausgeschlossen.
+
+**Blinder A/B-Test (gleiche Arme: n = 120; echte Kurve: n = 60):**
+
+| Hand | Setup | gleiche Arme: besser / schlechter | −25 % bestätigt | +25 % bestätigt |
+| --- | --- | --- | --- | --- |
+| Standard | vorher | 0,0 / 2,5 % | 97 % | 97 % |
+| Standard | nachher | 1,7 / 0,8 % | 100 % | 100 % |
+| schnell | vorher | 3,3 / 0,8 % | 98 % | 97 % |
+| schnell | nachher | 3,3 / 1,7 % | 100 % | 97 % |
+
+Falschurteile bleiben bei etwa 2–5 % insgesamt (unverändert; der Stichprobenfehler bei n = 120 liegt bei ±3 Punkten), echte Kurven werden weiter in 97–100 % bestätigt.
+
+**Gesamtbild:** Die Höhenverteilung macht den Trainer realistischer (Ziele stehen auf dem Boden, die meisten Bewegungen sind horizontal, es gibt eine Karte mit Ecken und Türen), aber **sie ändert die Ergebnisse der Simulation nicht messbar**, außer dass steigende schwache Kurvenvorlieben in der Fehleranalyse bei 15 Runden schlechter erkannt werden. Das ist kein Beleg für Realismus: die simulierte Hand ist in beiden Achsen gleich, die Verteilung der Zielhöhen ist angenommen, und es gibt keine echten Aufnahmen, an denen man prüfen könnte, ob Menschen vertikal anders treffen. Was die Änderung leistet, ist, dass die Übungsbewegungen den Bewegungen im Spiel ähnlicher sind (Realismus der Aufgabe, nicht der Zahlen).
+
+### E2. Crosshair
+
+Wird mit M12 ergänzt.
 
 ## C und D: was sich nicht geändert hat
 

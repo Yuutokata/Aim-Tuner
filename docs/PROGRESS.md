@@ -130,8 +130,8 @@ Order: the four items that change the numbers first (R1-R4), then the rest.
 - [x] `ElevationMix` + `eyeHeightMeters`/`headHeightMeters` in `TrainerGeometry` and the profile JSON (`trainer.elevation`): bulk near head level (spread 1.5 degrees), 12 % off level 3-10 degrees (40 % of them below); `uniform` switches back to the old field for comparisons
 - [x] Placement: flick/micro steps take their pitch from the mix (`placeNearLevel`), switching draws pitch from the mix, tracking is almost purely horizontal, flash cue elevation 12 degrees and the returning enemy near head level
 - [x] Horizontal and vertical endpoint errors in the metrics (`METRICS_VERSION` 3, old rounds are recomputed), shown on the results screen ("most of your misses are vertical")
-- [ ] Mini-map (floor, walls, corners, doorways) in the trainer scene, spawns at corners
-- [ ] Re-run the simulation experiments (`VerticalExperimentsTest`), results in ALGORITHMS.md and the new section "Crosshair und Zielhöhen" of ANALYSE.md
+- [x] Mini-map (floor, ring wall, corner pillars, door frames, columns under the heads) in the trainer scene; `trainer.arena` in the profile, 30 % of flick and switching targets stand at a corner or doorway
+- [x] Re-run the simulation experiments (`VerticalExperimentsTest`): no measurable change of the numbers except weaker detection of rising weak preferences at 15 rounds; results in ALGORITHMS.md "Vertical distribution" and section E of ANALYSE.md (E2 crosshair follows with M12)
 - [ ] Open (user): measure head height and the elevation of enemies in the shooting range (R1b), judge the mini-map
 
 ### M12 Valorant crosshair (requested: players aim differently with an unfamiliar crosshair)
