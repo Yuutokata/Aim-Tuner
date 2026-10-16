@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.core.scenario
 
+import kotlin.math.atan
 import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.sin
@@ -58,6 +59,11 @@ data class TrainerGeometry(
     val stopProbability: Double = 0.25,
     /** The flash turn-away scenario: popping time, positions, blind duration and the enemy that appears afterwards. */
     val flash: FlashGeometry = FlashGeometry(),
+    /** Camera height above the floor and the height of the middle of an enemy's head; their difference tilts level targets slightly with distance. */
+    val eyeHeightMeters: Double = 1.6,
+    val headHeightMeters: Double = 1.65,
+    /** Vertical distribution of the targets; [fieldPitchDegrees] stays the hard limit. */
+    val elevation: ElevationMix = ElevationMix(),
     val verified: Boolean = false,
 ) {
     init {
@@ -66,8 +72,15 @@ data class TrainerGeometry(
         require(flickAngles.zipWithNext().all { (a, b) -> a.maxDegrees < b.maxDegrees }) { "flick angle buckets must be increasing" }
         require(switchingSeparationDegrees > 0.0 && trackingDistanceMeters > 0.0) { "separation and distance must be positive" }
         require(stopProbability in 0.0..0.9) { "stop probability must be in 0..0.9" }
+        require(eyeHeightMeters in 0.5..3.0 && headHeightMeters in 0.5..3.0) { "eye and head height must be in 0.5..3 m" }
         require(clickTargetDiameterDegrees.max < 30.0 && trackingDiameterDegrees.max < 30.0) { "target diameters over 30 degrees are not targets" }
     }
+
+    /** Pitch in degrees at which the head of an enemy standing on the player's level at [distance] meters appears (negative: below the crosshair). */
+    fun levelPitchDegrees(distance: Double): Double = Math.toDegrees(atan((headHeightMeters - eyeHeightMeters) / distance))
+
+    /** A pitch for a new target at [distance] meters, from the vertical distribution. */
+    fun drawPitch(random: Random, distance: Double): Double = elevation.draw(random, levelPitchDegrees(distance), fieldPitchDegrees)
 
     /** World radius in meters of a sphere that looks [diameterDegrees] wide from [distance] meters. */
     fun radiusFor(diameterDegrees: Double, distance: Double): Double = distance * sin(Math.toRadians(diameterDegrees / 2.0))

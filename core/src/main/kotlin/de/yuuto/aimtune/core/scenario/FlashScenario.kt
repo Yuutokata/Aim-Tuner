@@ -138,10 +138,8 @@ class FlashScenario(private val durationNanos: Long, private val geometry: Train
     /** A head-sized target [FlashGeometry.returnMinDegrees]..[FlashGeometry.returnSpreadDegrees] from the anchor in a random direction. */
     private fun enemyAround(anchor: ViewAngles): Target {
         val angle = random.nextDouble(g.returnMinDegrees, maxOf(g.returnSpreadDegrees, g.returnMinDegrees + 0.01))
-        val heading = random.nextDouble(0.0, 2 * Math.PI)
-        val pitch = (anchor.pitchDegrees + angle * sin(heading)).coerceIn(-MAX_FLASH_PITCH, MAX_FLASH_PITCH)
-        val yaw = anchor.yawDegrees + angle * cos(heading) / cos(Math.toRadians(pitch))
         val distance = geometry.clickTargetDistanceMeters.uniform(random)
+        val (yaw, pitch) = placeNearLevel(geometry, anchor.yawDegrees, anchor.pitchDegrees, angle, distance, random, NO_YAW_LIMIT, MAX_FLASH_PITCH)
         val radius = geometry.radiusFor(geometry.clickTargetDiameterDegrees.logUniform(random), distance)
         return Target(nextTargetId++, ViewAngles.directionOf(yaw, pitch) * distance, radius)
     }
@@ -151,5 +149,6 @@ class FlashScenario(private val durationNanos: Long, private val geometry: Train
     private companion object {
         const val NANOS_PER_SECOND = 1_000_000_000.0
         const val MAX_FLASH_PITCH = 60.0
+        const val NO_YAW_LIMIT = 100_000.0
     }
 }

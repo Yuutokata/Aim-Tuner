@@ -4,7 +4,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Current
 
-- **Milestone:** M10 Flash turn-away (implemented, waiting for the user's hands-on test); M9 Review fixes (implemented, waiting for the user's hands-on test); M8 Results, i18n, packaging is implemented and waiting for the user's hands-on test
+- **Milestone:** M11 Realistic target heights and M12 Valorant crosshair (in progress, M11 first); M10 Flash turn-away (implemented, waiting for the user's hands-on test); M9 Review fixes (implemented, waiting for the user's hands-on test); M8 Results, i18n, packaging is implemented and waiting for the user's hands-on test
 - **Task:** fixes are in (see M9 below and docs/REVIEW.md status table). The target sizes are assumptions until R1b. M7's second hands-on part (analysis, blind test, Raw Accel import) is still open, and per the review the acceleration results should not be trusted before R2.
 
 ## Checklist
@@ -124,6 +124,22 @@ Order: the four items that change the numbers first (R1-R4), then the rest.
 - [x] Guard tests: `FlashScoreTest` (the dodge rate alone peaks at the fast end, the combined optimum is inside the range, "often" stays within 45 % of the return-only optimum), `FlashScenarioTest`, `TrainerHarnessTest` (the trainer records flash rounds like the headless runner)
 - [x] Docs: SPEC, ALGORITHMS, ARCHITECTURE, DESIGN, CONTRIBUTING, README
 - [ ] Open (user): check the flash timings in the game (the visible flight before the windup and the exit margin are assumptions, `trainer.flash.verified` in `games/valorant.json`), play flash rounds on the real mouse and judge the scenario (pop delay, enemy position, white-out)
+
+### M11 Realistic target heights and mini-map (requested: targets floated anywhere in a sphere; Valorant fights are on one level)
+- [x] Research: no separate vertical sensitivity in Valorant found (pitch = yaw 0.07, `pitchMultiplier` not needed so far); eye and head height are not published (assumed 1.6 m / 1.65 m, `verified: false`)
+- [x] `ElevationMix` + `eyeHeightMeters`/`headHeightMeters` in `TrainerGeometry` and the profile JSON (`trainer.elevation`): bulk near head level (spread 1.5 degrees), 12 % off level 3-10 degrees (40 % of them below); `uniform` switches back to the old field for comparisons
+- [x] Placement: flick/micro steps take their pitch from the mix (`placeNearLevel`), switching draws pitch from the mix, tracking is almost purely horizontal, flash cue elevation 12 degrees and the returning enemy near head level
+- [ ] Horizontal and vertical errors in the metrics (`METRICS_VERSION` 3), shown in the results
+- [ ] Mini-map (floor, walls, corners, doorways) in the trainer scene, spawns at corners
+- [ ] Re-run the simulation experiments (`VerticalExperimentsTest`), results in ALGORITHMS.md and the new section "Crosshair und Zielhöhen" of ANALYSE.md
+- [ ] Open (user): measure head height and the elevation of enemies in the shooting range (R1b), judge the mini-map
+
+### M12 Valorant crosshair (requested: players aim differently with an unfamiliar crosshair)
+- [ ] `docs/CROSSHAIR.md`: code format with sources (community parsers, no Riot spec), checked against real codes
+- [ ] `core/crosshair`: model, lossless codec, pixel-exact layout; movement/firing error parsed and kept, not rendered
+- [ ] Pixel-exact renderer in all scenarios, editor with live preview, named profiles in the settings, import/export of codes
+- [ ] Tests: code round trips for real codes, layout reference sizes, rendering through the screenshot tour
+- [ ] Open (user): compare the rendered crosshair with Valorant at the same resolution, export a code and paste it into Valorant
 
 ## Last session
 

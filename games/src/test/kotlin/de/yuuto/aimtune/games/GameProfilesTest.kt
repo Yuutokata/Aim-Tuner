@@ -114,6 +114,22 @@ class GameProfilesTest {
     }
 
     @Test
+    fun `the vertical distribution comes from the profile and can be switched back to the old uniform field`() {
+        val valorant = assertNotNull(bundled.find("valorant"))
+        assertEquals(1.5, valorant.geometry.elevation.spreadDegrees)
+        assertEquals(0.12, valorant.geometry.elevation.offLevelShare)
+        assertEquals(false, valorant.geometry.elevation.uniform)
+        assertEquals(1.6, valorant.geometry.eyeHeightMeters)
+        assertEquals(false, parseGameProfile(valid).geometry.elevation.uniform)
+        val uniform = parseGameProfile(valid.replace("\"sensitivity\"", "\"trainer\":{\"elevation\":{\"uniform\":true},\"headHeightMeters\":1.7},\"sensitivity\""))
+        assertEquals(true, uniform.geometry.elevation.uniform)
+        assertEquals(1.7, uniform.geometry.headHeightMeters)
+        assertFailsWith<GameProfileException> {
+            parseGameProfile(valid.replace("\"sensitivity\"", "\"trainer\":{\"elevation\":{\"offLevelShare\":2.0}},\"sensitivity\""))
+        }
+    }
+
+    @Test
     fun `the flash geometry follows the profile's field of view and can be overridden`() {
         val valorant = assertNotNull(bundled.find("valorant"))
         assertEquals(51.5, valorant.geometry.flash.halfFovDegrees, 0.1)

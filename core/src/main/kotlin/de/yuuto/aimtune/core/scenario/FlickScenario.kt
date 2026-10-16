@@ -86,8 +86,8 @@ class FlickScenario(private val config: FlickConfig, seed: Long) : Scenario {
     /** The next target [TrainerGeometry.drawFlickAngle] degrees from the previous one (from the starting view for the first). */
     private fun realisticTarget(g: TrainerGeometry, previous: Target?): Target {
         val (fromYaw, fromPitch) = previous?.let { anglesOf(it.center) } ?: (0.0 to 0.0)
-        val (yaw, pitch) = placeAt(fromYaw, fromPitch, g.drawFlickAngle(random), random, g.fieldYawDegrees, g.fieldPitchDegrees)
         val distance = g.clickTargetDistanceMeters.uniform(random)
+        val (yaw, pitch) = placeNearLevel(g, fromYaw, fromPitch, g.drawFlickAngle(random), distance, random, g.fieldYawDegrees, g.fieldPitchDegrees)
         val radius = g.radiusFor(g.clickTargetDiameterDegrees.logUniform(random), distance)
         return Target(nextId++, ViewAngles.directionOf(yaw, pitch) * distance, radius)
     }

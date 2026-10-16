@@ -23,6 +23,8 @@ data class TrackingConfig(
     val maxSegmentSeconds: Double = 2.8,
     /** Share of segments in which the target stands still (a counter-strafe) instead of moving. */
     val stopProbability: Double = 0.0,
+    /** Vertical share of the movement of each segment; strafing on a flat floor is almost purely horizontal. */
+    val pitchShare: Double = 0.5,
 ) {
     init {
         require(durationNanos > 0) { "durationNanos must be positive" }
@@ -33,13 +35,17 @@ data class TrackingConfig(
     }
 
     companion object {
+        private const val REALISTIC_MAX_PITCH = 4.0
+        private const val REALISTIC_PITCH_SHARE = 0.1
+
         /** Tracking with the angular size, strafe speed and stops of a game's [geometry]. */
         fun from(geometry: TrainerGeometry, durationNanos: Long): TrackingConfig {
             val speeds = geometry.trackingSpeedDegreesPerSecond
             return TrackingConfig(
                 durationNanos = durationNanos,
                 maxYawDegrees = minOf(35.0, geometry.fieldYawDegrees),
-                maxPitchDegrees = minOf(15.0, geometry.fieldPitchDegrees),
+                maxPitchDegrees = minOf(if (geometry.elevation.uniform) 15.0 else REALISTIC_MAX_PITCH, geometry.fieldPitchDegrees),
+                pitchShare = if (geometry.elevation.uniform) 0.5 else REALISTIC_PITCH_SHARE,
                 distance = geometry.trackingDistanceMeters,
                 targetRadius = geometry.radiusFor(geometry.trackingDiameterDegrees.mid, geometry.trackingDistanceMeters),
                 minSpeedDegreesPerSecond = speeds.min,
@@ -152,10 +158,10 @@ class TrackingScenario(private val config: TrackingConfig, seed: Long) : Scenari
         repeat(MAX_HEADING_ATTEMPTS) { attempt ->
             val heading = if (attempt == 0) preferredHeading else random.nextDouble(0.0, 2 * Math.PI)
             val nextYaw = yaw + reach * cos(heading)
-            val nextPitch = pitch + reach * sin(heading) * PITCH_SHARE
+            val nextPitch = pitch + reach * sin(heading) * config.pitchShare
             if (abs(nextYaw) <= config.maxYawDegrees && abs(nextPitch) <= config.maxPitchDegrees) return nextYaw to nextPitch
         }
-        return (yaw - yaw.sign * min(abs(yaw), reach)) to (pitch - pitch.sign * min(abs(pitch), reach * PITCH_SHARE))
+        return (yaw - yaw.sign * min(abs(yaw), reach)) to (pitch - pitch.sign * min(abs(pitch), reach * config.pitchShare))
     }
 
     private fun center(yaw: Double, pitch: Double): Vec3 = ViewAngles.directionOf(yaw, pitch) * config.distance
@@ -164,9 +170,6 @@ class TrackingScenario(private val config: TrackingConfig, seed: Long) : Scenari
         const val TARGET_ID = 0
         const val NANOS_PER_SECOND = 1_000_000_000.0
         const val MAX_HEADING_ATTEMPTS = 30
-
-        /** Vertical motion is damped: the field is much shorter than wide. */
-        const val PITCH_SHARE = 0.5
 
         /** The target starts in the inner part of the field. */
         const val START_SPREAD = 0.6

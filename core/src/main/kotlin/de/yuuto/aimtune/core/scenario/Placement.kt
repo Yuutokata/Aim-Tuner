@@ -6,6 +6,7 @@ import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 /** Yaw and pitch in degrees of the direction to [center]. */
@@ -29,4 +30,34 @@ internal fun placeAt(yaw: Double, pitch: Double, angle: Double, random: Random, 
     return (yaw + towardYaw * minOf(angle, abs(yaw) + fieldYaw / 2)).coerceIn(-fieldYaw, fieldYaw) to pitch
 }
 
+/**
+ * A spot [angle] degrees from ([yaw], [pitch]) for a target at [distance] meters, with its height taken from the
+ * geometry's vertical distribution: most targets stay near head level, so a flick is mostly horizontal. The pitch
+ * is drawn first and limited to 90 % of [angle]; the rest of the angle goes into yaw, to the side that stays in
+ * the field. With the old uniform field this is the isotropic [placeAt].
+ */
+internal fun placeNearLevel(
+    g: TrainerGeometry,
+    yaw: Double,
+    pitch: Double,
+    angle: Double,
+    distance: Double,
+    random: Random,
+    fieldYaw: Double,
+    fieldPitch: Double,
+): Pair<Double, Double> {
+    if (g.elevation.uniform) return placeAt(yaw, pitch, angle, random, fieldYaw, fieldPitch)
+    val wanted = g.elevation.draw(random, g.levelPitchDegrees(distance), fieldPitch)
+    val step = (wanted - pitch).coerceIn(-VERTICAL_LIMIT * angle, VERTICAL_LIMIT * angle)
+    val nextPitch = pitch + step
+    val sideways = sqrt(angle * angle - step * step) / cos(Math.toRadians(nextPitch))
+    val sign = if (random.nextBoolean()) 1.0 else -1.0
+    for (candidate in listOf(yaw + sign * sideways, yaw - sign * sideways)) {
+        if (abs(candidate) <= fieldYaw) return candidate to nextPitch
+    }
+    val toward = if (yaw > 0) -1.0 else 1.0
+    return (yaw + toward * minOf(sideways, abs(yaw) + fieldYaw / 2)).coerceIn(-fieldYaw, fieldYaw) to nextPitch
+}
+
+private const val VERTICAL_LIMIT = 0.9
 private const val MAX_PLACEMENT_TRIES = 60

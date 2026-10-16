@@ -16,7 +16,7 @@ data class FlashGeometry(
     /** Angle between the view and the flash when it becomes visible; it always lies inside the field of view. */
     val cueOffsetDegrees: PositiveRange = PositiveRange(10.0, 40.0),
     /** The flash sits within this angle above or below the horizontal from the view. */
-    val cueElevationDegrees: Double = 30.0,
+    val cueElevationDegrees: Double = 12.0,
     /** Distance the flash is drawn at; only the depth of the scene. */
     val distanceMeters: PositiveRange = PositiveRange(6.0, 20.0),
     /** Pause between a hit and the next flash. */

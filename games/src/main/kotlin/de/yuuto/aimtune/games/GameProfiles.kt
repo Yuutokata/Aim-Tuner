@@ -1,6 +1,7 @@
 package de.yuuto.aimtune.games
 
 import de.yuuto.aimtune.core.scenario.AngleBucket
+import de.yuuto.aimtune.core.scenario.ElevationMix
 import de.yuuto.aimtune.core.scenario.FlashGeometry
 import de.yuuto.aimtune.core.scenario.PositiveRange
 import de.yuuto.aimtune.core.scenario.TrainerGeometry
@@ -40,6 +41,29 @@ private data class GameProfileDto(
 
 @Serializable
 private data class RangeDto(val min: Double, val max: Double)
+
+/** The `elevation` block of the `trainer` block: where targets appear vertically. `uniform` is the old fully 3D field. */
+@Serializable
+private data class ElevationDto(
+    val spreadDegrees: Double? = null,
+    val offLevelShare: Double? = null,
+    val offLevelDegrees: RangeDto? = null,
+    val loweredShare: Double? = null,
+    val uniform: Boolean = false,
+    val sources: List<String> = emptyList(),
+    val notes: String? = null,
+) {
+    fun toMix(): ElevationMix {
+        val d = ElevationMix()
+        return ElevationMix(
+            spreadDegrees = spreadDegrees ?: d.spreadDegrees,
+            offLevelShare = offLevelShare ?: d.offLevelShare,
+            offLevelDegrees = offLevelDegrees?.let { PositiveRange(it.min, it.max) } ?: d.offLevelDegrees,
+            loweredShare = loweredShare ?: d.loweredShare,
+            uniform = uniform,
+        )
+    }
+}
 
 @Serializable
 private data class AngleBucketDto(val maxDegrees: Double, val weight: Double)
@@ -93,6 +117,9 @@ private data class TrainerDto(
     val strafeSpeedMetersPerSecond: RangeDto? = null,
     val stopProbability: Double? = null,
     val flash: FlashDto? = null,
+    val eyeHeightMeters: Double? = null,
+    val headHeightMeters: Double? = null,
+    val elevation: ElevationDto? = null,
     val verified: Boolean = false,
 ) {
     fun toGeometry(horizontalFovDegrees: Double): TrainerGeometry {
@@ -111,6 +138,9 @@ private data class TrainerDto(
             strafeSpeedMetersPerSecond = strafeSpeedMetersPerSecond?.range() ?: d.strafeSpeedMetersPerSecond,
             stopProbability = stopProbability ?: d.stopProbability,
             flash = flash?.toGeometry(horizontalFovDegrees) ?: d.flash.forHorizontalFov(horizontalFovDegrees),
+            eyeHeightMeters = eyeHeightMeters ?: d.eyeHeightMeters,
+            headHeightMeters = headHeightMeters ?: d.headHeightMeters,
+            elevation = elevation?.toMix() ?: d.elevation,
             verified = verified,
         )
     }

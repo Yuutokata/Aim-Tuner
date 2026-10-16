@@ -83,8 +83,8 @@ class SwitchingScenario(private val config: SwitchingConfig, seed: Long) : Scena
         val maxYaw = g?.fieldYawDegrees?.let { minOf(it, config.maxYawDegrees) } ?: config.maxYawDegrees
         val maxPitch = g?.fieldPitchDegrees?.let { minOf(it, config.maxPitchDegrees) } ?: config.maxPitchDegrees
         val yaw = random.nextDouble(-maxYaw, maxYaw)
-        val pitch = random.nextDouble(-maxPitch, maxPitch)
         val distance = if (g != null) g.clickTargetDistanceMeters.uniform(random) else random.nextDouble(config.minDistance, config.maxDistance)
+        val pitch = if (g != null) g.elevation.draw(random, g.levelPitchDegrees(distance), maxPitch) else random.nextDouble(-maxPitch, maxPitch)
         val radius = if (g != null) g.radiusFor(g.clickTargetDiameterDegrees.logUniform(random), distance) else config.targetRadius
         return Target(nextId++, ViewAngles.directionOf(yaw, pitch) * distance, radius)
     }

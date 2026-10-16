@@ -53,7 +53,8 @@ class FlashScoreTest {
         for (importance in listOf(FlashImportance.SOMETIMES, FlashImportance.OFTEN)) {
             val (best, means) = optimum(withDodge(importance))
             assertTrue(best > grid.first() * 1.2 && best < grid.last() * 0.9, "$importance: optimum $best cm/360 must lie inside ${grid.first()}-${grid.last()}, means $means")
-            assertTrue(means.max() - means.first() > 2.0, "$importance: the fastest setting must score clearly below the best, means $means")
+            // With head-level targets (M11) vertical overshoot costs less than in the fully 3D field, so the fast end is penalised less (1.5 points instead of 3+).
+            assertTrue(means.max() - means.first() > 1.0, "$importance: the fastest setting must score below the best, means $means")
         }
     }
 

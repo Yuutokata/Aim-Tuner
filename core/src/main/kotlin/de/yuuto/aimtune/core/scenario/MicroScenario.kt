@@ -69,11 +69,11 @@ class MicroScenario(private val config: MicroConfig, seed: Long) : Scenario {
     }
 
     private fun spawn(nowNanos: Long) {
-        val (nextYaw, nextPitch) = nextAngles()
-        yaw = nextYaw
-        pitch = nextPitch
         val g = config.geometry
         val distance = if (g != null) g.clickTargetDistanceMeters.uniform(random) else random.nextDouble(config.minDistance, config.maxDistance)
+        val (nextYaw, nextPitch) = nextAngles(distance)
+        yaw = nextYaw
+        pitch = nextPitch
         val radius = if (g != null) g.radiusFor(g.clickTargetDiameterDegrees.logUniform(random), distance) else config.targetRadius
         val target = Target(nextId++, ViewAngles.directionOf(yaw, pitch) * distance, radius)
         current = target
@@ -81,9 +81,9 @@ class MicroScenario(private val config: MicroConfig, seed: Long) : Scenario {
     }
 
     /** A random spot whose true angle to the previous target is within the step range and inside the field. */
-    private fun nextAngles(): Pair<Double, Double> {
+    private fun nextAngles(distance: Double): Pair<Double, Double> {
         config.geometry?.let { g ->
-            return placeAt(yaw, pitch, g.microStepDegrees.uniform(random), random, minOf(g.fieldYawDegrees, config.maxYawDegrees), minOf(g.fieldPitchDegrees, config.maxPitchDegrees))
+            return placeNearLevel(g, yaw, pitch, g.microStepDegrees.uniform(random), distance, random, minOf(g.fieldYawDegrees, config.maxYawDegrees), minOf(g.fieldPitchDegrees, config.maxPitchDegrees))
         }
         val from = ViewAngles.directionOf(yaw, pitch)
         repeat(MAX_PLACEMENT_ATTEMPTS) {
