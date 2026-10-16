@@ -42,6 +42,11 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
     private val cueTracker = FlashCueTracker()
     private val hud = Hud(config, ctx.ui.tokens, ctx.i18n, roundLabel = session?.label?.let { ctx.i18n.t(it) }, crosshair = ctx.settings.current.activeCrosshair())
 
+    init {
+        trainer.onRoundStarted = { if (ctx.settings.current.hitSound) ctx.hitSounds.reset() }
+        trainer.onShot = { result -> if (ctx.settings.current.hitSound) ctx.hitSounds.onShot(result) }
+    }
+
     /** Exposed for the screenshot tour. */
     val roundPhase: Phase get() = trainer.phase
 

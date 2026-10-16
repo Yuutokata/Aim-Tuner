@@ -33,6 +33,8 @@ data class AppSettings(
     val scenarios: List<String> = DEFAULT_SCENARIOS,
     /** Play the cue sounds of the flash scenario (alert, whine, pop, ringing). */
     val flashSound: Boolean = true,
+    /** Play a short sound for every hit; it rises with a streak of hits. */
+    val hitSound: Boolean = true,
     /** The player's Valorant crosshairs, stored as profile codes; none means the default crosshair is drawn. */
     val crosshairs: List<SavedCrosshair> = emptyList(),
     /** Id of the selected entry of [crosshairs]; used in all scenarios. */

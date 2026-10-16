@@ -6,6 +6,7 @@ import com.badlogic.gdx.Screen
 import de.yuuto.aimtune.app.accel.AccelPhase
 import de.yuuto.aimtune.app.accel.AccelRun
 import de.yuuto.aimtune.app.audio.FlashSounds
+import de.yuuto.aimtune.app.audio.HitSounds
 import de.yuuto.aimtune.app.accel.AccelSession
 import de.yuuto.aimtune.app.blind.AxisSummary
 import de.yuuto.aimtune.app.blind.BlindRun
@@ -74,6 +75,10 @@ class AppContext(
 ) {
     private var nextSeed = options.seed ?: System.nanoTime()
     private val flashSoundsDelegate = lazy { FlashSounds() }
+    private val hitSoundsDelegate = lazy { HitSounds() }
+
+    /** The hit sound; created on first use for the same reason. */
+    val hitSounds: HitSounds get() = hitSoundsDelegate.value
 
     /** The flash cue sounds; created on first use because loading them needs the audio device. */
     val flashSounds: FlashSounds get() = flashSoundsDelegate.value
@@ -81,6 +86,7 @@ class AppContext(
     /** Frees what the audio device holds; call when the app closes. */
     fun disposeAudio() {
         if (flashSoundsDelegate.isInitialized()) flashSoundsDelegate.value.dispose()
+        if (hitSoundsDelegate.isInitialized()) hitSoundsDelegate.value.dispose()
     }
     private var loadedI18n: I18n? = null
     private var languageOverride: Language? = null

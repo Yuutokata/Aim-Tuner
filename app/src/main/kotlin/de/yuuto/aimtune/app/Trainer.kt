@@ -48,6 +48,12 @@ class Trainer(
         private set
     val rate = EventRateMeter()
 
+    /** Called for every shot with its result, whether the click came from the window or from the report stream. */
+    /** Called when a round begins. */
+    var onRoundStarted: (() -> Unit)? = null
+
+    var onShot: ((ShotResult) -> Unit)? = null
+
     val degreesPerCountValue: Double get() = degreesPerCount
     val activeTargets: List<Target> get() = if (phase == Phase.RUNNING) scenario?.targets.orEmpty() else emptyList()
     val activeFlash: FlashState? get() = if (phase == Phase.RUNNING) scenario?.flash else null
@@ -61,6 +67,7 @@ class Trainer(
 
     fun startRound() {
         roundSeed = nextSeed++
+        onRoundStarted?.invoke()
         log.log(System.Logger.Level.INFO, "starting ${config.scenario.id} round, seed $roundSeed")
         source.drain { }
         view = ViewAngles()
@@ -143,7 +150,7 @@ class Trainer(
 
     private fun shoot(s: Scenario, nowNanos: Long): ShotResult {
         s.update(nowNanos, view)
-        return s.fire(Vec3.ZERO, view.direction(), nowNanos)
+        return s.fire(Vec3.ZERO, view.direction(), nowNanos).also { onShot?.invoke(it) }
     }
 
     private companion object {

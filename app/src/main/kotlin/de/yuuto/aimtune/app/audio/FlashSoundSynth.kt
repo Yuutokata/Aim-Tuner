@@ -81,7 +81,7 @@ object FlashSoundSynth {
     }
 
     /** Samples of [seconds] from [value] at each time, scaled so the peak is [PEAK] of full scale. */
-    private fun render(seconds: Double, value: (Double) -> Double): ShortArray {
+    internal fun render(seconds: Double, value: (Double) -> Double): ShortArray {
         val raw = DoubleArray((seconds * SAMPLE_RATE).toInt()) { value(it.toDouble() / SAMPLE_RATE) }
         val scale = PEAK / max(raw.maxOf { abs(it) }, 1e-9)
         return ShortArray(raw.size) { (raw[it] * scale * Short.MAX_VALUE).toInt().toShort() }
