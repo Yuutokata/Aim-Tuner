@@ -41,6 +41,7 @@ private const val FOOTER_BUTTON_HEIGHT = 64f
 private val ROUND_LENGTHS = listOf(30, 45, 60, 90)
 private const val FLASH_SEGMENT_WIDTH = 150f
 private const val FLASH_HELP_WIDTH = 760f
+private const val SOUND_TILE_WIDTH = 200f
 
 private val METRIC_KEYS = mapOf(
     ScoreMetric.ACCURACY to "metric.accuracy",
@@ -74,8 +75,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         addRow(left, t("settings.language"), languageSelect())
         addRow(left, t("settings.flash"), flashImportanceButtons(draft.flashImportance) { draft = draft.copy(flashImportance = it); message = null; rebuild() })
         left.add(ui.label(t("settings.flash_help"), Styles.CAPTION_MUTED, wrap = true)).colspan(2).left().width(FLASH_HELP_WIDTH).padBottom(ROW_GAP).row()
-        addRow(left, t("settings.flash_sound"), onOffButtons(flashSound) { flashSound = it })
-        addRow(left, t("settings.hit_sound"), onOffButtons(hitSound) { hitSound = it })
+        addRow(left, t("settings.sounds"), soundToggles())
         val runSetup = ui.button(t("settings.run_setup"), Styles.SECONDARY) { ctx.showOnboarding(SetupStep.DPI, afterFinish = ctx::showSettings) }
         addRow(left, t("settings.style_pad"), Table().also { it.add(runSetup).height(CONTROL_HEIGHT) })
 
@@ -237,13 +237,18 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
 
     private fun flashImportanceLabels() = FlashImportance.entries.associateWith { t("flash.importance.${it.name.lowercase()}") }
 
-    private fun onOffButtons(selected: Boolean, set: (Boolean) -> Unit): Table {
+    /** Both sound switches in one row, so the left column stays short enough for the footer. */
+    private fun soundToggles(): Table {
         val table = Table()
-        listOf(true to t("settings.on"), false to t("settings.off")).forEach { (on, name) ->
-            val button: TextButton = ui.button(name, Styles.TILE) { set(on); message = null; rebuild() }
+        listOf(t("settings.flash_sound") to flashSound, t("settings.hit_sound") to hitSound).forEachIndexed { index, (name, on) ->
+            val button: TextButton = ui.button(name, Styles.TILE) {
+                if (index == 0) flashSound = !flashSound else hitSound = !hitSound
+                message = null
+                rebuild()
+            }
             button.setProgrammaticChangeEvents(false)
-            button.isChecked = selected == on
-            table.add(button).width(FLASH_SEGMENT_WIDTH).height(CONTROL_HEIGHT).padRight(SEGMENT_GAP)
+            button.isChecked = on
+            table.add(button).width(SOUND_TILE_WIDTH).height(CONTROL_HEIGHT).padRight(SEGMENT_GAP)
         }
         return table
     }
