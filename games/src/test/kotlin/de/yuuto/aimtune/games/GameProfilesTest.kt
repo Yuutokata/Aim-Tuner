@@ -134,7 +134,7 @@ class GameProfilesTest {
         val valorant = assertNotNull(bundled.find("valorant"))
         assertEquals(51.5, valorant.geometry.flash.halfFovDegrees, 0.1)
         assertEquals(61.5, valorant.geometry.flash.safeAngleDegrees, 0.1)
-        assertEquals(0.45, valorant.geometry.flash.popDelaySeconds.min)
+        assertEquals(0.5, valorant.geometry.flash.popDelaySeconds.min)
         assertEquals(false, valorant.geometry.flash.verified)
         assertEquals(50.0, parseGameProfile(valid).geometry.flash.halfFovDegrees, 0.1)
         val custom = parseGameProfile(valid.replace("\"sensitivity\"", "\"trainer\":{\"flash\":{\"blindSeconds\":2.0,\"popDelaySeconds\":{\"min\":0.3,\"max\":0.6},\"verified\":true}},\"sensitivity\""))

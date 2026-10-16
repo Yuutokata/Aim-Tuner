@@ -5,14 +5,15 @@ package de.yuuto.aimtune.core.scenario
  * visible, where it appears, how long a player who looks at it is blind, and where the enemy shows up
  * afterwards. Angles are degrees; times are seconds.
  *
- * The documented windups of the Valorant flashes are 0.3-0.6 s (Curveball 0.6, Yoru's Blindside 0.6,
- * Breach 0.5, Skye's Guiding Light 0.3, KAY/O's telegraph 0.3) and the maximum blind durations 1.5-2.25 s
+ * The windups of the Valorant flashes (valorant.fandom.com) are Flashpoint 0.5 s, Arc Rose 0.5 s, Curveball 0.6 s,
+ * Blindside 0.6 s (KAY/O's FLASH/drive 1.0 s lobbed and 1.6 s thrown, Skye's Guiding Light up to 2 s are longer) and
+ * the blind durations 1.5-2.25 s
  * (docs/ALGORITHMS.md "Flash turn-away"). The time a player sees a flash before it pops also contains part
  * of its flight, which no source gives; the default range is an assumption and [verified] says so.
  */
 data class FlashGeometry(
     /** Time from the moment the flash is visible until it pops. */
-    val popDelaySeconds: PositiveRange = PositiveRange(0.45, 0.9),
+    val popDelaySeconds: PositiveRange = PositiveRange(0.5, 0.65),
     /** Angle between the view and the flash when it becomes visible; it always lies inside the field of view. */
     val cueOffsetDegrees: PositiveRange = PositiveRange(10.0, 40.0),
     /** The flash sits within this angle above or below the horizontal from the view. */
