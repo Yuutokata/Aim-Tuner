@@ -43,6 +43,7 @@ Dependency direction: `app` → `storage`/`input`/`games` → `core`. `core` dep
 - Internal unit is cm/360°; never store sensitivity in a game-specific unit.
 - Never guess APIs or file formats (LibGDX, LWJGL, JNA, Raw Accel): check current docs or source first.
 - Tests for all logic; the simulated player verifies optimizer and accel convergence.
+- Branches: all work happens on `dev`; `main` only receives merges from `dev` for new features and releases (never commit to `main` directly). Releases are tags `vX.Y.Z` on `main`, which start the release workflow. Push only when the user asks.
 - One commit per completed step, format `<type>: <description>`. Stop after each milestone for user testing.
 - UI follows `docs/design/` (tokens → Scene2D skin in `assets/ui/`); note deviations in `docs/DESIGN.md`.
 - Keep docs in sync: update ARCHITECTURE, ALGORITHMS, DESIGN when a milestone changes them.
