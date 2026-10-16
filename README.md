@@ -51,9 +51,13 @@ Settings and your rounds are stored in `%APPDATA%\AimTune` (set `AIMTUNE_DATA_DI
 | --- | --- |
 | ![Menu](docs/screenshots/menu.png) | ![Acceleration analysis](docs/screenshots/accel-analysis.png) |
 
-| History | Blind round |
+| History | Blind round (map, head-height targets, your crosshair) |
 | --- | --- |
 | ![History](docs/screenshots/history.png) | ![A blind round](docs/screenshots/blind-running.png) |
+
+| Crosshair editor |
+| --- |
+| ![Crosshair editor](docs/screenshots/crosshair.png) |
 
 The screenshots are rendered with sample data by `./gradlew :app:screenshots` (`:app:screenshotsDe` for German).
 
