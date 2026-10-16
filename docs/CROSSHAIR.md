@@ -63,6 +63,16 @@ The defaults of the table are those of a fresh profile in the reader's initial s
 
 `c` (preset or `c;8` with `u`/`t` hex and `b;1`), `s` (center dot size), `o` (opacity), `d;0` (no dot). The meaning of `s` is unclear: generated codes use whole numbers, real codes carry values like `0.7`. AimTune does not draw the sniper scope; the section is kept as it is.
 
+## What real codes show
+
+Seventeen professional and community codes (thespike.gg, The Loadout, Sportskeeda; the list is the test set of `CrosshairCodecTest`) read back and write out unchanged. Things they show beyond the generator: the header can carry more keys (`p;0`, `s;1`, `c;1`); the primary section can carry `s;0` (unknown meaning, kept); `0f;0` is common in codes with the lines hidden or kept (the generator's "firing error off"); `1m`, `1e;0.281` and `1f;0` exist for the outer lines; lengths of 0 are legal (`0l;0`, `1l;0`); `Nv;0` with `Ng;1` means no vertical lines; the sniper section may carry `b;1;c;8;t;<hex>` (custom color) or only `o`; a code can have a custom color without `c;8` (`u;D099E2FF` with no `c`): AimTune treats `u` as active only with `c;8` or `b;1` and otherwise keeps it untouched (open point 5).
+
+## How AimTune handles the code
+
+- `CrosshairCode` (`core/crosshair`) is the raw, lossless list of sections and entries; `Crosshair` is the typed primary section (colors, outlines, dot, inner and outer lines) read from and written back into the code. Only values that differ from what the code already says are written, new keys are inserted in the game's order, and a key that equals its default is omitted. `CrosshairLayout` computes the pixel rectangles; `CrosshairRenderer` (app) draws them on the back buffer; `CrosshairScreen` is the editor.
+- Profiles are stored in `settings.json` as `crosshairs` (id, name, code) and `activeCrosshair`; the code string is what is stored, so a profile can be copied into Valorant and keeps every key AimTune does not know.
+- A new crosshair starts with Valorant's default sizes (inner 6 / 2 / 3 / 0.8, outer 2 / 2 / 10 / 0.35, outlines 0.5, no dot) in **cyan**, which is AimTune's choice, not the game's.
+
 ## Decisions for AimTune
 
 - The trainer draws the **primary** crosshair. The ADS and sniper sections are parsed, preserved and exported unchanged; the editor edits the primary section only.
@@ -78,3 +88,4 @@ The defaults of the table are those of a fresh profile in the reader's initial s
 2. The meaning of `m` (primary level) and of the header `s;1` / `c;1`.
 3. The range of the outer line offset and of the line lengths, and the exact RGB values of the color presets.
 4. How Valorant places an odd-thickness element on an even-sized screen.
+5. Whether a custom color (`u`) without `c;8` / `b;1` is active in the game.
