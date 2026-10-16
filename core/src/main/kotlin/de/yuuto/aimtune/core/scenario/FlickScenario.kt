@@ -87,9 +87,10 @@ class FlickScenario(private val config: FlickConfig, seed: Long) : Scenario {
     private fun realisticTarget(g: TrainerGeometry, previous: Target?): Target {
         val (fromYaw, fromPitch) = previous?.let { anglesOf(it.center) } ?: (0.0 to 0.0)
         val distance = g.clickTargetDistanceMeters.uniform(random)
-        val (yaw, pitch) = placeNearLevel(g, fromYaw, fromPitch, g.drawFlickAngle(random), distance, random, g.fieldYawDegrees, g.fieldPitchDegrees)
-        val radius = g.radiusFor(g.clickTargetDiameterDegrees.logUniform(random), distance)
-        return Target(nextId++, ViewAngles.directionOf(yaw, pitch) * distance, radius)
+        val (drawnYaw, drawnPitch) = placeNearLevel(g, fromYaw, fromPitch, g.drawFlickAngle(random), distance, random, g.fieldYawDegrees, g.fieldPitchDegrees)
+        val (yaw, pitch, atDistance) = snapToFeature(g, random, Spot(drawnYaw, drawnPitch, distance))
+        val radius = g.radiusFor(g.clickTargetDiameterDegrees.logUniform(random), atDistance)
+        return Target(nextId++, ViewAngles.directionOf(yaw, pitch) * atDistance, radius)
     }
 
     private companion object {

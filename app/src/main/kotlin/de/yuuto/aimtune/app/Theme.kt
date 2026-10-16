@@ -12,5 +12,8 @@ object Theme {
     val accentSoft: Color = Color.valueOf("b5abfc")
     val accentDeep: Color = Color.valueOf("5d5294")
     val roomWall: Color = Color.valueOf("292b31")
+    val roomFloor: Color = Color.valueOf("1d1f26")
+    val roomStructure: Color = Color.valueOf("3a3d47")
+    val roomBody: Color = Color.valueOf("4a4570")
     val caution: Color = Color.valueOf("E69F00")
 }

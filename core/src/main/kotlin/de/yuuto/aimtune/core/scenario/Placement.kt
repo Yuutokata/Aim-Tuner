@@ -59,5 +59,21 @@ internal fun placeNearLevel(
     return (yaw + toward * minOf(sideways, abs(yaw) + fieldYaw / 2)).coerceIn(-fieldYaw, fieldYaw) to nextPitch
 }
 
+/** Where a target stands: direction in degrees and distance in meters. */
+internal data class Spot(val yaw: Double, val pitch: Double, val distance: Double)
+
+/**
+ * For [TrainerGeometry.arena]'s share of targets, moves the spot to the corner or doorway nearest in yaw (within the
+ * layout's snap angle): the target then stands at the feature's yaw and distance, keeping its height relative to head level.
+ */
+internal fun snapToFeature(g: TrainerGeometry, random: Random, spot: Spot): Spot {
+    val arena = g.arena
+    if (arena.featureShare <= 0.0 || g.elevation.uniform || random.nextDouble() >= arena.featureShare) return spot
+    val feature = arena.featureNear(spot.yaw) ?: return spot
+    val distance = feature.distanceMeters.coerceIn(g.clickTargetDistanceMeters.min, g.clickTargetDistanceMeters.max)
+    val pitch = spot.pitch - g.levelPitchDegrees(spot.distance) + g.levelPitchDegrees(distance)
+    return Spot(feature.yawDegrees, pitch.coerceIn(-g.fieldPitchDegrees, g.fieldPitchDegrees), distance)
+}
+
 private const val VERTICAL_LIMIT = 0.9
 private const val MAX_PLACEMENT_TRIES = 60

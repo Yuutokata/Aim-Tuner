@@ -1,6 +1,9 @@
 package de.yuuto.aimtune.games
 
 import de.yuuto.aimtune.core.scenario.AngleBucket
+import de.yuuto.aimtune.core.scenario.ArenaFeature
+import de.yuuto.aimtune.core.scenario.ArenaFeatureKind
+import de.yuuto.aimtune.core.scenario.ArenaLayout
 import de.yuuto.aimtune.core.scenario.ElevationMix
 import de.yuuto.aimtune.core.scenario.FlashGeometry
 import de.yuuto.aimtune.core.scenario.PositiveRange
@@ -66,6 +69,29 @@ private data class ElevationDto(
 }
 
 @Serializable
+private data class ArenaFeatureDto(val kind: String, val yawDegrees: Double, val distanceMeters: Double)
+
+/** The `arena` block of the `trainer` block: the minimal map and how often targets stand at its corners and doorways. */
+@Serializable
+private data class ArenaDto(
+    val wallDistanceMeters: Double? = null,
+    val featureShare: Double? = null,
+    val snapDegrees: Double? = null,
+    val features: List<ArenaFeatureDto>? = null,
+    val notes: String? = null,
+) {
+    fun toLayout(): ArenaLayout {
+        val d = ArenaLayout()
+        return ArenaLayout(
+            wallDistanceMeters = wallDistanceMeters ?: d.wallDistanceMeters,
+            features = features?.map { ArenaFeature(ArenaFeatureKind.valueOf(it.kind.uppercase()), it.yawDegrees, it.distanceMeters) } ?: d.features,
+            featureShare = featureShare ?: d.featureShare,
+            snapDegrees = snapDegrees ?: d.snapDegrees,
+        )
+    }
+}
+
+@Serializable
 private data class AngleBucketDto(val maxDegrees: Double, val weight: Double)
 
 /** The `flash` block of the `trainer` block; `sources` and `notes` are for people reading the profile and are not used. */
@@ -120,6 +146,7 @@ private data class TrainerDto(
     val eyeHeightMeters: Double? = null,
     val headHeightMeters: Double? = null,
     val elevation: ElevationDto? = null,
+    val arena: ArenaDto? = null,
     val verified: Boolean = false,
 ) {
     fun toGeometry(horizontalFovDegrees: Double): TrainerGeometry {
@@ -141,6 +168,7 @@ private data class TrainerDto(
             eyeHeightMeters = eyeHeightMeters ?: d.eyeHeightMeters,
             headHeightMeters = headHeightMeters ?: d.headHeightMeters,
             elevation = elevation?.toMix() ?: d.elevation,
+            arena = arena?.toLayout() ?: d.arena,
             verified = verified,
         )
     }

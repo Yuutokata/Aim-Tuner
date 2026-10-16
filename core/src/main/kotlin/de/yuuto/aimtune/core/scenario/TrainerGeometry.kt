@@ -64,6 +64,8 @@ data class TrainerGeometry(
     val headHeightMeters: Double = 1.65,
     /** Vertical distribution of the targets; [fieldPitchDegrees] stays the hard limit. */
     val elevation: ElevationMix = ElevationMix(),
+    /** The minimal map (floor, wall, corners, doorways) and how often a target stands at a corner or doorway. */
+    val arena: ArenaLayout = ArenaLayout(),
     val verified: Boolean = false,
 ) {
     init {

@@ -15,11 +15,17 @@ import com.badlogic.gdx.graphics.g3d.attributes.IntAttribute
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.graphics.glutils.HdpiUtils
+import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.Disposable
 import de.yuuto.aimtune.core.math.ViewAngles
+import de.yuuto.aimtune.core.scenario.ArenaFeatureKind
 import de.yuuto.aimtune.core.scenario.FlashState
 import de.yuuto.aimtune.core.scenario.Target
+import de.yuuto.aimtune.core.scenario.TrainerGeometry
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.tan
 
 /**
  * Plain 3D room with one sphere per target. The camera sits at the origin and uses the vertical
@@ -30,6 +36,8 @@ class TrainerScene(
     /** The picture is letterboxed to this width / height, whatever the window's shape. */
     private val aspectRatio: Double = 16.0 / 9.0,
     private val modelRadius: Double = DEFAULT_MODEL_RADIUS,
+    /** With the geometry of a game the scene has a floor at eye height, a wall, corners and doorways; without it only the plain room. */
+    geometry: TrainerGeometry? = null,
 ) : Disposable {
     private var windowWidth = 16
     private var windowHeight = 9
@@ -44,13 +52,29 @@ class TrainerScene(
         add(DirectionalLight().set(0.6f, 0.6f, 0.6f, -0.4f, -1f, -0.3f))
     }
 
+    private val floorY: Float? = geometry?.let { -it.eyeHeightMeters.toFloat() }
+
     private val roomModel: Model = ModelBuilder().createBox(
         ROOM_WIDTH, ROOM_HEIGHT, ROOM_DEPTH,
         // Front faces are culled so the inside of the box is what we see.
         Material(ColorAttribute.createDiffuse(Theme.roomWall), IntAttribute.createCullFace(GL20.GL_FRONT)),
         (Usage.Position or Usage.Normal).toLong(),
     )
-    private val room = ModelInstance(roomModel).apply { transform.setToTranslation(0f, 0f, ROOM_CENTER_Z) }
+    // The plain room is centered on the camera; with a floor, the room's bottom sits below it so the floor covers it.
+    private val room = ModelInstance(roomModel).apply {
+        transform.setToTranslation(0f, floorY?.let { it - ROOM_BELOW_FLOOR + ROOM_HEIGHT / 2 } ?: 0f, if (floorY == null) ROOM_CENTER_Z else 0f)
+    }
+
+    private val unitBoxes = listOf(Theme.roomFloor, Theme.roomStructure, Theme.roomBody).map { color ->
+        ModelBuilder().createBox(1f, 1f, 1f, Material(ColorAttribute.createDiffuse(color)), (Usage.Position or Usage.Normal).toLong())
+    }
+    private val floorBox = unitBoxes[0]
+    private val structureBox = unitBoxes[1]
+    private val bodyBox = unitBoxes[2]
+
+    /** Floor, wall ring, corner pillars and door frames; empty without a geometry. */
+    private val arena: List<ModelInstance> = if (geometry == null || floorY == null) emptyList() else buildArena(geometry, floorY)
+    private val bodyInstance = ModelInstance(bodyBox)
 
     private val targetModel: Model = ModelBuilder().createSphere(
         modelRadius.toFloat() * 2, modelRadius.toFloat() * 2, modelRadius.toFloat() * 2, SPHERE_DIVISIONS, SPHERE_DIVISIONS,
@@ -95,6 +119,7 @@ class TrainerScene(
         }
         batch.begin(camera)
         batch.render(room, environment)
+        arena.forEach { batch.render(it, environment) }
         if (flash != null) {
             val orb = ViewAngles.directionOf(flash.yawDegrees, flash.pitchDegrees) * flash.distanceMeters
             val scale = (flash.distanceMeters * sin(Math.toRadians(FLASH_ORB_DEGREES / 2.0)) / modelRadius).toFloat()
@@ -105,9 +130,64 @@ class TrainerScene(
             val scale = (target.radius / modelRadius).toFloat()
             targetInstance.transform.setToTranslation(target.center.x.toFloat(), target.center.y.toFloat(), target.center.z.toFloat()).scale(scale, scale, scale)
             batch.render(targetInstance, environment)
+            drawBody(target)
         }
         batch.end()
         HdpiUtils.glViewport(0, 0, windowWidth, windowHeight)
+    }
+
+    /** A column from the floor to the bottom of a head-sized target, so the head stands on something. */
+    private fun drawBody(target: Target) {
+        val floor = floorY ?: return
+        if (target.radius >= MAX_HEAD_RADIUS) return
+        val top = (target.center.y - target.radius).toFloat()
+        val height = top - floor
+        if (height < MIN_BODY_HEIGHT) return
+        val yaw = Math.toDegrees(atan2(target.center.x, -target.center.z))
+        bodyInstance.transform.setToTranslation(target.center.x.toFloat(), floor + height / 2, target.center.z.toFloat())
+            .rotateRad(Vector3.Y, -Math.toRadians(yaw).toFloat()).scale(BODY_WIDTH, height, BODY_DEPTH)
+        batch.render(bodyInstance, environment)
+    }
+
+    /** A box [sx] wide (sideways), [sy] high and [sz] deep (along the line of sight) centered at ([x], [y], [z]), turned to face yaw [yawDegrees]. */
+    private fun part(model: Model, x: Float, y: Float, z: Float, sx: Float, sy: Float, sz: Float, yawDegrees: Double): ModelInstance =
+        ModelInstance(model).apply { transform.setToTranslation(x, y, z).rotateRad(Vector3.Y, -Math.toRadians(yawDegrees).toFloat()).scale(sx, sy, sz) }
+
+    private fun buildArena(geometry: TrainerGeometry, floor: Float): List<ModelInstance> {
+        val parts = mutableListOf<ModelInstance>()
+        parts += part(floorBox, 0f, floor - FLOOR_THICKNESS / 2, 0f, FLOOR_SIZE, FLOOR_THICKNESS, FLOOR_SIZE, 0.0)
+        val layout = geometry.arena
+        val wall = layout.wallDistanceMeters
+        val segmentWidth = (2.0 * wall * tan(Math.PI / WALL_SEGMENTS) * 1.02).toFloat()
+        for (i in 0 until WALL_SEGMENTS) {
+            val yaw = i * 360.0 / WALL_SEGMENTS
+            val c = ViewAngles.directionOf(yaw, 0.0) * wall
+            parts += part(structureBox, c.x.toFloat(), floor + WALL_HEIGHT / 2, c.z.toFloat(), segmentWidth, WALL_HEIGHT, WALL_THICKNESS, yaw)
+        }
+        layout.features.forEachIndexed { index, feature ->
+            val yaw = feature.yawDegrees
+            val at = ViewAngles.directionOf(yaw, 0.0) * feature.distanceMeters
+            // Sideways on the ground, to the right of the line of sight.
+            val sideX = cos(Math.toRadians(yaw)).toFloat()
+            val sideZ = sin(Math.toRadians(yaw)).toFloat()
+            fun beside(offset: Float, depth: Float, height: Float, width: Float) =
+                part(structureBox, at.x.toFloat() + sideX * offset, floor + height / 2, at.z.toFloat() + sideZ * offset, width, height, depth, yaw)
+            when (feature.kind) {
+                ArenaFeatureKind.CORNER -> {
+                    val side = if (index % 2 == 0) 1f else -1f
+                    parts += beside(side * (CORNER_WIDTH / 2 + ENEMY_CLEARANCE), CORNER_WIDTH, CORNER_HEIGHT, CORNER_WIDTH)
+                }
+                ArenaFeatureKind.DOORWAY -> {
+                    parts += beside(-DOOR_HALF_WIDTH, JAMB, DOOR_HEIGHT, JAMB)
+                    parts += beside(DOOR_HALF_WIDTH, JAMB, DOOR_HEIGHT, JAMB)
+                    parts += part(
+                        structureBox, at.x.toFloat(), floor + DOOR_HEIGHT + LINTEL / 2, at.z.toFloat(),
+                        2 * DOOR_HALF_WIDTH + JAMB, LINTEL, JAMB, yaw,
+                    )
+                }
+            }
+        }
+        return parts
     }
 
     /** Fills the picture with white, the way a flash does. */
@@ -124,6 +204,7 @@ class TrainerScene(
         batch.dispose()
         roomModel.dispose()
         targetModel.dispose()
+        unitBoxes.forEach { it.dispose() }
     }
 
     private companion object {
@@ -131,10 +212,27 @@ class TrainerScene(
         const val DEFAULT_MODEL_RADIUS = 1.0
         const val NEAR_PLANE = 0.05f
         const val FAR_PLANE = 200f
-        const val ROOM_WIDTH = 80f
+        const val ROOM_WIDTH = 150f
         const val ROOM_HEIGHT = 50f
-        const val ROOM_DEPTH = 70f
+        const val ROOM_DEPTH = 150f
         const val ROOM_CENTER_Z = -10f
+        const val ROOM_BELOW_FLOOR = 5f
+        const val FLOOR_SIZE = 140f
+        const val FLOOR_THICKNESS = 0.5f
+        const val WALL_SEGMENTS = 36
+        const val WALL_HEIGHT = 6f
+        const val WALL_THICKNESS = 0.6f
+        const val CORNER_WIDTH = 1.6f
+        const val CORNER_HEIGHT = 4.2f
+        const val ENEMY_CLEARANCE = 0.35f
+        const val DOOR_HALF_WIDTH = 1.1f
+        const val DOOR_HEIGHT = 3.0f
+        const val JAMB = 0.4f
+        const val LINTEL = 0.4f
+        const val BODY_WIDTH = 0.45f
+        const val BODY_DEPTH = 0.3f
+        const val MIN_BODY_HEIGHT = 0.2f
+        const val MAX_HEAD_RADIUS = 0.3
         const val SPHERE_DIVISIONS = 24
 
         /** Apparent size of the flash orb, about a grenade seen from a few meters. */
