@@ -19,6 +19,7 @@ import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.Disposable
 import de.yuuto.aimtune.core.math.ViewAngles
 import de.yuuto.aimtune.core.scenario.ArenaFeatureKind
+import de.yuuto.aimtune.core.scenario.ArenaLayout
 import de.yuuto.aimtune.core.scenario.FlashState
 import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.scenario.TrainerGeometry
@@ -48,8 +49,13 @@ class TrainerScene(
     }
     private val batch = ModelBatch()
     private val environment = Environment().apply {
-        set(ColorAttribute(ColorAttribute.AmbientLight, 0.55f, 0.55f, 0.6f, 1f))
-        add(DirectionalLight().set(0.6f, 0.6f, 0.6f, -0.4f, -1f, -0.3f))
+        set(ColorAttribute(ColorAttribute.AmbientLight, 0.42f, 0.42f, 0.48f, 1f))
+        add(DirectionalLight().set(0.85f, 0.85f, 0.85f, -0.55f, -1f, -0.35f))
+        // Distant things fade into the dark: the main depth cue besides perspective (the camera's far plane is the fog distance).
+        set(ColorAttribute(ColorAttribute.Fog, Theme.roomFog.r, Theme.roomFog.g, Theme.roomFog.b, 1f))
+    }
+    private val fogOnly = Environment().apply {
+        set(ColorAttribute(ColorAttribute.Fog, Theme.roomFog.r, Theme.roomFog.g, Theme.roomFog.b, 1f))
     }
 
     private val floorY: Float? = geometry?.let { -it.eyeHeightMeters.toFloat() }
@@ -65,12 +71,31 @@ class TrainerScene(
         transform.setToTranslation(0f, floorY?.let { it - ROOM_BELOW_FLOOR + ROOM_HEIGHT / 2 } ?: 0f, if (floorY == null) ROOM_CENTER_Z else 0f)
     }
 
-    private val unitBoxes = listOf(Theme.roomFloor, Theme.roomStructure, Theme.roomBody).map { color ->
+    private val unitBoxes = listOf(Theme.roomFloor, Theme.roomStructure, Theme.roomBody, Theme.roomPillar, Theme.roomPanel, Theme.roomCrate).map { color ->
         ModelBuilder().createBox(1f, 1f, 1f, Material(ColorAttribute.createDiffuse(color)), (Usage.Position or Usage.Normal).toLong())
     }
     private val floorBox = unitBoxes[0]
     private val structureBox = unitBoxes[1]
     private val bodyBox = unitBoxes[2]
+    private val pillarBox = unitBoxes[3]
+    private val panelBox = unitBoxes[4]
+    private val crateBox = unitBoxes[5]
+
+    /** Thin lines on the floor every 2 m: the strongest depth cue on an otherwise plain floor. */
+    private val gridModel: Model? = floorY?.let { floor ->
+        val builder = ModelBuilder()
+        builder.begin()
+        val lines = builder.part("grid", GL20.GL_LINES, Usage.Position.toLong(), Material(ColorAttribute.createDiffuse(Theme.roomGrid)))
+        val y = floor + GRID_LIFT
+        var at = -GRID_EXTENT
+        while (at <= GRID_EXTENT) {
+            lines.line(at, y, -GRID_EXTENT, at, y, GRID_EXTENT)
+            lines.line(-GRID_EXTENT, y, at, GRID_EXTENT, y, at)
+            at += GRID_SPACING
+        }
+        builder.end()
+    }
+    private val gridInstance: ModelInstance? = gridModel?.let { ModelInstance(it) }
 
     /** Floor, wall ring, corner pillars and door frames; empty without a geometry. */
     private val arena: List<ModelInstance> = if (geometry == null || floorY == null) emptyList() else buildArena(geometry, floorY)
@@ -120,6 +145,11 @@ class TrainerScene(
         batch.begin(camera)
         batch.render(room, environment)
         arena.forEach { batch.render(it, environment) }
+        gridInstance?.let { batch.render(it, fogOnly) }
+        batch.end()
+        // Targets are drawn over the map: whatever the map hides, the player must still be able to see them.
+        Gdx.gl.glClear(GL20.GL_DEPTH_BUFFER_BIT)
+        batch.begin(camera)
         if (flash != null) {
             val orb = ViewAngles.directionOf(flash.yawDegrees, flash.pitchDegrees) * flash.distanceMeters
             val scale = (flash.distanceMeters * sin(Math.toRadians(FLASH_ORB_DEGREES / 2.0)) / modelRadius).toFloat()
@@ -162,7 +192,12 @@ class TrainerScene(
         for (i in 0 until WALL_SEGMENTS) {
             val yaw = i * 360.0 / WALL_SEGMENTS
             val c = ViewAngles.directionOf(yaw, 0.0) * wall
-            parts += part(structureBox, c.x.toFloat(), floor + WALL_HEIGHT / 2, c.z.toFloat(), segmentWidth, WALL_HEIGHT, WALL_THICKNESS, yaw)
+            parts += part(if (i % 2 == 0) structureBox else panelBox, c.x.toFloat(), floor + WALL_HEIGHT / 2, c.z.toFloat(), segmentWidth, WALL_HEIGHT, WALL_THICKNESS, yaw)
+        }
+        // Crates just in front of the wall, farther away than any target: parallax and a sense of size.
+        CRATES.forEach { (yaw, distance, size) ->
+            val c = ViewAngles.directionOf(yaw, 0.0) * distance
+            parts += part(crateBox, c.x.toFloat(), floor + size / 2, c.z.toFloat(), size, size, size, yaw + 20.0)
         }
         layout.features.forEachIndexed { index, feature ->
             val yaw = feature.yawDegrees
@@ -171,7 +206,7 @@ class TrainerScene(
             val sideX = cos(Math.toRadians(yaw)).toFloat()
             val sideZ = sin(Math.toRadians(yaw)).toFloat()
             fun beside(offset: Float, depth: Float, height: Float, width: Float) =
-                part(structureBox, at.x.toFloat() + sideX * offset, floor + height / 2, at.z.toFloat() + sideZ * offset, width, height, depth, yaw)
+                part(pillarBox, at.x.toFloat() + sideX * offset, floor + height / 2, at.z.toFloat() + sideZ * offset, width, height, depth, yaw)
             when (feature.kind) {
                 ArenaFeatureKind.CORNER -> {
                     val side = if (index % 2 == 0) 1f else -1f
@@ -181,7 +216,7 @@ class TrainerScene(
                     parts += beside(-DOOR_HALF_WIDTH, JAMB, DOOR_HEIGHT, JAMB)
                     parts += beside(DOOR_HALF_WIDTH, JAMB, DOOR_HEIGHT, JAMB)
                     parts += part(
-                        structureBox, at.x.toFloat(), floor + DOOR_HEIGHT + LINTEL / 2, at.z.toFloat(),
+                        pillarBox, at.x.toFloat(), floor + DOOR_HEIGHT + LINTEL / 2, at.z.toFloat(),
                         2 * DOOR_HALF_WIDTH + JAMB, LINTEL, JAMB, yaw,
                     )
                 }
@@ -205,13 +240,14 @@ class TrainerScene(
         roomModel.dispose()
         targetModel.dispose()
         unitBoxes.forEach { it.dispose() }
+        gridModel?.dispose()
     }
 
     private companion object {
         /** The sphere model is built once at this radius and scaled per target. */
         const val DEFAULT_MODEL_RADIUS = 1.0
         const val NEAR_PLANE = 0.05f
-        const val FAR_PLANE = 200f
+        const val FAR_PLANE = 60f
         const val ROOM_WIDTH = 150f
         const val ROOM_HEIGHT = 50f
         const val ROOM_DEPTH = 150f
@@ -222,17 +258,27 @@ class TrainerScene(
         const val WALL_SEGMENTS = 36
         const val WALL_HEIGHT = 6f
         const val WALL_THICKNESS = 0.6f
-        const val CORNER_WIDTH = 1.6f
+        val CORNER_WIDTH = ArenaLayout.CORNER_WIDTH.toFloat()
         const val CORNER_HEIGHT = 4.2f
-        const val ENEMY_CLEARANCE = 0.35f
-        const val DOOR_HALF_WIDTH = 1.1f
-        const val DOOR_HEIGHT = 3.0f
-        const val JAMB = 0.4f
+        val ENEMY_CLEARANCE = ArenaLayout.ENEMY_CLEARANCE.toFloat()
+        val DOOR_HALF_WIDTH = ArenaLayout.DOOR_HALF_WIDTH.toFloat()
+        const val DOOR_HEIGHT = 4.2f
+        val JAMB = ArenaLayout.JAMB.toFloat()
         const val LINTEL = 0.4f
         const val BODY_WIDTH = 0.45f
         const val BODY_DEPTH = 0.3f
         const val MIN_BODY_HEIGHT = 0.2f
         const val MAX_HEAD_RADIUS = 0.3
+        const val GRID_SPACING = 2f
+        const val GRID_EXTENT = 60f
+        const val GRID_LIFT = 0.01f
+
+        /** Yaw, distance (beyond the farthest target) and edge length of the crates. */
+        val CRATES = listOf(
+            Triple(-150.0, 33.0, 2.4f), Triple(-118.0, 34.0, 3.2f), Triple(-96.0, 32.5, 1.8f), Triple(-63.0, 34.0, 2.8f),
+            Triple(-24.0, 33.0, 2.0f), Triple(8.0, 34.0, 3.4f), Triple(41.0, 32.5, 2.2f), Triple(70.0, 34.0, 3.0f),
+            Triple(104.0, 33.0, 2.6f), Triple(131.0, 34.0, 1.9f), Triple(165.0, 32.5, 3.2f),
+        )
         const val SPHERE_DIVISIONS = 24
 
         /** Apparent size of the flash orb, about a grenade seen from a few meters. */

@@ -75,5 +75,30 @@ internal fun snapToFeature(g: TrainerGeometry, random: Random, spot: Spot): Spot
     return Spot(feature.yawDegrees, pitch.coerceIn(-g.fieldPitchDegrees, g.fieldPitchDegrees), distance)
 }
 
+/**
+ * Moves a target that stands behind a pillar or a door post of the map so that it can be seen from the player's
+ * position: closer than the blocker when the distance range allows it, otherwise to the side. The old uniform field has
+ * no map and is left alone.
+ */
+internal fun ensureVisible(g: TrainerGeometry, random: Random, spot: Spot, marginDegrees: Double = VISIBLE_MARGIN_DEGREES): Spot {
+    if (g.elevation.uniform) return spot
+    var current = spot
+    repeat(MAX_VISIBILITY_TRIES) {
+        val blocker = g.arena.occluderFor(current.yaw, current.distance, marginDegrees) ?: return current
+        val nearest = blocker.distance - VISIBLE_GAP_METERS
+        current = if (nearest >= g.clickTargetDistanceMeters.min) {
+            val distance = random.nextDouble(g.clickTargetDistanceMeters.min, nearest)
+            current.copy(pitch = current.pitch - g.levelPitchDegrees(current.distance) + g.levelPitchDegrees(distance), distance = distance)
+        } else {
+            val toward = if (current.yaw >= (blocker.yawLow + blocker.yawHigh) / 2) 1.0 else -1.0
+            current.copy(yaw = (if (toward > 0) blocker.yawHigh + marginDegrees + 0.5 else blocker.yawLow - marginDegrees - 0.5))
+        }
+    }
+    return current
+}
+
+private const val MAX_VISIBILITY_TRIES = 6
+private const val VISIBLE_GAP_METERS = 1.0
+private const val VISIBLE_MARGIN_DEGREES = 1.0
 private const val VERTICAL_LIMIT = 0.9
 private const val MAX_PLACEMENT_TRIES = 60

@@ -77,3 +77,47 @@ class ArenaLayoutTest {
         assertFailsWith<IllegalArgumentException> { ArenaFeature(ArenaFeatureKind.CORNER, 200.0, 5.0) }
     }
 }
+
+class ArenaVisibilityTest {
+    private val second = 1_000_000_000L
+
+    /** True when a pillar or door post nearer than the target covers it from the origin. */
+    private fun hidden(g: TrainerGeometry, t: Target): Boolean {
+        val (yaw, _) = anglesOf(t.center)
+        val halfSize = Math.toDegrees(kotlin.math.asin(t.radius / t.center.length))
+        return g.arena.occluderFor(yaw, t.center.length, halfSize) != null
+    }
+
+    @Test
+    fun `no click target stands behind a pillar or a door post`() {
+        val g = TrainerGeometry.DEFAULT
+        for (kind in listOf(ScenarioKind.FLICK, ScenarioKind.SWITCHING, ScenarioKind.MICRO)) {
+            var total = 0
+            var covered = 0
+            for (seed in 1L..60L) {
+                val s = kind.create(60 * second, seed, g)
+                s.start(0L)
+                val seen = mutableListOf<Target>()
+                repeat(40) { i ->
+                    seen += s.events.filterIsInstance<TargetEvent.Spawned>().map { it.target }.filter { n -> seen.none { it.id == n.id } }
+                    s.fire(Vec3.ZERO, s.targets.minBy { it.id }.center.normalized(), (i + 1).toLong())
+                }
+                total += seen.size
+                covered += seen.count { hidden(g, it) }
+            }
+            assertEquals(0, covered, "$kind: $covered of $total targets were hidden by the map")
+        }
+    }
+
+    @Test
+    fun `the occluders follow the sizes of the scene`() {
+        val layout = ArenaLayout(features = listOf(ArenaFeature(ArenaFeatureKind.CORNER, 10.0, 10.0), ArenaFeature(ArenaFeatureKind.DOORWAY, -20.0, 20.0)))
+        val o = layout.occluders()
+        assertEquals(3, o.size, "one pillar and two door posts")
+        val pillar = o.first()
+        assertTrue(pillar.yawLow > 10.0 && pillar.yawHigh > pillar.yawLow, "the first pillar is to the right of its enemy")
+        assertNull(layout.occluderFor(10.0, 10.0, 0.0), "a target at the corner itself is not hidden by it")
+        assertNotNull(layout.occluderFor((pillar.yawLow + pillar.yawHigh) / 2, 25.0, 0.0), "a target far behind the pillar is hidden")
+        assertNull(layout.occluderFor((pillar.yawLow + pillar.yawHigh) / 2, 5.0, 0.0), "a target in front of it is not")
+    }
+}

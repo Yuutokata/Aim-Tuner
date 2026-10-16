@@ -139,10 +139,14 @@ class FlashScenario(private val durationNanos: Long, private val geometry: Train
     private fun enemyAround(anchor: ViewAngles): Target {
         val angle = random.nextDouble(g.returnMinDegrees, maxOf(g.returnSpreadDegrees, g.returnMinDegrees + 0.01))
         val distance = geometry.clickTargetDistanceMeters.uniform(random)
-        val (yaw, pitch) = placeNearLevel(geometry, anchor.yawDegrees, anchor.pitchDegrees, angle, distance, random, NO_YAW_LIMIT, MAX_FLASH_PITCH)
-        val radius = geometry.radiusFor(geometry.clickTargetDiameterDegrees.logUniform(random), distance)
-        return Target(nextTargetId++, ViewAngles.directionOf(yaw, pitch) * distance, radius)
+        val (drawnYaw, drawnPitch) = placeNearLevel(geometry, anchor.yawDegrees, anchor.pitchDegrees, angle, distance, random, NO_YAW_LIMIT, MAX_FLASH_PITCH)
+        val spot = ensureVisible(geometry, random, Spot(wrapYaw(drawnYaw), drawnPitch, distance))
+        val radius = geometry.radiusFor(geometry.clickTargetDiameterDegrees.logUniform(random), spot.distance)
+        return Target(nextTargetId++, ViewAngles.directionOf(spot.yaw, spot.pitch) * spot.distance, radius)
     }
+
+    /** Yaw in -180..180, so that it can be compared with the map's features. */
+    private fun wrapYaw(yaw: Double): Double = ((yaw + 180.0) % 360.0 + 360.0) % 360.0 - 180.0
 
     private fun seconds(value: Double): Long = (value * NANOS_PER_SECOND).toLong()
 

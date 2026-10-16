@@ -71,11 +71,12 @@ class MicroScenario(private val config: MicroConfig, seed: Long) : Scenario {
     private fun spawn(nowNanos: Long) {
         val g = config.geometry
         val distance = if (g != null) g.clickTargetDistanceMeters.uniform(random) else random.nextDouble(config.minDistance, config.maxDistance)
-        val (nextYaw, nextPitch) = nextAngles(distance)
-        yaw = nextYaw
-        pitch = nextPitch
-        val radius = if (g != null) g.radiusFor(g.clickTargetDiameterDegrees.logUniform(random), distance) else config.targetRadius
-        val target = Target(nextId++, ViewAngles.directionOf(yaw, pitch) * distance, radius)
+        val (drawnYaw, drawnPitch) = nextAngles(distance)
+        val visible = if (g != null) ensureVisible(g, random, Spot(drawnYaw, drawnPitch, distance)) else Spot(drawnYaw, drawnPitch, distance)
+        yaw = visible.yaw
+        pitch = visible.pitch
+        val radius = if (g != null) g.radiusFor(g.clickTargetDiameterDegrees.logUniform(random), visible.distance) else config.targetRadius
+        val target = Target(nextId++, ViewAngles.directionOf(yaw, pitch) * visible.distance, radius)
         current = target
         eventLog += TargetEvent.Spawned(nowNanos, target)
     }

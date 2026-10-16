@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
 class FlashScoreTest {
     private val player = SimulatedPlayer.forHeadSizedTargets(50.0)
     private val grid = geometricGrid(20.0, 100.0, 8)
-    private val roundsEach = 14
+    private val roundsEach = 40
 
     private val inputs: List<List<Map<ScoreMetric, Double>>> by lazy {
         grid.mapIndexed { gi, cm ->

@@ -1,6 +1,7 @@
 package de.yuuto.aimtune.core.scenario
 
 import kotlin.math.abs
+import kotlin.math.atan2
 
 enum class ArenaFeatureKind { CORNER, DOORWAY }
 
@@ -35,6 +36,30 @@ data class ArenaLayout(
         require(featureShare in 0.0..1.0 && snapDegrees in 0.0..10.0) { "feature share must be 0..1 and snap 0..10 degrees" }
     }
 
+    /** A part of the map that blocks the view: the yaw range it covers from the origin and its distance. */
+    data class Occluder(val yawLow: Double, val yawHigh: Double, val distance: Double)
+
+    /** The pillars of the corners and the door posts, as the scene draws them (same sizes, same side per feature). */
+    fun occluders(): List<Occluder> = features.flatMapIndexed { index, f ->
+        val spans = when (f.kind) {
+            ArenaFeatureKind.CORNER -> {
+                val side = if (index % 2 == 0) 1.0 else -1.0
+                listOf(listOf(side * ENEMY_CLEARANCE, side * (ENEMY_CLEARANCE + CORNER_WIDTH)).sorted())
+            }
+            ArenaFeatureKind.DOORWAY -> listOf(
+                listOf(-DOOR_HALF_WIDTH - JAMB / 2, -DOOR_HALF_WIDTH + JAMB / 2),
+                listOf(DOOR_HALF_WIDTH - JAMB / 2, DOOR_HALF_WIDTH + JAMB / 2),
+            )
+        }
+        spans.map { (low, high) ->
+            Occluder(f.yawDegrees + Math.toDegrees(atan2(low, f.distanceMeters)), f.yawDegrees + Math.toDegrees(atan2(high, f.distanceMeters)), f.distanceMeters)
+        }
+    }
+
+    /** A part of the map nearer than [distance] that hides a target at [yawDegrees] (widened by [marginDegrees] for the size of the target), if any. */
+    fun occluderFor(yawDegrees: Double, distance: Double, marginDegrees: Double): Occluder? =
+        occluders().firstOrNull { it.distance < distance - NEAR_MARGIN && yawDegrees in (it.yawLow - marginDegrees)..(it.yawHigh + marginDegrees) }
+
     /** The feature nearest in yaw to [yawDegrees], if it is within [snapDegrees]. */
     fun featureNear(yawDegrees: Double): ArenaFeature? =
         features.minByOrNull { abs(it.yawDegrees - yawDegrees) }?.takeIf { abs(it.yawDegrees - yawDegrees) <= snapDegrees }
@@ -51,6 +76,12 @@ data class ArenaLayout(
             ArenaFeature(ArenaFeatureKind.CORNER, 55.0, 24.0),
             ArenaFeature(ArenaFeatureKind.DOORWAY, 80.0, 12.0),
         )
+        /** Sizes in meters shared with the scene: a corner pillar, the free space between an enemy and its pillar, a door's half width and post. */
+        const val CORNER_WIDTH = 1.6
+        const val ENEMY_CLEARANCE = 0.35
+        const val DOOR_HALF_WIDTH = 1.1
+        const val JAMB = 0.4
+        private const val NEAR_MARGIN = 0.5
         val DEFAULT = ArenaLayout()
         val NONE = ArenaLayout(featureShare = 0.0)
     }

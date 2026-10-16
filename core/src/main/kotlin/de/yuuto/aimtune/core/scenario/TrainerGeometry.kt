@@ -100,15 +100,25 @@ data class TrainerGeometry(
         var pick = random.nextDouble(total)
         var low = 0.0
         for (bucket in flickAngles) {
-            if (pick < bucket.weight) return random.nextDouble(maxOf(low, MIN_FLICK_DEGREES), maxOf(bucket.maxDegrees, MIN_FLICK_DEGREES + 0.01))
+            if (pick < bucket.weight) return withinScreen(random.nextDouble(maxOf(low, MIN_FLICK_DEGREES), maxOf(bucket.maxDegrees, MIN_FLICK_DEGREES + 0.01)), random)
             pick -= bucket.weight
             low = bucket.maxDegrees
         }
-        return flickAngles.last().maxDegrees
+        return withinScreen(flickAngles.last().maxDegrees, random)
+    }
+
+    /**
+     * The next target has to be on the screen when the crosshair is on the previous one, otherwise the player cannot
+     * find it: angles beyond what fits next to the middle of the picture are redrawn between 70 % and 100 % of that.
+     */
+    private fun withinScreen(angle: Double, random: Random): Double {
+        val limit = flash.halfFovDegrees - SCREEN_EDGE_MARGIN_DEGREES
+        return if (angle <= limit) angle else random.nextDouble(limit * 0.7, limit)
     }
 
     companion object {
         const val MIN_FLICK_DEGREES = 1.0
+        private const val SCREEN_EDGE_MARGIN_DEGREES = 6.0
         val DEFAULT_FLICK_ANGLES = listOf(AngleBucket(5.0, 0.30), AngleBucket(10.0, 0.30), AngleBucket(20.0, 0.20), AngleBucket(40.0, 0.15), AngleBucket(90.0, 0.05))
         val DEFAULT = TrainerGeometry()
     }

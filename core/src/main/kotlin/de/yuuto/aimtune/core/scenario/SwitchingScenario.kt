@@ -85,7 +85,7 @@ class SwitchingScenario(private val config: SwitchingConfig, seed: Long) : Scena
         val yaw = random.nextDouble(-maxYaw, maxYaw)
         val distance = if (g != null) g.clickTargetDistanceMeters.uniform(random) else random.nextDouble(config.minDistance, config.maxDistance)
         val pitch = if (g != null) g.elevation.draw(random, g.levelPitchDegrees(distance), maxPitch) else random.nextDouble(-maxPitch, maxPitch)
-        val spot = if (g != null) snapToFeature(g, random, Spot(yaw, pitch, distance)) else Spot(yaw, pitch, distance)
+        val spot = if (g != null) ensureVisible(g, random, snapToFeature(g, random, Spot(yaw, pitch, distance))) else Spot(yaw, pitch, distance)
         val radius = if (g != null) g.radiusFor(g.clickTargetDiameterDegrees.logUniform(random), spot.distance) else config.targetRadius
         return Target(nextId++, ViewAngles.directionOf(spot.yaw, spot.pitch) * spot.distance, radius)
     }
