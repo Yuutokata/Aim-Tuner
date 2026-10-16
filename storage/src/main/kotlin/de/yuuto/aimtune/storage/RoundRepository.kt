@@ -44,9 +44,10 @@ data class RoundRow(
  * Rounds with an older version are recomputed from their stored raw events ([RoundRepository.refreshMetrics]).
  * 2: the first reach of a movement must come after a reaction time and cover a share of the distance (REVIEW.md C2);
  *    the accuracy the score uses is the first-shot accuracy (REVIEW.md M6).
- * 3: flash turn-away rounds (the dodge rate); rounds of the other scenarios are unchanged.
+ * 3: horizontal and vertical endpoint error of the first movement (mean_abs_first_error_h_deg / _v_deg, mean_first_error_v_deg);
+ *    older rounds get them from their stored events. Flash turn-away rounds (the dodge rate) came in with this version too.
  */
-const val METRICS_VERSION = 2
+const val METRICS_VERSION = 3
 
 /** How many stored rounds [RoundRepository.refreshMetrics] recomputed, and how many could not be (unreadable events). */
 data class MetricsRefresh(val updated: Int, val failed: Int)
@@ -327,6 +328,9 @@ fun RoundMetrics.toNamedValues(): Map<String, Double> = buildMap {
     flashDodgeRate?.let { put("flash_dodge_rate", it) }
     flashMeanTurnMs?.let { put("flash_mean_turn_ms", it) }
     flashTurnPeakSpeed?.let { put("flash_turn_peak_speed", it) }
+    meanAbsFirstErrorHDegrees?.let { put("mean_abs_first_error_h_deg", it) }
+    meanAbsFirstErrorVDegrees?.let { put("mean_abs_first_error_v_deg", it) }
+    meanFirstErrorVDegrees?.let { put("mean_first_error_v_deg", it) }
 }
 
 /** The stored metrics a round's score is computed from, as [de.yuuto.aimtune.core.metrics.RoundMetrics.scoreInputs] would give them. */

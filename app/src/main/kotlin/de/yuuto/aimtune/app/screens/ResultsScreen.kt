@@ -5,6 +5,7 @@ import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.utils.Align
 import de.yuuto.aimtune.app.AppContext
+import de.yuuto.aimtune.app.blind.AxisSummary
 import de.yuuto.aimtune.app.blind.ScoredRound
 import de.yuuto.aimtune.app.ui.ChartActor
 import de.yuuto.aimtune.app.ui.sensitivityChart
@@ -37,6 +38,8 @@ data class ResultsData(
     val sessions: Int,
     /** Every round with its score, for the chart dots. */
     val scored: List<ScoredRound> = emptyList(),
+    /** Which axis the misses come from; null while too few rounds have movements. */
+    val axes: AxisSummary? = null,
 )
 
 /**
@@ -96,7 +99,23 @@ class ResultsScreen(ctx: AppContext, private val data: ResultsData) : UiScreen(c
             if (result.isFlat) "results.equivalent_flat" else "results.equivalent",
             "%.0f".format(Locale.ROOT, result.equivalentLowCm360), "%.0f".format(Locale.ROOT, result.equivalentHighCm360),
         )
-        return Table().also { it.add(ui.label(equivalent, Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH) }
+        return Table().also {
+            it.add(ui.label(equivalent, Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH).row()
+            axesText()?.let { text -> it.add(ui.label(text, Styles.BODY_MUTED, wrap = true)).left().width(CARD_WIDTH).padTop(16f) }
+        }
+    }
+
+    /** Which axis the endpoint errors of the first movements come from, e.g. "most of your misses are vertical". */
+    private fun axesText(): String? {
+        val axes = data.axes ?: return null
+        val vertical = (axes.verticalShare * 100).roundToInt()
+        return when (axes.verdict) {
+            AxisSummary.Verdict.VERTICAL_HIGH -> t("results.axes_vertical_high", vertical)
+            AxisSummary.Verdict.VERTICAL_LOW -> t("results.axes_vertical_low", vertical)
+            AxisSummary.Verdict.VERTICAL -> t("results.axes_vertical", vertical)
+            AxisSummary.Verdict.HORIZONTAL -> t("results.axes_horizontal", 100 - vertical)
+            AxisSummary.Verdict.BALANCED -> t("results.axes_balanced", vertical)
+        }
     }
 
     private fun chartBlock(result: OptimizationResult): Table {

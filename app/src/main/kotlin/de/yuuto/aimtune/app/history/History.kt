@@ -1,6 +1,7 @@
 package de.yuuto.aimtune.app.history
 
 import de.yuuto.aimtune.app.blind.BlindTest
+import de.yuuto.aimtune.app.blind.AxisErrors
 import de.yuuto.aimtune.app.blind.PastRound
 import de.yuuto.aimtune.core.optimizer.OptimizerConfig
 import de.yuuto.aimtune.core.score.MetricWeights
@@ -42,7 +43,7 @@ fun buildHistory(
             val upTo = ordered.takeWhile { it.id != session.id } + session
             val merged = upTo.filter { it.kind == SessionKind.SENSITIVITY && it.gameId == session.gameId && it.dpi == session.dpi }
                 .flatMap { s -> bySession[s.id].orEmpty().filter { it.blind } }
-                .map { PastRound(it.sessionId, it.cm360, it.scoreInputs(), it.scenario) }
+                .map { PastRound(it.sessionId, it.cm360, it.scoreInputs(), it.scenario, AxisErrors.of(it)) }
             BlindTest.analyzeStored(range, weights, merged, config)
         } else {
             null

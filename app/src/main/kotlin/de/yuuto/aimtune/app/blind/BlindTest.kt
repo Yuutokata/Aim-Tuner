@@ -16,7 +16,13 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 
 /** A stored round of an earlier session, reduced to what the optimizer needs; [scenario] is the scenario id. */
-data class PastRound(val sessionId: Long, val cm360: Double, val inputs: Map<ScoreMetric, Double>, val scenario: String = ScenarioKind.FLICK.id)
+data class PastRound(
+    val sessionId: Long,
+    val cm360: Double,
+    val inputs: Map<ScoreMetric, Double>,
+    val scenario: String = ScenarioKind.FLICK.id,
+    val axes: AxisErrors? = null,
+)
 
 /** A blind round as the results chart plots it; [score] is null while the round has no usable score yet. */
 data class ScoredRound(val cm360: Double, val score: Double?, val sessionId: Long)
@@ -86,6 +92,9 @@ class BlindTest(
     /** Every round in the model (earlier sessions and this run) with its current score; null score while it has none. */
     fun scoredRounds(): List<ScoredRound> = scoreRounds(weights, past + played)
 
+    /** Which axis the misses of all rounds in the model come from; null with fewer than three rounds that have movements. */
+    fun axisSummary(): AxisSummary? = AxisSummary.of((past + played).map { it.axes })
+
     /** Rounds of this run and of all earlier sessions in the model. */
     val totalRounds: Int get() = past.size + played.size
 
@@ -93,7 +102,7 @@ class BlindTest(
 
     /** Adds a finished round of [scenario] played at [cm360] and starts the analysis. */
     fun recordRound(cm360: Double, metrics: RoundMetrics, scenario: ScenarioKind = ScenarioKind.FLICK) {
-        played += PastRound(CURRENT_RUN, cm360, metrics.scoreInputs(), scenario.id)
+        played += PastRound(CURRENT_RUN, cm360, metrics.scoreInputs(), scenario.id, AxisErrors.of(metrics))
         lastOutcome = RoundOutcome.of(scenario, metrics)
         job = schedule(past + played)
     }

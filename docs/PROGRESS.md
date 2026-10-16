@@ -129,7 +129,7 @@ Order: the four items that change the numbers first (R1-R4), then the rest.
 - [x] Research: no separate vertical sensitivity in Valorant found (pitch = yaw 0.07, `pitchMultiplier` not needed so far); eye and head height are not published (assumed 1.6 m / 1.65 m, `verified: false`)
 - [x] `ElevationMix` + `eyeHeightMeters`/`headHeightMeters` in `TrainerGeometry` and the profile JSON (`trainer.elevation`): bulk near head level (spread 1.5 degrees), 12 % off level 3-10 degrees (40 % of them below); `uniform` switches back to the old field for comparisons
 - [x] Placement: flick/micro steps take their pitch from the mix (`placeNearLevel`), switching draws pitch from the mix, tracking is almost purely horizontal, flash cue elevation 12 degrees and the returning enemy near head level
-- [ ] Horizontal and vertical errors in the metrics (`METRICS_VERSION` 3), shown in the results
+- [x] Horizontal and vertical endpoint errors in the metrics (`METRICS_VERSION` 3, old rounds are recomputed), shown on the results screen ("most of your misses are vertical")
 - [ ] Mini-map (floor, walls, corners, doorways) in the trainer scene, spawns at corners
 - [ ] Re-run the simulation experiments (`VerticalExperimentsTest`), results in ALGORITHMS.md and the new section "Crosshair und Zielhöhen" of ANALYSE.md
 - [ ] Open (user): measure head height and the elevation of enemies in the shooting range (R1b), judge the mini-map

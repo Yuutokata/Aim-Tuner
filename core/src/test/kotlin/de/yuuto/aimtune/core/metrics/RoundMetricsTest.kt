@@ -74,6 +74,29 @@ class RoundMetricsTest {
     }
 
     @Test
+    fun `the endpoint error is split into a horizontal and a vertical part`() {
+        val t = target(0, yaw = 20.0, pitch = 10.0)
+        // Exactly the right distance sideways, but 4 degrees too high (mouse up looks up).
+        val rec = recording(
+            listOf(Reach(100.0, 150.0, dx = counts(20.0 * Math.cos(Math.toRadians(10.0))), dy = -counts(14.0)), Reach(350.0, 120.0, dx = 0.0, dy = counts(4.0))),
+            listOf(TargetEvent.Spawned(0, t), TargetEvent.Hit(560 * ms, 0)),
+        )
+        val metrics = computeRoundMetrics(rec)
+        val m = metrics.movements.single()
+        assertEquals(0.0, assertNotNull(m.firstErrorHDegrees), 0.7)
+        assertEquals(4.0, assertNotNull(m.firstErrorVDegrees), 0.7)
+        assertEquals(4.0, assertNotNull(metrics.meanFirstErrorVDegrees), 0.7)
+        assertTrue(assertNotNull(metrics.verticalErrorShare) > 0.75, "share ${metrics.verticalErrorShare}")
+    }
+
+    @Test
+    fun `a round without movements has no axis errors`() {
+        val metrics = computeRoundMetrics(recording(emptyList(), emptyList()))
+        assertNull(metrics.verticalErrorShare)
+        assertNull(metrics.meanAbsFirstErrorHDegrees)
+    }
+
+    @Test
     fun `vertical targets use the pitch direction (mouse up looks up)`() {
         val t = target(0, yaw = 0.0, pitch = 15.0)
         val rec = recording(

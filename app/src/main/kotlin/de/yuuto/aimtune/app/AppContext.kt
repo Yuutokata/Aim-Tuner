@@ -7,6 +7,7 @@ import de.yuuto.aimtune.app.accel.AccelPhase
 import de.yuuto.aimtune.app.accel.AccelRun
 import de.yuuto.aimtune.app.audio.FlashSounds
 import de.yuuto.aimtune.app.accel.AccelSession
+import de.yuuto.aimtune.app.blind.AxisSummary
 import de.yuuto.aimtune.app.blind.BlindRun
 import de.yuuto.aimtune.app.blind.BlindSession
 import de.yuuto.aimtune.app.blind.BlindTest
@@ -150,7 +151,7 @@ class AppContext(
     /** Ends the run and shows what it found; back to the menu when nothing was played or stored. */
     fun stopBlindTest(run: BlindRun) {
         val result = run.test.step().result
-        val data = ResultsData(run.profile, run.dpi, run.currentCm360, result, run.test.totalRounds, run.test.sessionCount, run.test.scoredRounds())
+        val data = ResultsData(run.profile, run.dpi, run.currentCm360, result, run.test.totalRounds, run.test.sessionCount, run.test.scoredRounds(), run.test.axisSummary())
         run.test.close()
         if (run.test.totalRounds == 0) showMenu() else switchTo(ResultsScreen(this, data))
     }
@@ -162,6 +163,7 @@ class AppContext(
         val data = ResultsData(
             config.profile, config.dpi, config.cm360, stored.result, stored.rounds.size, stored.rounds.map { it.sessionId }.distinct().size,
             BlindTest.scoreRounds(stored.weights, stored.rounds),
+            AxisSummary.of(stored.rounds.map { it.axes }),
         )
         switchTo(ResultsScreen(this, data))
     }

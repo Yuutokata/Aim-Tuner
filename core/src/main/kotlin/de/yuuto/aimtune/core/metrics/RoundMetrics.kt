@@ -45,6 +45,10 @@ data class MovementMetric(
     val correctiveSubmovements: Int,
     /** Straight angular distance divided by the angular path actually travelled, in (0, 1]. */
     val pathEfficiency: Double?,
+    /** Where the first submovement ended relative to the target, on the screen plane in degrees: > 0 is right of the target. */
+    val firstErrorHDegrees: Double? = null,
+    /** Same for the vertical axis: > 0 is above the target (the crosshair ended too high). */
+    val firstErrorVDegrees: Double? = null,
 )
 
 data class RoundMetrics(
@@ -71,7 +75,20 @@ data class RoundMetrics(
     val flashMeanTurnMs: Double? = null,
     /** Mean peak speed of the turn away in counts per ms; the curve analysis uses the return movements, this one is a diagnostic. */
     val flashTurnPeakSpeed: Double? = null,
-)
+    /** Mean absolute horizontal and vertical endpoint error of the first submovements in degrees; they show which axis the misses come from. */
+    val meanAbsFirstErrorHDegrees: Double? = null,
+    val meanAbsFirstErrorVDegrees: Double? = null,
+    /** Mean signed vertical endpoint error in degrees: > 0 means the first movement tends to end above the target. */
+    val meanFirstErrorVDegrees: Double? = null,
+) {
+    /** Share of the endpoint error (summed over both axes) that is vertical, null without first movements. */
+    val verticalErrorShare: Double?
+        get() {
+            val h = meanAbsFirstErrorHDegrees ?: return null
+            val v = meanAbsFirstErrorVDegrees ?: return null
+            return if (h + v > 0.0) v / (h + v) else null
+        }
+}
 
 /** Computes the metrics of a round from its recording, as defined in docs/ALGORITHMS.md. */
 fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = MetricsParams()): RoundMetrics {
@@ -106,6 +123,9 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
         flashDodgeRate = flash?.dodgeRate,
         flashMeanTurnMs = flash?.meanTurnMs,
         flashTurnPeakSpeed = flash?.meanTurnPeakSpeed,
+        meanAbsFirstErrorHDegrees = movements.mapNotNull { it.firstErrorHDegrees }.map { abs(it) }.averageOrNull(),
+        meanAbsFirstErrorVDegrees = movements.mapNotNull { it.firstErrorVDegrees }.map { abs(it) }.averageOrNull(),
+        meanFirstErrorVDegrees = movements.mapNotNull { it.firstErrorVDegrees }.averageOrNull(),
     )
 }
 
@@ -141,9 +161,11 @@ private fun movementMetric(
     val inWindow = submovements.filter { it.peakNanos in t0..t1 }
     val firstIndex = inWindow.indexOfFirst { isFirstReach(it, track, if (fromNanos > spawn.timeNanos) null else t0, toTarget, distance, targetPitch, params) }
     val first = inWindow.getOrNull(firstIndex)
-    val firstError = first?.let {
+    val firstMoved = first?.let {
         val end = track.viewAt(it.endNanos - 1)
-        val moved = offset(start.yawDegrees, start.pitchDegrees, end.yawDegrees, end.pitchDegrees, targetPitch)
+        offset(start.yawDegrees, start.pitchDegrees, end.yawDegrees, end.pitchDegrees, targetPitch)
+    }
+    val firstError = firstMoved?.let { moved ->
         val along = (moved.x * toTarget.x + moved.y * toTarget.y) / distance
         (along - distance) / distance
     }
@@ -157,6 +179,8 @@ private fun movementMetric(
         firstPeakSpeedCountsPerMs = first?.peakSpeedCountsPerMs,
         correctiveSubmovements = if (first == null) maxOf(0, inWindow.size - 1) else inWindow.size - 1 - firstIndex,
         pathEfficiency = if (path > 0.0) minOf(1.0, distance / path) else null,
+        firstErrorHDegrees = firstMoved?.let { it.x - toTarget.x },
+        firstErrorVDegrees = firstMoved?.let { it.y - toTarget.y },
     )
 }
 

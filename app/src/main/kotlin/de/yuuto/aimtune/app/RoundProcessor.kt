@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.app
 
+import de.yuuto.aimtune.app.blind.AxisErrors
 import de.yuuto.aimtune.app.blind.PastRound
 import de.yuuto.aimtune.core.metrics.RoundMetrics
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
@@ -98,7 +99,7 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
         val repo = repository ?: return emptyList()
         return try {
             executor.submit<List<PastRound>> {
-                repo.blindRounds(gameId, dpi).map { PastRound(it.sessionId, it.cm360, it.scoreInputs(), it.scenario) }
+                repo.blindRounds(gameId, dpi).map { PastRound(it.sessionId, it.cm360, it.scoreInputs(), it.scenario, AxisErrors.of(it)) }
             }.get()
         } catch (e: Exception) {
             log.log(System.Logger.Level.ERROR, "reading earlier rounds failed: ${e.message}", e)
