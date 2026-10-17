@@ -35,7 +35,7 @@ class SettingsStoreTest {
         val settings = AppSettings(
             language = "de", dpi = 1600.0, gameId = "valorant", inGameSensitivity = 0.35, aimStyle = "MIXED",
             padWidthCm = 45.0, padHeightCm = 40.0, roundSeconds = 60,
-            metricWeights = mapOf("ACCURACY" to 50.0, "TIME_TO_HIT" to 50.0),
+            metricWeights = mapOf("ACCURACY" to 50.0, "TIME_TO_HIT" to 50.0), fullscreen = true,
         )
         store.save(settings)
         assertEquals(settings, store.load())

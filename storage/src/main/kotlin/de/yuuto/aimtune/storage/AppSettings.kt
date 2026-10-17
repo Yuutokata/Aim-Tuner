@@ -42,6 +42,8 @@ data class AppSettings(
     /** The newest release the last successful check found (version and its page), so the hint stays on days without a check. */
     val latestKnownVersion: String? = null,
     val latestKnownUrl: String? = null,
+    /** The window is shown fullscreen; F11 switches it and the choice is kept for the next start. */
+    val fullscreen: Boolean = false,
     /** The player's Valorant crosshairs, stored as profile codes; none means the default crosshair is drawn. */
     val crosshairs: List<SavedCrosshair> = emptyList(),
     /** Id of the selected entry of [crosshairs]; used in all scenarios. */

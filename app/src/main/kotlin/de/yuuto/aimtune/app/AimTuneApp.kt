@@ -2,10 +2,12 @@ package de.yuuto.aimtune.app
 
 import com.badlogic.gdx.Game
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.Input
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Graphics
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3WindowAdapter
 import de.yuuto.aimtune.app.input.GlfwMouseSource
 import de.yuuto.aimtune.app.screens.MainMenuScreen
+import de.yuuto.aimtune.app.screens.TrainerScreen
 import de.yuuto.aimtune.app.update.AppVersion
 import de.yuuto.aimtune.app.update.UpdateChecker
 import de.yuuto.aimtune.app.update.UpdateService
@@ -19,6 +21,9 @@ import de.yuuto.aimtune.storage.AppSettings
 import de.yuuto.aimtune.storage.Database
 import de.yuuto.aimtune.storage.SettingsStore
 import org.lwjgl.glfw.GLFW
+
+internal const val WINDOW_WIDTH = 1280
+internal const val WINDOW_HEIGHT = 720
 
 /** LibGDX entry point: wires the services together and hands over to the screens. */
 class AimTuneApp(private val options: LaunchOptions) : Game() {
@@ -71,6 +76,22 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
         val screenshotDir = options.screenshotDir
         if (screenshotDir == null) ctx.showMenu() else tour = ScreenshotTour(ctx, screenshotDir) { Gdx.app.exit() }
         if (screenshotDir == null && !options.noUpdateCheck) startUpdateCheck(ctx)
+        if (screenshotDir == null && ctx.settings.current.fullscreen) setFullscreen(true)
+    }
+
+    /** Fullscreen in the display's current mode (no resolution change); windowed goes back to the start size. */
+    private fun setFullscreen(on: Boolean) {
+        if (on) Gdx.graphics.setFullscreenMode(Gdx.graphics.displayMode) else Gdx.graphics.setWindowedMode(WINDOW_WIDTH, WINDOW_HEIGHT)
+    }
+
+    /** F11 works on every screen but a running round, where a window change would lose the focus and abort it. */
+    private fun toggleFullscreenOnF11() {
+        val ctx = context ?: return
+        if (!Gdx.input.isKeyJustPressed(Input.Keys.F11) || screen is TrainerScreen) return
+        val on = !Gdx.graphics.isFullscreen
+        setFullscreen(on)
+        // A damaged settings file is never overwritten by a side effect.
+        if (ctx.startupProblems.isEmpty()) ctx.settings.save(ctx.settings.current.copy(fullscreen = on))
     }
 
     /**
@@ -102,6 +123,7 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
     }
 
     override fun render() {
+        if (tour == null) toggleFullscreenOnF11()
         super.render()
         tour?.afterRender()
     }
