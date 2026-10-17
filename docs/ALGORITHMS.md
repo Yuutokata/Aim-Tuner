@@ -141,6 +141,23 @@ Commands: `AIMTUNE_REVIEW=1 ./gradlew.bat :core:cleanTest :core:test --tests "*G
 
 The goal (median ≤ 9 %, bias ≤ 5 % with drift) was not met. With 10 rounds a session and an optimum this flat (±15 % costs under a point), a move of 5-10 % per session is hardly visible in the data, so the model can rarely tell it from noise. The drift hint fires in 5 % of the runs without drift and in 23-30 % with it. A single session gives identical results with either setting.
 
+**Follow-up: a curve for micro-adjustments and flash turns (M14b).** The user's goal is lower gain for small, slow corrections and more gain for turning away from a flash and back. That is a trade-off between precision and speed, which only shows in the outcome, not in the endpoint errors. Findings:
+- **Two-way sweep** of slow gain × fast ratio (`TwoWayCurveSweepTest`, `twoway-sweep.txt`; micro/flash/flick mix, flash weight 35):
+  - Lowering the slow gain never paid, because the simulated hand hits every micro target at plain sensitivity already (accuracy 1.000). The simulator cannot judge that half of the goal.
+  - A higher fast ratio paid only for a hand that adapts to the curve: 52 → 61 points at ×1.5, flash dodge 8 → 23 %.
+- **Search designs** (`BlockStrengthSearchTest.blockSearch`, `block-strength-search.txt`):
+  - Playing each strength in blocks of 3-4 rounds (first dropped) instead of a new strength every round changed nothing.
+  - A micro/flash/flick mix with range 0.70-2.00 found strong rising curves for adapting hands, but also for hands that do not want them (benefit −4 to −15).
+- **The whole chain** (`chainSearchAndBlindTest`, `chain-strength-search-flash35.txt` / `-flash15.txt`; 16 players per row): search, offer when the range excludes plain, blind A/B test, export when better.
+  - The blind test kept curves away from flat hands in every design (0-1 of 16 exported).
+  - The new mix lost against the app's mix, because the A/B test, which alternates every round, let its stronger curves through less often.
+  - The app's mix with the range widened to **0.70-1.75** won:
+    - with flash weight 35: adapting flat hand +10.5 against +4.6 points; +15 % +10.4 against +7.9; −15 % +3.7 against +3.4; non-adapting +15 % +20.9 against +20.6;
+    - with flash weight 15: mean over the four +8.8 against +7.8 (the adapting −15 % row fell from +2.7 to +0.9);
+    - flat hands got no export (against 1 of 16 at 0.70-1.45).
+  - 0.70-2.00 let single harmful curves through again.
+- `CurveStrength.MAX_WITH_FLASH = 1.75` is therefore the upper end whenever the search plays flash rounds (`searchRange(flash)`). Without flash rounds it stays 1.45, because the earlier sweep without them saw a wider range overshoot.
+
 ## Bayesian optimization (M5, implemented in `core/optimizer`)
 
 **Model.** `x = ln(cm360)`. Round scores (0-100, computed over all rounds together, see "Metrics and score") are standardized and modelled as `y = f(x) + offset(session) + noise` with a Matern 5/2 prior on `f`. The session offset (a better or worse day) is integrated out by adding a "same session" covariance `tau^2` to the kernel matrix, so rounds of many sessions give one estimate of `f` without a day-to-day shift biasing the optimum. Hyperparameters (lengthscale 0.12-0.7 times the log width of the search range, signal variance, noise variance 0.15-1.2, session variance 0 / 0.1 / 0.4, scenario variance 0 / 0.4) are picked from a small grid by marginal likelihood. The noise floor is deliberately not tiny: with few rounds a near-zero noise estimate gives an overconfident fit. Cholesky is hand-written (ADR 0004 amendment).
