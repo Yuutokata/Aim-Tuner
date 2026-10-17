@@ -9,6 +9,10 @@ import kotlinx.serialization.Serializable
 
 class SettingsException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
+/** Which curve finder the acceleration analysis uses. */
+@Serializable
+enum class CurveFinder { LEGACY, V2 }
+
 /**
  * User settings stored as JSON. Everything personal is nullable and stays null until onboarding
  * fills it; nothing user-specific is defaulted. Metric weights are keyed by [ScoreMetric] name.
@@ -48,6 +52,11 @@ data class AppSettings(
     val crosshairs: List<SavedCrosshair> = emptyList(),
     /** Id of the selected entry of [crosshairs]; used in all scenarios. */
     val activeCrosshair: String? = null,
+    /**
+     * V2 bounds the curve to the measured speeds and exports it as a Raw Accel lookup table (docs/ALGORITHMS.md
+     * "Bounded curves"); LEGACY keeps the fitted family.
+     */
+    val curveFinder: CurveFinder = CurveFinder.V2,
 ) {
     /** @throws SettingsException describing the first invalid field. */
     fun validate() {

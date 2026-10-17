@@ -10,6 +10,7 @@ import de.yuuto.aimtune.core.accel.AccelAbPlan
 import de.yuuto.aimtune.core.accel.AccelAnalysis
 import de.yuuto.aimtune.core.accel.AccelFit
 import de.yuuto.aimtune.core.accel.AccelFitResult
+import de.yuuto.aimtune.core.accel.bounded
 import de.yuuto.aimtune.core.accel.evaluateAb
 import de.yuuto.aimtune.core.accel.CurveStrength
 import de.yuuto.aimtune.core.accel.MovementSample
@@ -73,6 +74,8 @@ class AccelRun(
     startWithTest: AccelFit? = null,
     /** Rounds of earlier searches at this sensitivity; the search builds on them, so it plays fewer new rounds. */
     priorSearch: List<PriorSearchRound> = emptyList(),
+    /** Bound the recommended curve to the measured speeds as a lookup table (curve finder v2); false keeps the fitted family. */
+    private val boundedCurves: Boolean = true,
 ) {
     var phase = when {
         startWithTest != null -> AccelPhase.TEST
@@ -203,7 +206,7 @@ class AccelRun(
             }
             AccelPhase.TEST -> {
                 val round = plan.round(outcomes.size)
-                outcomes += AbOutcome(round.pair, round.condition, metrics.scoreInputs())
+                outcomes += AbOutcome(round.pair, round.condition, metrics.scoreInputs(), round.scenario.id)
                 if (outcomes.size % 2 == 0) decide()
             }
             AccelPhase.SEARCH -> {
@@ -275,7 +278,9 @@ class AccelRun(
     }
 
     private fun finishCalibration() {
-        fit = fitAccel(AccelAnalysis(calibrationSamples + prior.samples))
+        val analysis = AccelAnalysis(calibrationSamples + prior.samples)
+        val result = fitAccel(analysis)
+        fit = if (boundedCurves) result.bounded(analysis) else result
         phase = AccelPhase.ANALYSIS
     }
 

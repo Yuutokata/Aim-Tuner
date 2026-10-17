@@ -125,6 +125,30 @@ class AccelFitTest {
         assertTrue(abs(ln(fit.sensitivityFactor)) <= ln(1.1) + 1e-9, "factor ${fit.sensitivityFactor}")
     }
 
+    private fun naturalFit() = AccelFit("natural", NaturalCurve(0.1, 1.5), 0.95, chiSquare = 1.0, nullChiSquare = 20.0, bicGain = 12.0, gainRange = 1.3)
+
+    @Test
+    fun `bounding a fit to a speed window keeps it inside and holds the edge values outside`() {
+        val fit = naturalFit()
+        val bounded = fit.boundedTo(4.0, 9.0)
+        listOf(4.0, 6.0, 9.0).forEach { v ->
+            assertEquals(fit.curve.multiplier(v), bounded.curve.multiplier(v), 1e-3, "at $v")
+        }
+        assertEquals(bounded.curve.multiplier(4.0), bounded.curve.multiplier(2.0))
+        assertEquals(bounded.curve.multiplier(9.0), bounded.curve.multiplier(40.0))
+        assertTrue(fit.curve.multiplier(40.0) > bounded.curve.multiplier(40.0) + 0.05)
+        assertEquals(0.95, bounded.sensitivityFactor)
+        assertTrue(bounded.family.endsWith("(table)"), bounded.family)
+        assertTrue(bounded.curve is LookupCurve)
+    }
+
+    @Test
+    fun `no recommendation gives no bounded recommendation`() {
+        val analysis = AccelAnalysis(emptyList())
+        val result = AccelFitResult(emptyList(), emptyList(), null, "none", AccelReason.NO_FIT)
+        assertNull(boundedRecommendation(result, analysis))
+    }
+
     private companion object {
         const val DPI = 800.0
     }

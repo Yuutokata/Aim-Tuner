@@ -12,6 +12,7 @@ import de.yuuto.aimtune.app.ui.caps
 import de.yuuto.aimtune.app.ui.frame
 import de.yuuto.aimtune.app.ui.label
 import de.yuuto.aimtune.core.accel.AccelAnalysis
+import de.yuuto.aimtune.core.accel.bounded
 import de.yuuto.aimtune.core.accel.fitAccel
 import java.util.Locale
 
@@ -26,7 +27,7 @@ private const val FOOTER_BUTTON_HEIGHT = 64f
  */
 class AccelLastAnalysisScreen(ctx: AppContext, private val last: LastCalibration?) : AccelFitScreen(ctx) {
     private val analysis = last?.data?.takeIf { it.rounds > 0 }?.let { AccelAnalysis(it.samples) }
-    private val fit = analysis?.let(::fitAccel)
+    private val fit = analysis?.let { fitAccel(it).let { result -> if (ctx.boundedCurves) result.bounded(it) else result } }
 
     override fun build(): Actor {
         val content = Table()

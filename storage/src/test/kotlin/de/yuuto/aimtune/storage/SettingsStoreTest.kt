@@ -36,9 +36,17 @@ class SettingsStoreTest {
             language = "de", dpi = 1600.0, gameId = "valorant", inGameSensitivity = 0.35, aimStyle = "MIXED",
             padWidthCm = 45.0, padHeightCm = 40.0, roundSeconds = 60,
             metricWeights = mapOf("ACCURACY" to 50.0, "TIME_TO_HIT" to 50.0), fullscreen = true,
+            curveFinder = CurveFinder.LEGACY,
         )
         store.save(settings)
         assertEquals(settings, store.load())
+    }
+
+    @Test
+    fun `settings files without a curve finder load with v2`() {
+        val file = dir.resolve("old.json")
+        Files.writeString(file, """{"version":1,"dpi":800.0}""")
+        assertEquals(CurveFinder.V2, SettingsStore(file).load().curveFinder)
     }
 
     @Test

@@ -116,4 +116,69 @@ class AccelSpecTest {
         assertFailsWith<IllegalArgumentException> { AccelSpec.decode("classic;acceleration=x;exponent=2;inputOffset=0;cap=0") }
         assertFailsWith<IllegalArgumentException> { AccelSpec.decode("classic;acceleration=-1;exponent=2;inputOffset=0;cap=0") }
     }
+
+    private val lut = LookupCurve(listOf(2.0, 4.0, 8.0), listOf(1.0, 1.5, 1.25))
+
+    @Test
+    fun `lookup returns the exact multiplier at its points`() {
+        assertEquals(1.0, lut.multiplier(2.0))
+        assertEquals(1.5, lut.multiplier(4.0))
+        assertEquals(1.25, lut.multiplier(8.0))
+    }
+
+    @Test
+    fun `lookup interpolates linearly between points`() {
+        assertEquals(1.25, lut.multiplier(3.0), 1e-12)
+        assertEquals(1.375, lut.multiplier(6.0), 1e-12)
+    }
+
+    @Test
+    fun `lookup is flat below the first and above the last point`() {
+        assertEquals(1.0, lut.multiplier(0.1))
+        assertEquals(1.25, lut.multiplier(100.0))
+    }
+
+    @Test
+    fun `lookup rounds its points to float`() {
+        val curve = LookupCurve(listOf(1.0, 2.0), listOf(1.1, 1.2))
+        assertEquals(1.100000023841858, curve.multipliers[0])
+        assertEquals(1.100000023841858, curve.multiplier(1.0))
+    }
+
+    @Test
+    fun `lookup rejects invalid tables`() {
+        assertFailsWith<IllegalArgumentException> { LookupCurve(listOf(1.0), listOf(1.0)) }
+        val many = List(258) { 1.0 + it }
+        assertFailsWith<IllegalArgumentException> { LookupCurve(many, many) }
+        assertEquals(257, LookupCurve(many.take(257), many.take(257)).speeds.size)
+        assertFailsWith<IllegalArgumentException> { LookupCurve(listOf(1.0, 1.0), listOf(1.0, 1.0)) }
+        assertFailsWith<IllegalArgumentException> { LookupCurve(listOf(2.0, 1.0), listOf(1.0, 1.0)) }
+        assertFailsWith<IllegalArgumentException> { LookupCurve(listOf(0.0, 1.0), listOf(1.0, 1.0)) }
+        assertFailsWith<IllegalArgumentException> { LookupCurve(listOf(-1.0, 1.0), listOf(1.0, 1.0)) }
+        assertFailsWith<IllegalArgumentException> { LookupCurve(listOf(1.0, 2.0), listOf(1.0, 0.0)) }
+        assertFailsWith<IllegalArgumentException> { LookupCurve(listOf(1.0, 2.0), listOf(1.0, -0.5)) }
+    }
+
+    @Test
+    fun `a lookup curve survives the spec text round trip`() {
+        val curve = LookupCurve(listOf(1.5, 4.25, 9.0, 20.0), listOf(0.9, 1.1, 1.3, 1.31))
+        assertEquals(curve, AccelSpec.decode(AccelSpec.encode(curve)))
+        assertTrue(AccelSpec.encode(curve).startsWith("lut;points="))
+    }
+
+    @Test
+    fun `malformed lookup specs are rejected`() {
+        listOf(
+            "lut",
+            "lut;points=",
+            "lut;points=1:1",
+            "lut;points=1:1,2",
+            "lut;points=1:1,2:x",
+            "lut;points=a:1,2:1",
+            "lut;points=2:1,1:1",
+            "lut;points=1:1,2:-1",
+            "lut;speeds=1:1,2:1",
+            "lut;points=1:1:1,2:1",
+        ).forEach { spec -> assertFailsWith<IllegalArgumentException>(spec) { AccelSpec.decode(spec) } }
+    }
 }

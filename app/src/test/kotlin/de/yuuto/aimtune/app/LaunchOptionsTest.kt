@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.app
 
+import de.yuuto.aimtune.storage.CurveFinder
 import java.nio.file.Paths
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,6 +31,14 @@ class LaunchOptionsTest {
         assertFalse(o.vsync)
         assertEquals(Paths.get("out"), o.screenshotDir)
         assertEquals(Paths.get("logs"), o.recordDir)
+    }
+
+    @Test
+    fun `the curve finder is parsed and unset by default`() {
+        assertNull(parse().curveFinder)
+        assertEquals(CurveFinder.LEGACY, parse("--curve-finder", "legacy").curveFinder)
+        assertEquals(CurveFinder.V2, parse("--curve-finder", "V2").curveFinder)
+        assertFailsWith<LaunchOptionsException> { parse("--curve-finder", "v3") }
     }
 
     @Test

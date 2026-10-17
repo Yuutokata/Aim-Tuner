@@ -55,6 +55,7 @@ import de.yuuto.aimtune.core.units.AimStyle
 import de.yuuto.aimtune.core.units.searchRange
 import de.yuuto.aimtune.games.GameProfiles
 import de.yuuto.aimtune.input.RawMouseSource
+import de.yuuto.aimtune.storage.CurveFinder
 import de.yuuto.aimtune.storage.RawAccelExport
 import de.yuuto.aimtune.storage.ResearchExportResult
 import de.yuuto.aimtune.storage.SettingsException
@@ -253,6 +254,9 @@ class AppContext(
         }
     }
 
+    /** Whether curves are bounded to the measured speeds (curve finder v2); the launch option overrides the setting. */
+    val boundedCurves: Boolean get() = (options.curveFinder ?: settings.current.curveFinder) == CurveFinder.V2
+
     /** Starts the acceleration steps at the recommended sensitivity; back to the intro if there is none yet. */
     fun startAccelRun(search: Boolean = false) {
         if (!source.hasReportTimestamps) return showAccel()
@@ -265,6 +269,7 @@ class AppContext(
         val run = AccelRun(
             base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, prior = prior, startWithSearch = search,
             flash = settings.current.flashImportance() != FlashImportance.NEVER, priorSearch = priorSearch,
+            boundedCurves = boundedCurves,
         )
         showAccelStep(run)
     }
@@ -275,7 +280,7 @@ class AppContext(
         val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
         val base = stored.config.copy(dpi = last.dpi, cm360 = last.cm360)
         showAccelStep(
-            AccelRun(base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, flash = settings.current.flashImportance() != FlashImportance.NEVER, startWithTest = curve),
+            AccelRun(base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, flash = settings.current.flashImportance() != FlashImportance.NEVER, startWithTest = curve, boundedCurves = boundedCurves),
         )
     }
 

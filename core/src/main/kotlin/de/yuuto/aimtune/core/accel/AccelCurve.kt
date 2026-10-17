@@ -77,6 +77,44 @@ data class NaturalCurve(
 }
 
 /**
+ * Raw Accel "Look Up Table" with "Gain / Velocity" set to Velocity (`common/accel-lookup.hpp`, v1.7.1): the multiplier
+ * is interpolated linearly in speed and multiplier between the points, and held at the first point's value below it and at
+ * the last point's value above it, so a table built over the measured speeds stays flat outside them. Raw Accel keeps the
+ * points as floats, so they are rounded to float here and the curve under test is the curve exported. At most
+ * [MAX_POINTS] points with strictly increasing positive speeds and positive multipliers (the rules of its editor).
+ */
+class LookupCurve(speeds: List<Double>, multipliers: List<Double>) : AccelCurve {
+    val speeds: List<Double> = speeds.map { it.toFloat().toDouble() }
+    val multipliers: List<Double> = multipliers.map { it.toFloat().toDouble() }
+
+    init {
+        require(this.speeds.size == this.multipliers.size) { "one multiplier per speed expected" }
+        require(this.speeds.size in 2..MAX_POINTS) { "a lookup table needs 2 to $MAX_POINTS points" }
+        require(this.speeds.first() > 0.0 && this.speeds.all { it.isFinite() } && this.speeds.zipWithNext().all { (a, b) -> b > a }) {
+            "speeds must be positive, finite and strictly increasing"
+        }
+        require(this.multipliers.all { it > 0.0 && it.isFinite() }) { "multipliers must be positive" }
+    }
+
+    override fun multiplier(speed: Double): Double {
+        if (speed.isNaN() || speed <= speeds.first()) return multipliers.first()
+        if (speed >= speeds.last()) return multipliers.last()
+        val i = speeds.binarySearch(speed).let { if (it >= 0) return multipliers[it] else -it - 2 }
+        val t = (speed - speeds[i]) / (speeds[i + 1] - speeds[i])
+        return multipliers[i] + (multipliers[i + 1] - multipliers[i]) * t
+    }
+
+    override fun equals(other: Any?): Boolean = other is LookupCurve && speeds == other.speeds && multipliers == other.multipliers
+    override fun hashCode(): Int = 31 * speeds.hashCode() + multipliers.hashCode()
+    override fun toString(): String = "LookupCurve(${speeds.size} points, ${speeds.first()}-${speeds.last()} in/s)"
+
+    companion object {
+        /** `LUT_POINTS_CAPACITY` of Raw Accel 1.7.1 (`common/rawaccel-base.hpp`). */
+        const val MAX_POINTS = 257
+    }
+}
+
+/**
  * Raw Accel "Power": `(scale * v)^exponent` above the speed where it reaches [outputOffset], which
  * is the multiplier below that speed. With an offset of 1 the curve starts at 1. A [cap] above 0 is
  * the largest multiplier.

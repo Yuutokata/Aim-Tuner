@@ -19,6 +19,7 @@ import de.yuuto.aimtune.core.accel.AccelReason
 import de.yuuto.aimtune.core.accel.ClassicCurve
 import de.yuuto.aimtune.core.accel.CurveStrength
 import de.yuuto.aimtune.core.accel.GainPoint
+import de.yuuto.aimtune.core.accel.LookupCurve
 import de.yuuto.aimtune.core.accel.NaturalCurve
 import de.yuuto.aimtune.core.accel.PowerCurve
 import de.yuuto.aimtune.storage.RawAccelExport
@@ -149,6 +150,7 @@ abstract class AccelFitScreen(ctx: AppContext) : UiScreen(ctx) {
         is ClassicCurve -> t("accel.analysis.params_classic", number("%.4f", curve.acceleration), number("%.2f", curve.exponent), number("%.2f", curve.cap))
         is NaturalCurve -> t("accel.analysis.params_natural", number("%.3f", curve.decayRate), number("%.2f", curve.limit))
         is PowerCurve -> t("accel.analysis.params_power", number("%.4f", curve.scale), number("%.2f", curve.exponent))
+        is LookupCurve -> t("accel.analysis.params_table", curve.speeds.size, number("%.1f", curve.speeds.first()), number("%.1f", curve.speeds.last()))
         else -> ""
     }
 }

@@ -3,6 +3,8 @@ package de.yuuto.aimtune.app.accel
 import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.core.accel.AbStatus
 import de.yuuto.aimtune.core.accel.AccelAnalysis
+import de.yuuto.aimtune.core.accel.AccelFit
+import de.yuuto.aimtune.core.accel.LookupCurve
 import de.yuuto.aimtune.core.accel.trialAccel
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.MetricWeights
@@ -47,6 +49,18 @@ class AccelRunTest {
         assertEquals(AbStatus.ACCEL_BETTER, run.verdict?.status)
         assertEquals(AccelPhase.DONE, run.phase)
         assertTrue(run.testRoundsDone in 8..run.maxTestRounds && run.testRoundsDone % 2 == 0)
+    }
+
+    @Test
+    fun `the candidate is a bounded lookup table unless the legacy curve finder is chosen`() {
+        fun candidateOf(bounded: Boolean): AccelFit? {
+            val run = AccelRun(base, MetricWeights.DEFAULT, runKey = 1, seed = 3, boundedCurves = bounded)
+            while (run.phase == AccelPhase.CALIBRATION) play(run, fallingGainPlayer)
+            return run.candidate
+        }
+        assertTrue(candidateOf(true)?.curve is LookupCurve)
+        val legacy = assertNotNull(candidateOf(false))
+        assertFalse(legacy.curve is LookupCurve)
     }
 
     @Test
