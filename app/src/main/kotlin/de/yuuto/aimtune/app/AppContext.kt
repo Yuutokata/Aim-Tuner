@@ -260,6 +260,16 @@ class AppContext(
         showAccelStep(run)
     }
 
+    /** Starts the blind test of [curve], which the stored calibration rounds gave, at the setup they were played with. */
+    fun startAccelTest(curve: AccelFit, last: LastCalibration) {
+        if (!source.hasReportTimestamps || !rawAccelConfirmed) return showAccel()
+        val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
+        val base = stored.config.copy(dpi = last.dpi, cm360 = last.cm360)
+        showAccelStep(
+            AccelRun(base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, flash = settings.current.flashImportance() != FlashImportance.NEVER, startWithTest = curve),
+        )
+    }
+
     /** The screen that fits the run: a round while one is due, otherwise the analysis or the verdict. */
     fun showAccelStep(run: AccelRun) = switchTo(
         when (run.phase) {

@@ -60,7 +60,10 @@ class AccelLastAnalysisScreen(ctx: AppContext, private val last: LastCalibration
         footer.add().expandX()
         if (fit?.recommended != null) {
             footer.addButton(ui.button(t("accel.result.copy"), Styles.SECONDARY) { copy() }, minWidth = 260f).padRight(16f)
-            footer.addButton(ui.button(t("accel.result.export"), Styles.PRIMARY) { export() }, minWidth = 300f)
+            footer.addButton(ui.button(t("accel.result.export"), Styles.SECONDARY) { export() }, minWidth = 300f).padRight(16f)
+            val test = ui.button(t("accel.last.test"), Styles.PRIMARY) { testBlind() }
+            test.isDisabled = !canTest()
+            footer.addButton(test, minWidth = 300f)
         }
         return ui.frame(null, content, footer)
     }
@@ -73,11 +76,20 @@ class AccelLastAnalysisScreen(ctx: AppContext, private val last: LastCalibration
         card.add(ui.caps(t("accel.result.raw_accel_title"))).left().row()
         card.add(ui.label(t("accel.last.untested"), Styles.CAUTION, wrap = true)).left().width(EXPORT_WIDTH - 2 * CARD_PADDING).padTop(8f).row()
         card.add(ui.label(t("accel.result.raw_accel_text"), Styles.CAPTION_MUTED, wrap = true)).left().width(EXPORT_WIDTH - 2 * CARD_PADDING).padTop(8f).row()
+        if (!canTest()) card.add(ui.label(t("accel.last.test_blocked"), Styles.CAPTION_MUTED, wrap = true)).left().width(EXPORT_WIDTH - 2 * CARD_PADDING).padTop(16f).row()
         exported?.let { result ->
             val text = result.fold({ t("accel.result.saved", it) }, { t("accel.result.save_failed", it.message.orEmpty()) })
             card.add(ui.label(text, if (result.isSuccess) Styles.OK else Styles.CAUTION, wrap = true)).left().width(EXPORT_WIDTH - 2 * CARD_PADDING).padTop(16f)
         }
         return card
+    }
+
+    /** The blind test compares with the plain mouse, so it needs the Raw Accel check of the intro and a mouse with report timestamps. */
+    private fun canTest() = ctx.rawAccelConfirmed && ctx.source.hasReportTimestamps
+
+    private fun testBlind() {
+        val curve = fit?.recommended ?: return
+        if (canTest()) ctx.startAccelTest(curve, checkNotNull(last))
     }
 
     private fun export() {

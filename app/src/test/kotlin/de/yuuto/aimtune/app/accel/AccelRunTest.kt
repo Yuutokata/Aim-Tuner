@@ -241,6 +241,20 @@ class AccelRunTest {
     }
 
     @Test
+    fun `a curve can be tested blind straight away, without a calibration`() {
+        val analysed = sampleAccelRun(base, AccelPhase.ANALYSIS)
+        val curve = checkNotNull(analysed.candidate)
+        val run = AccelRun(base, MetricWeights.DEFAULT, runKey = 9, seed = 9, startWithTest = curve)
+        assertEquals(AccelPhase.TEST, run.phase)
+        assertEquals(curve, run.candidate)
+        assertEquals(0, run.calibrationDone)
+        val configs = (0 until 2).map { run.nextRoundConfig().also { _ -> play(run, fallingGainPlayer) } }
+        assertEquals(1, configs.count { it.accel != null }, "one round of a pair has the curve")
+        while (run.phase == AccelPhase.TEST) play(run, fallingGainPlayer)
+        assertEquals(AbStatus.ACCEL_BETTER, run.verdict?.status)
+    }
+
+    @Test
     fun `tracking is never part of the acceleration rounds`() {
         assertTrue(ScenarioKind.TRACKING !in AccelRun.CLICK_SCENARIOS)
     }

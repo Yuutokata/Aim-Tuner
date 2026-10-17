@@ -69,8 +69,14 @@ class AccelRun(
     startWithSearch: Boolean = false,
     /** Play flash turn-away rounds in the strength search and the blind test. */
     flash: Boolean = false,
+    /** Begin with the blind test of this curve, e.g. one the stored calibration rounds gave; no calibration or search. */
+    startWithTest: AccelFit? = null,
 ) {
-    var phase = if (startWithSearch) AccelPhase.SEARCH else AccelPhase.CALIBRATION
+    var phase = when {
+        startWithTest != null -> AccelPhase.TEST
+        startWithSearch -> AccelPhase.SEARCH
+        else -> AccelPhase.CALIBRATION
+    }
         private set
 
     var fit: AccelFitResult? = null
@@ -95,7 +101,7 @@ class AccelRun(
     /** Where the curve under test came from. */
     enum class Source { ANALYSIS, TRIAL, SEARCH }
 
-    private var tested: AccelFit? = null
+    private var tested: AccelFit? = startWithTest
     private var source = Source.ANALYSIS
 
     private val search = StrengthSearch(weights, seed)
