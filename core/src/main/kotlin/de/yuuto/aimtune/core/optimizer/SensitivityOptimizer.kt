@@ -50,6 +50,11 @@ data class OptimizationResult(
      */
     val equivalentLowCm360: Double = optimumCm360,
     val equivalentHighCm360: Double = optimumCm360,
+    /**
+     * Time model only: the best sensitivity moved between days (the fit chose a moving curve, or the newest session alone
+     * puts its best value outside the interval of all of them). The result then leans on the newest days.
+     */
+    val dayDriftDetected: Boolean = false,
 ) {
     /** True when the equivalent stretch is wide, so any value in it is as good as another. */
     val isFlat: Boolean get() = equivalentHighCm360 / equivalentLowCm360 >= FLAT_RATIO
@@ -80,6 +85,12 @@ data class OptimizerConfig(
     /** Other cm/360 values within this log distance of the previous round are not suggested next. */
     val exclusionLn: Double = 0.03,
     val maxRounds: Int = 80,
+    /**
+     * Time model of M14 (sensitivity v2): the fit may let the score curve move over days (`GpHyperParams.driftShare`) and
+     * rounds older than [maxAgeDays] before the newest one are left out. False keeps the legacy model.
+     */
+    val timeDrift: Boolean = false,
+    val maxAgeDays: Double = 42.0,
 ) {
     init {
         require(initialDesignRounds >= 2 && gridPoints >= 20 && posteriorSamples >= 50) { "config too small" }
@@ -104,7 +115,8 @@ class SensitivityOptimizer(
     private val width = lnHi - lnLo
     private val grid = DoubleArray(config.gridPoints) { lnLo + width * it / (config.gridPoints - 1) }
 
-    fun suggestNext(history: List<Observation>): Suggestion {
+    fun suggestNext(all: List<Observation>): Suggestion {
+        val history = recent(all)
         val n = history.size
         if (n < config.initialDesignRounds) return Suggestion(designPoint(n), SuggestionKind.DESIGN)
         // Every few rounds a fresh design point: sensitivities spread over the whole run keep a drift in time
@@ -125,7 +137,8 @@ class SensitivityOptimizer(
     }
 
     /** Null while there are too few rounds for a model (fewer than 3). */
-    fun analyze(history: List<Observation>): OptimizationResult? {
+    fun analyze(all: List<Observation>): OptimizationResult? {
+        val history = recent(all)
         if (history.size < MIN_ROUNDS_FOR_RESULT) return null
         val gp = fitBest(history) ?: return null
         val posterior = gp.posterior(grid)
@@ -141,6 +154,7 @@ class SensitivityOptimizer(
         val atEdge = optimumX - lnLo < EDGE_FRACTION * width || lnHi - optimumX < EDGE_FRACTION * width
         val rawConfidence = (100.0 * summary.probabilityNegligibleLoss).toInt()
         val drift = gp.hyper.trendVariance > 0.0
+        val dayDrift = gp.hyper.driftShare > 0.0 || newestSessionOutside(history, summary)
         val limited = history.size < config.minRoundsForFullConfidence || atEdge
         val capped = if (limited) minOf(rawConfidence, LIMITED_CONFIDENCE_CAP) else rawConfidence
         val confidence = if (drift) minOf(capped, DRIFT_CONFIDENCE_CAP) else capped
@@ -150,6 +164,7 @@ class SensitivityOptimizer(
             optimumCm360 = exp(optimumX),
             atRangeEdge = atEdge,
             driftDetected = drift,
+            dayDriftDetected = dayDrift,
             intervalLowCm360 = exp(summary.lowX),
             intervalHighCm360 = exp(summary.highX),
             confidencePercent = confidence,
@@ -165,6 +180,28 @@ class SensitivityOptimizer(
             equivalentLowCm360 = exp(grid[equivalentEdge(posterior, best, negligible, -1)]),
             equivalentHighCm360 = exp(grid[equivalentEdge(posterior, best, negligible, +1)]),
         )
+    }
+
+    /** With the time model, the rounds of the last [OptimizerConfig.maxAgeDays] before the newest one; all rounds otherwise. */
+    private fun recent(history: List<Observation>): List<Observation> {
+        if (!config.timeDrift || history.isEmpty()) return history
+        val newest = history.maxOf { it.days }
+        return history.filter { it.days >= newest - config.maxAgeDays }
+    }
+
+    /**
+     * Time model only: whether the newest session, fitted alone, puts its best value outside the 80 % interval of all
+     * rounds. It needs enough rounds of its own; a short session says too little to raise the alarm.
+     */
+    private fun newestSessionOutside(history: List<Observation>, all: OptimumSummary): Boolean {
+        if (!config.timeDrift) return false
+        val newest = history.maxBy { it.days }.sessionId
+        val own = history.filter { it.sessionId == newest }
+        if (own.size < MIN_ROUNDS_FOR_SESSION_CHECK || own.size == history.size) return false
+        val gp = fitBest(own, timeSearch = false) ?: return false
+        val posterior = gp.posterior(grid)
+        val best = refinedOptimumX(posterior, grid.indices.maxBy { posterior.mean[it] })
+        return best < all.lowX || best > all.highX
     }
 
     /** Grid index of the end of the stretch around [bestIndex] (in direction [step]) that scores within [negligible] of the best. */
@@ -264,7 +301,7 @@ class SensitivityOptimizer(
     }
 
     /** Best hyperparameters from a small grid by marginal likelihood, scaled to the search range. */
-    private fun fitBest(history: List<Observation>): GaussianProcess? {
+    private fun fitBest(history: List<Observation>, timeSearch: Boolean = config.timeDrift): GaussianProcess? {
         val multiSession = history.map { it.sessionId }.distinct().size > 1
         val multiGroup = history.map { it.group }.distinct().size > 1
         // A long history makes every fit slow (cubic); the hyperparameters hardly change after a few hundred rounds.
@@ -289,6 +326,20 @@ class SensitivityOptimizer(
                 if (gp.logMarginalLikelihood > bestLml + TREND_MIN_LML_GAIN) {
                     bestLml = gp.logMarginalLikelihood
                     bestHyper = hyper
+                }
+            }
+        }
+        // The time model is searched around the best fit as well, and only when the rounds span several days.
+        val spansDays = history.maxOf { it.days } - history.minOf { it.days } >= MIN_DAYS_FOR_TIME_MODEL
+        if (timeSearch && multiSession && spansDays) {
+            bestHyper?.let { base ->
+                for (share in DRIFT_SHARES) for (days in DRIFT_DAYS) {
+                    val hyper = base.copy(driftShare = share, driftDays = days)
+                    val gp = GaussianProcess.fit(searchOn, hyper) ?: continue
+                    if (gp.logMarginalLikelihood > bestLml + TIME_MIN_LML_GAIN) {
+                        bestLml = gp.logMarginalLikelihood
+                        bestHyper = hyper
+                    }
                 }
             }
         }
@@ -325,5 +376,14 @@ class SensitivityOptimizer(
 
         /** A trend must raise the log marginal likelihood by this much to be taken (a mild Occam penalty against false alarms). */
         const val TREND_MIN_LML_GAIN = 1.0
+
+        /** Share of the curve's variance that may move over days, and how many days it takes to forget; chosen like the trend. */
+        val DRIFT_SHARES = listOf(0.5, 1.0, 2.0, 4.0)
+        val DRIFT_DAYS = listOf(2.0, 7.0, 21.0)
+        const val TIME_MIN_LML_GAIN = 1.0
+        const val MIN_DAYS_FOR_TIME_MODEL = 0.5
+
+        /** The newest session alone must have this many rounds to raise the drift hint; with 10 it did so in 30 % of runs without drift. */
+        const val MIN_ROUNDS_FOR_SESSION_CHECK = 20
     }
 }
