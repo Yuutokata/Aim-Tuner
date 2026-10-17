@@ -156,6 +156,18 @@ class StoredSearchesTest {
     }
 
     @Test
+    fun `a search with flash rounds, or one that builds on such rounds, searches up to the wider strength`() {
+        val inputs = mapOf(de.yuuto.aimtune.core.score.ScoreMetric.ACCURACY to 0.5)
+        fun searchOf(flash: Boolean, prior: List<PriorSearchRound> = emptyList()) = StrengthSearch(MetricWeights.DEFAULT, seed = 1L, prior = prior, flash = flash).apply {
+            listOf(0.8, 1.0, 1.2, 1.4, 0.9, 1.1).forEachIndexed { i, s -> record(s, "flick", inputs + (de.yuuto.aimtune.core.score.ScoreMetric.ACCURACY to 0.4 + 0.05 * i)) }
+        }
+        assertEquals(CurveStrength.MAX, assertNotNull(searchOf(flash = false).result()).rangeMax, 1e-9)
+        assertEquals(CurveStrength.MAX_WITH_FLASH, assertNotNull(searchOf(flash = true).result()).rangeMax, 1e-9)
+        val earlier = listOf(PriorSearchRound(5L, 0, 1.7, "flash", inputs))
+        assertEquals(CurveStrength.MAX_WITH_FLASH, assertNotNull(searchOf(flash = false, prior = earlier).result()).rangeMax, 1e-9)
+    }
+
+    @Test
     fun `without a stored search there is none`() {
         val processor = RoundProcessor(Database.open(dir.resolve("b.db")))
         assertNull(processor.lastSearch(MetricWeights.DEFAULT))

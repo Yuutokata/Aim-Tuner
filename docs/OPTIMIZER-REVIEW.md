@@ -346,6 +346,27 @@ kalibriert: Ab 80 % war der wahre Verlust in allen Läufen vernachlässigbar.
 4. **Alte Kurve zum Vergleich:** Mit `--curve-finder legacy` lässt sich die alte Kurvenform holen. Ein blinder Vergleich
    über mehrere Tage wäre der erste echte Beleg.
 
+## Nachtrag: Kurve für Micro-Adjustments und Flash (M14b)
+
+Dein Ziel: wenig Gain für kleine, langsame Korrekturen, viel Gain zum Wegdrehen vor einem Flash und zurück. Das ist ein
+Abwägen zwischen Genauigkeit und Tempo. Man sieht es nur am Ergebnis (Treffer, Zeit, ausgewichene Flashes), nicht an den
+Zielfehlern. Getestet wurde in der Simulation, übernommen nur, was besser war.
+
+| Test | Ergebnis | Übernommen? |
+|---|---|---|
+| Tagesform-Modell mit 20–30 Runden pro Session | bei Drift besser (30 Runden, 10 %: 14,9 statt 19,5 % Fehler), ohne Drift bei 20 Runden schlechter (7,2 statt 5,0 %), Hinweis 40 % Fehlalarm | nein |
+| Zwei-Wege-Kurve (langsam weniger, schnell mehr Gain) | langsam weniger hilft im Simulator nie, weil seine Hand Micro-Ziele immer trifft; nicht prüfbar | nein |
+| Stärkensuche in Blöcken (gleiche Stärke mehrere Runden) | bringt nichts gegenüber dem Wechsel jede Runde | nein |
+| Suche mit Micro/Flash/Flick-Mix bis 2,0 | findet starke Kurven, aber auch für Hände, die sie nicht wollen; nach dem Blindtest schlechter als heute | nein |
+| **heutige Suche mit Flash, Bereich bis 1,75 statt 1,45** | mehr Nutzen bei Händen, die eine Kurve wollen oder sich gewöhnen (+10,5 statt +4,6 Punkte bei Flash „often"), keine schädliche Kurve exportiert | **ja** |
+
+Wichtig für dich:
+- Die Erweiterung wirkt nur, wenn Flash in den Einstellungen nicht auf „never" steht. Am meisten bringt „often".
+- Ob eine niedrigere Grund-Sensitivity für deine Micro-Adjustments hilft, kann nur ein echter Test zeigen. Am einfachsten
+  probierst du die Sensitivity-Suche mit eingeschalteten Micro-Runden und vergleichst ihr Ergebnis mit deiner jetzigen.
+- In deiner bisherigen echten Suche lag das Ergebnis bei 0,70, also weniger Gain bei Tempo. Mit Flash „often" und dem neuen
+  Bereich lohnt eine neue Suche. Liegt sie danach am oberen Rand (1,75), spricht das klar für deinen Wunsch.
+
 ## Verwendete Agenten und Modelle
 
 - Bewertung, Urteil und Bericht: Hauptsession, Claude Opus 5.5.

@@ -109,7 +109,7 @@ class AccelRun(
     private var tested: AccelFit? = startWithTest
     private var source = Source.ANALYSIS
 
-    private val search = StrengthSearch(weights, seed, plannedRounds = StrengthSearch.plannedFor(priorSearch.size), prior = priorSearch)
+    private val search = StrengthSearch(weights, seed, plannedRounds = StrengthSearch.plannedFor(priorSearch.size), prior = priorSearch, flash = flash)
     private var searchCandidate: AccelFit? = null
     private var currentStrength = CurveStrength.NEUTRAL
 

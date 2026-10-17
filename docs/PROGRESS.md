@@ -182,6 +182,15 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 
 ## Last session
 
+- M14b (user's goal: low gain for micro-adjustments, high gain for flash turn-away and return):
+  - Tried and not taken:
+    - the time model with 20-30 rounds a session (better under drift, worse without, 40 % false hints);
+    - a two-way curve (the simulated hand hits every micro target, so lower slow gain cannot be judged);
+    - block designs for the strength search;
+    - a micro/flash/flick search up to 2.0 (worse after the blind test).
+  - Taken: with flash rounds the strength search goes up to 1.75 instead of 1.45 (`CurveStrength.MAX_WITH_FLASH`). In the whole chain it reaches more players who gain from a curve and exported no harmful one (ALGORITHMS.md "Follow-up").
+  - Open (user): a new strength search with flash "often". Does it end near 1.75, or at the low end again as the earlier real search did (0.70)?
+
 - M14 (docs/OPTIMIZER-REVIEW.md "Umsetzung und Ergebnisse", ALGORITHMS.md "M14"): gate harness with four player models.
   - Outcomes:
     - curve finder v2 passed and is the default;

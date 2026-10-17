@@ -58,7 +58,7 @@ class DriftGateTest {
     @Test
     fun driftGate() {
         val sessions = 4
-        val perSession = 10
+        val perSession = System.getenv("AIMTUNE_ROUNDS_PER_SESSION")?.toIntOrNull() ?: 10
         val out = StringBuilder("== Gate T7 drift: $sessions sessions x $perSession rounds, sessions $daysPerSession days apart, FLICK, $seeds seeds, range 20-140 ==\n")
         out.appendLine("Truth = configured optimum of session 4 (50*(1+d)^3) [sweep: 17-point 20-160 sweep, 20 rounds/point, degree-4 argmax of session 4 player]")
         val grid = geometricGrid(20.0, 160.0, 17)
@@ -93,6 +93,6 @@ class DriftGateTest {
             out.appendLine("   %2d rounds %-26s error factor median %.4f | 80%% cover %3.0f%% | optimum sum %.6f | n=%d".format(
                 rounds, label, median(factor), 100.0 * rs.count { it.intervalLowCm360 <= 50.0 && 50.0 <= it.intervalHighCm360 } / rs.size, rs.sumOf { it.optimumCm360 }, rs.size))
         }
-        write("gate-t7-drift.txt", out.toString())
+        write("gate-" + (System.getenv("AIMTUNE_DRIFT_TAG") ?: "t7-drift") + ".txt", out.toString())
     }
 }

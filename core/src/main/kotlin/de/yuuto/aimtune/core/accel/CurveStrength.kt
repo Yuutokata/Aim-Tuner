@@ -17,6 +17,14 @@ object CurveStrength {
     const val MIN = 0.7
     const val MAX = 1.45
 
+    /**
+     * The upper end when the search plays flash rounds. A faster turn away from a flash pays for more gain at speed, and
+     * with flash rounds the whole chain (search, then blind test) reached more players who gain from a curve and exported
+     * no harmful one more often (chain-strength-search-flash35/15.txt, M14 follow-up). Without flash rounds a wider range
+     * only overshot moderate preferences (assess-strength-range.txt), so it stays at [MAX] there.
+     */
+    const val MAX_WITH_FLASH = 1.75
+
     /** The strength of "no curve". */
     const val NEUTRAL = 1.0
 
@@ -27,8 +35,11 @@ object CurveStrength {
     const val DECAY = 0.05
     private const val PSEUDO_SCALE = 100.0
 
-    /** The range the optimizer searches, as pseudo cm/360. */
+    /** The range the optimizer searches without flash rounds, as pseudo cm/360. */
     val searchRange = SearchRange(MIN * PSEUDO_SCALE, MAX * PSEUDO_SCALE)
+
+    /** The range the optimizer searches, as pseudo cm/360: up to [MAX_WITH_FLASH] when the search plays flash rounds. */
+    fun searchRange(flash: Boolean): SearchRange = if (flash) SearchRange(MIN * PSEUDO_SCALE, MAX_WITH_FLASH * PSEUDO_SCALE) else searchRange
 
     fun toPseudo(strength: Double): Double = strength * PSEUDO_SCALE
 

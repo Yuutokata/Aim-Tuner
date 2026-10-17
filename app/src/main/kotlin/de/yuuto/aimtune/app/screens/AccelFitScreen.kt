@@ -78,7 +78,7 @@ abstract class AccelFitScreen(ctx: AppContext) : UiScreen(ctx) {
             ui.label(t("accel.search.range", "%.2f".format(Locale.ROOT, r.low), "%.2f".format(Locale.ROOT, r.high), r.confidencePercent), Styles.CAPTION_MUTED, wrap = true),
         ).left().width(width - 2 * CARD_PADDING).padTop(12f).row()
         if (r.atEdge) {
-            card.add(ui.label(t("accel.search.edge", "%.2f".format(Locale.ROOT, CurveStrength.MIN), "%.2f".format(Locale.ROOT, CurveStrength.MAX)), Styles.CAUTION, wrap = true))
+            card.add(ui.label(t("accel.search.edge", "%.2f".format(Locale.ROOT, r.rangeMin), "%.2f".format(Locale.ROOT, r.rangeMax)), Styles.CAUTION, wrap = true))
                 .left().width(width - 2 * CARD_PADDING).padTop(12f)
         }
         return card
