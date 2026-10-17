@@ -90,7 +90,7 @@ class StoredSearchesTest {
         val result = assertNotNull(stored.result)
         assertTrue(abs(result.strength - live.strength) < 0.03, "stored ${result.strength}, live ${live.strength}")
         assertEquals(live.excludesPlain, result.excludesPlain)
-        assertEquals(run.searchOffer != null, stored.offer != null)
+        assertEquals(run.searchOffer != null, stored.clear)
     }
 
     private fun storeSearch(processor: RoundProcessor, config: TrainerConfig, seed: Long, runKey: Long, startAt: Long): AccelRun {
@@ -123,6 +123,36 @@ class StoredSearchesTest {
         val result = assertNotNull(pooled.result)
         assertTrue(result.strength < 1.0, "the falling player wants a falling strength, was ${result.strength}")
         assertNotNull(pooled.offer)
+    }
+
+    @Test
+    fun `a new search builds on the stored ones and needs fewer new rounds`() {
+        val profile = checkNotNull(GameProfiles.load().find("valorant"))
+        val config = TrainerConfig(800.0, 34.4, profile, roundSeconds = 30, seed = 0)
+        val processor = RoundProcessor(Database.open(dir.resolve("d.db")))
+        val first = storeSearch(processor, config, seed = 7, runKey = 1, startAt = 0)
+        val prior = processor.priorSearch(800.0, 34.4)
+        assertEquals(first.searchRounds, prior.size)
+        assertTrue(processor.priorSearch(800.0, 50.0).isEmpty(), "another sensitivity has none")
+        assertTrue(processor.priorSearch(1600.0, 34.4).isEmpty(), "another DPI has none")
+
+        val second = AccelRun(config, MetricWeights.DEFAULT, runKey = 2, seed = 8, startWithSearch = true, priorSearch = prior)
+        assertEquals(StrengthSearch.MIN_PLANNED_WITH_PRIOR, second.searchRounds, "24 earlier rounds leave a day of 8")
+        assertEquals(prior.size, second.priorSearchRounds)
+        assertTrue(second.searchMinRounds < StrengthSearch.MIN_ROUNDS)
+        repeat(second.searchMinRounds - 1) { play(second) }
+        assertTrue(!second.canFinishSearchNow)
+        while (second.phase == AccelPhase.SEARCH) play(second)
+        assertEquals(AccelPhase.SEARCH_RESULT, second.phase)
+        val result = assertNotNull(second.searchResult)
+        assertEquals(prior.size + second.searchRounds, result.rounds, "the result counts the earlier rounds too")
+        assertTrue(result.strength < 1.0 && second.searchOffer != null, "the falling player still gets a falling curve: $result")
+        processor.close()
+    }
+
+    private fun play(run: AccelRun) {
+        val next = run.nextRoundConfig()
+        run.recordRound(HeadlessRound.of(next.scenario, fallingGainPlayer, next.dpi, next.cm360, next.seed, next.roundSeconds, accel = next.accel))
     }
 
     @Test

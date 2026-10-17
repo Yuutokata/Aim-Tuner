@@ -259,9 +259,13 @@ class AppContext(
         val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
         val result = stored.result ?: return showAccel()
         val base = stored.config.copy(cm360 = result.optimumCm360)
-        // The search does not use the calibration, so only a run that starts with it looks for earlier rounds.
+        // A run looks for the earlier rounds of what it starts with: the calibration or the search.
         val prior = if (search) PriorCalibration.NONE else processor.priorCalibration(base.dpi, base.cm360)
-        val run = AccelRun(base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, prior = prior, startWithSearch = search, flash = settings.current.flashImportance() != FlashImportance.NEVER)
+        val priorSearch = if (search) processor.priorSearch(base.dpi, base.cm360) else emptyList()
+        val run = AccelRun(
+            base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, prior = prior, startWithSearch = search,
+            flash = settings.current.flashImportance() != FlashImportance.NEVER, priorSearch = priorSearch,
+        )
         showAccelStep(run)
     }
 

@@ -24,24 +24,44 @@ data class StrengthResult(
 )
 
 /**
+ * A round of an earlier search, as the optimizer needs it: the strength it was played with, its score inputs and where it
+ * was played. [sessionKey] says which earlier session it belongs to (a better or worse day is learned per session) and
+ * [step] is its position within that session.
+ */
+data class PriorSearchRound(val sessionKey: Long, val step: Int, val strength: Double, val scenarioId: String, val scoreInputs: Map<ScoreMetric, Double>)
+
+/**
  * The blind search for the curve strength: rounds played with different strengths (some of them no curve
  * at all) at the recommended sensitivity, scored like every other round, and the same optimizer that
  * finds the sensitivity looks for the strength that scores best. Without UI; [AccelRun] drives it.
+ * [prior] holds the rounds of earlier searches at the same setup; they count for the optimizer like the rounds of
+ * this search, so [plannedRounds] can be lower and the first strengths already build on what is known.
  */
-class StrengthSearch(private val weights: MetricWeights, seed: Long, val plannedRounds: Int = DEFAULT_ROUNDS) {
+class StrengthSearch(
+    private val weights: MetricWeights,
+    seed: Long,
+    val plannedRounds: Int = DEFAULT_ROUNDS,
+    private val prior: List<PriorSearchRound> = emptyList(),
+) {
     private val optimizer = SensitivityOptimizer(CurveStrength.searchRange, seed)
     private val inputs = mutableListOf<Map<ScoreMetric, Double>>()
     private val scenarios = mutableListOf<String>()
     private val pseudo = mutableListOf<Double>()
 
+    /** Rounds of this search, without the earlier ones. */
     val roundsPlayed: Int get() = inputs.size
+
+    val priorRounds: Int get() = prior.size
+
+    /** From this many own rounds on the search may end early: 16 in all, but a day with earlier rounds still plays a few new ones. */
+    val minRounds: Int get() = minOf(plannedRounds, maxOf(MIN_NEW_ROUNDS, MIN_ROUNDS - prior.size))
 
     /** The strength of the next round. Blind: callers must not show it. */
     fun nextStrength(): Double = CurveStrength.fromPseudo(optimizer.suggestNext(history()).cm360)
 
     fun record(strength: Double, scenario: ScenarioKind, metrics: RoundMetrics) = record(strength, scenario.id, metrics.scoreInputs())
 
-    /** Takes a round by its scenario id and score inputs, e.g. from the stored rounds of an earlier search. */
+    /** Takes a round by its scenario id and score inputs. */
     fun record(strength: Double, scenarioId: String, scoreInputs: Map<ScoreMetric, Double>) {
         inputs += scoreInputs
         scenarios += scenarioId
@@ -55,12 +75,17 @@ class StrengthSearch(private val weights: MetricWeights, seed: Long, val planned
         val low = CurveStrength.fromPseudo(analysis.intervalLowCm360)
         val high = CurveStrength.fromPseudo(analysis.intervalHighCm360)
         val side = low > CurveStrength.NEUTRAL || high < CurveStrength.NEUTRAL
-        return StrengthResult(strength, low, high, analysis.confidencePercent, roundsPlayed, side && CurveStrength.isCurve(strength), analysis.atRangeEdge)
+        return StrengthResult(strength, low, high, analysis.confidencePercent, prior.size + roundsPlayed, side && CurveStrength.isCurve(strength), analysis.atRangeEdge)
     }
 
     private fun history(): List<Observation> {
-        val scores = ScoreCalculator(weights).scoreRounds(inputs, scenarios)
-        return pseudo.indices.map { Observation(0L, pseudo[it], scores[it] ?: UNKNOWN_SCORE, scenarios[it].hashCode(), it) }
+        val scores = ScoreCalculator(weights).scoreRounds(prior.map { it.scoreInputs } + inputs, prior.map { it.scenarioId } + scenarios)
+        val earlier = prior.indices.map {
+            val round = prior[it]
+            Observation(round.sessionKey, CurveStrength.toPseudo(round.strength), scores[it] ?: UNKNOWN_SCORE, round.scenarioId.hashCode(), round.step)
+        }
+        val own = pseudo.indices.map { Observation(OWN_SESSION, pseudo[it], scores[prior.size + it] ?: UNKNOWN_SCORE, scenarios[it].hashCode(), it) }
+        return earlier + own
     }
 
     companion object {
@@ -68,7 +93,17 @@ class StrengthSearch(private val weights: MetricWeights, seed: Long, val planned
         const val DEFAULT_ROUNDS = 24
         const val MIN_ROUNDS = 16
 
+        /** With earlier rounds to build on, a search still plays at least this many new rounds, and may end after [MIN_NEW_ROUNDS]. */
+        const val MIN_NEW_ROUNDS = 6
+        const val MIN_PLANNED_WITH_PRIOR = 8
+
+        /** The session id of this search's own rounds; stored sessions have positive ids. */
+        private const val OWN_SESSION = 0L
+
         /** A round without a usable score yet only counts for the design phase. */
         private const val UNKNOWN_SCORE = 50.0
+
+        /** The rounds to plan for a search that has [priorRounds] earlier rounds to build on. */
+        fun plannedFor(priorRounds: Int): Int = if (priorRounds == 0) DEFAULT_ROUNDS else maxOf(MIN_PLANNED_WITH_PRIOR, DEFAULT_ROUNDS - priorRounds)
     }
 }

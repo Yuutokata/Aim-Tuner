@@ -4,6 +4,7 @@ import de.yuuto.aimtune.app.accel.AccelRun
 import de.yuuto.aimtune.app.accel.LastCalibration
 import de.yuuto.aimtune.app.accel.LastSearch
 import de.yuuto.aimtune.app.accel.PriorCalibration
+import de.yuuto.aimtune.app.accel.PriorSearchRound
 import de.yuuto.aimtune.app.accel.StoredSearches
 import de.yuuto.aimtune.app.blind.AxisErrors
 import de.yuuto.aimtune.app.blind.PastRound
@@ -152,13 +153,30 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
             executor.submit<LastSearch?> {
                 val searches = repo.sessions().filter { it.kind != SessionKind.SENSITIVITY }.mapNotNull { session ->
                     val rounds = StoredSearches.searchRounds(session.kind, repo.rounds(session.id))
-                    if (rounds.isEmpty()) null else StoredSearches.SearchSession(session.dpi, rounds)
+                    if (rounds.isEmpty()) null else StoredSearches.SearchSession(session.id, session.dpi, rounds)
                 }
                 StoredSearches.pool(searches, weights)
             }.get()
         } catch (e: Exception) {
             log.log(System.Logger.Level.ERROR, "reading the last search failed: ${e.message}", e)
             null
+        }
+    }
+
+    /** The stored search rounds at this DPI and sensitivity for a new search to build on; none without a database or if reading fails. */
+    fun priorSearch(dpi: Double, cm360: Double): List<PriorSearchRound> {
+        val repo = repository ?: return emptyList()
+        return try {
+            executor.submit<List<PriorSearchRound>> {
+                val searches = repo.sessions().filter { it.kind != SessionKind.SENSITIVITY }.mapNotNull { session ->
+                    val rounds = StoredSearches.searchRounds(session.kind, repo.rounds(session.id))
+                    if (rounds.isEmpty()) null else StoredSearches.SearchSession(session.id, session.dpi, rounds)
+                }
+                StoredSearches.priorRounds(searches, dpi, cm360)
+            }.get()
+        } catch (e: Exception) {
+            log.log(System.Logger.Level.ERROR, "reading earlier search rounds failed: ${e.message}", e)
+            emptyList()
         }
     }
 

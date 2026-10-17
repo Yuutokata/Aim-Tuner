@@ -14,7 +14,11 @@ import kotlin.math.abs
 
 /** What the stored blind strength searches at one setup found together, computed again from their rounds. [offer] is the curve when the search excluded "no curve". */
 data class LastSearch(val dpi: Double, val cm360: Double, val rounds: Int, val sessions: Int, val result: StrengthResult?) {
-    val offer: AccelFit? get() = result?.takeIf { it.excludesPlain }?.let { strengthAccel(it.strength) }
+    /** The curve of the best strength whenever that is a real curve, even when "no curve" is still inside the range (see [clear]). */
+    val offer: AccelFit? get() = result?.takeIf { CurveStrength.isCurve(it.strength) }?.let { strengthAccel(it.strength) }
+
+    /** True when the range of the best strength excludes "no curve", i.e. the search says clearly that a curve scored better. */
+    val clear: Boolean get() = result?.excludesPlain == true
 }
 
 /**
@@ -27,8 +31,12 @@ object StoredSearches {
     private const val SAME_STRENGTH = 1e-9
     private const val MIN_DISTINCT_STRENGTHS = 4
 
-    /** Share by which the sensitivity of an earlier search may differ from the newest one's, as for the pooled calibration. */
-    const val CM360_TOLERANCE = PriorCalibration.CM360_TOLERANCE
+    /**
+     * Share by which the sensitivity of an earlier search may differ from the new one's (5 %). A strength is a gain
+     * relative to the slow speeds, which depends less on the sensitivity than the way first movements miss does, so this is
+     * wider than for the calibration; the recommended sensitivity moved by 4.5 % between two days in the author's data.
+     */
+    const val CM360_TOLERANCE = 0.05
 
     /** The newest rounds that are analysed; the optimizer's cost grows with them. */
     const val MAX_ROUNDS = 120
@@ -88,22 +96,31 @@ object StoredSearches {
         return i
     }
 
-    /** One stored search (non-empty [rounds] from [searchRounds]) and the DPI it was played with. */
-    class SearchSession(val dpi: Double, val rounds: List<RoundRow>) {
+    /** One stored search (non-empty [rounds] from [searchRounds]), its session and the DPI it was played with. */
+    class SearchSession(val sessionId: Long, val dpi: Double, val rounds: List<RoundRow>) {
         val cm360: Double get() = rounds.first().cm360
     }
 
     /**
-     * The newest search together with the earlier ones at the same DPI and a sensitivity within [CM360_TOLERANCE] of it
-     * ([sessions] oldest first), at most the newest [MAX_ROUNDS] rounds. The strengths are played at the same sensitivity, so
-     * the rounds of several days tell the same optimizer more about which strength scores best. Null without a search.
+     * The rounds of the searches at this DPI and a sensitivity within [CM360_TOLERANCE] of [cm360] ([sessions] oldest first),
+     * at most the newest [MAX_ROUNDS], each with its session and its position in it, so the optimizer can learn a better or
+     * worse day per session. The strengths are all played at the same sensitivity, which is what lets the rounds of
+     * several days answer the same question.
      */
+    fun priorRounds(sessions: List<SearchSession>, dpi: Double, cm360: Double): List<PriorSearchRound> =
+        sessions.filter { abs(it.dpi - dpi) < 0.5 && abs(it.cm360 / cm360 - 1.0) <= CM360_TOLERANCE }
+            .flatMap { session ->
+                session.rounds.mapIndexed { step, round ->
+                    PriorSearchRound(session.sessionId, step, checkNotNull(strengthOf(round.accel)), round.scenario, round.scoreInputs())
+                }
+            }
+            .takeLast(MAX_ROUNDS)
+
+    /** The newest search together with the earlier ones at its setup, analysed together; null without a search. */
     fun pool(sessions: List<SearchSession>, weights: MetricWeights): LastSearch? {
         val newest = sessions.lastOrNull() ?: return null
-        val same = sessions.filter { abs(it.dpi - newest.dpi) < 0.5 && abs(it.cm360 / newest.cm360 - 1.0) <= CM360_TOLERANCE }
-        val rounds = same.flatMap { it.rounds }.takeLast(MAX_ROUNDS)
-        val search = StrengthSearch(weights, seed = 0L, plannedRounds = rounds.size)
-        rounds.forEach { search.record(checkNotNull(strengthOf(it.accel)), it.scenario, it.scoreInputs()) }
-        return LastSearch(newest.dpi, newest.cm360, rounds.size, same.size, search.result())
+        val rounds = priorRounds(sessions, newest.dpi, newest.cm360)
+        val result = StrengthSearch(weights, seed = 0L, plannedRounds = rounds.size, prior = rounds).result()
+        return LastSearch(newest.dpi, newest.cm360, rounds.size, rounds.map { it.sessionKey }.distinct().size, result)
     }
 }

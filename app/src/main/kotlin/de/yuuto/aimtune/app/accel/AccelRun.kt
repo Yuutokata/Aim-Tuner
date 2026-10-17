@@ -71,6 +71,8 @@ class AccelRun(
     flash: Boolean = false,
     /** Begin with the blind test of this curve, e.g. one the stored calibration rounds gave; no calibration or search. */
     startWithTest: AccelFit? = null,
+    /** Rounds of earlier searches at this sensitivity; the search builds on them, so it plays fewer new rounds. */
+    priorSearch: List<PriorSearchRound> = emptyList(),
 ) {
     var phase = when {
         startWithTest != null -> AccelPhase.TEST
@@ -104,7 +106,7 @@ class AccelRun(
     private var tested: AccelFit? = startWithTest
     private var source = Source.ANALYSIS
 
-    private val search = StrengthSearch(weights, seed)
+    private val search = StrengthSearch(weights, seed, plannedRounds = StrengthSearch.plannedFor(priorSearch.size), prior = priorSearch)
     private var searchCandidate: AccelFit? = null
     private var currentStrength = CurveStrength.NEUTRAL
 
@@ -126,10 +128,16 @@ class AccelRun(
 
     val searchDone: Int get() = search.roundsPlayed
 
+    /** How many rounds of earlier searches this search builds on. */
+    val priorSearchRounds: Int get() = search.priorRounds
+
+    /** From this many new rounds on the search can be ended early. */
+    val searchMinRounds: Int get() = search.minRounds
+
     val searchRounds: Int get() = search.plannedRounds
 
     /** True once enough search rounds are played to finish early. */
-    val canFinishSearchNow: Boolean get() = phase == AccelPhase.SEARCH && search.roundsPlayed >= StrengthSearch.MIN_ROUNDS
+    val canFinishSearchNow: Boolean get() = phase == AccelPhase.SEARCH && search.roundsPlayed >= search.minRounds
 
     /** Whether the wanted gain the analysis measured rises with speed; a guess for the direction of a trial curve. */
     val trialRises: Boolean

@@ -5,7 +5,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table
 import de.yuuto.aimtune.app.AppContext
 import de.yuuto.aimtune.app.accel.AccelPhase
 import de.yuuto.aimtune.app.accel.AccelRun
-import de.yuuto.aimtune.app.accel.StrengthSearch
 import de.yuuto.aimtune.app.ui.Styles
 import de.yuuto.aimtune.app.ui.addButton
 import de.yuuto.aimtune.app.ui.button
@@ -91,7 +90,8 @@ class AccelBetweenScreen(ctx: AppContext, private val run: AccelRun) : UiScreen(
     private fun explanation() = when {
         calibrating && run.prior.rounds > 0 -> t("accel.between.explain_calibration", AccelRun.MIN_CALIBRATION_ROUNDS) + " " + t("accel.between.prior", run.prior.rounds)
         calibrating -> t("accel.between.explain_calibration", AccelRun.MIN_CALIBRATION_ROUNDS)
-        searching -> t("accel.between.explain_search", StrengthSearch.MIN_ROUNDS)
+        searching && run.priorSearchRounds > 0 -> t("accel.between.explain_search", run.searchMinRounds) + " " + t("accel.between.prior_search", run.priorSearchRounds)
+        searching -> t("accel.between.explain_search", run.searchMinRounds)
         else -> t("accel.between.explain_test", run.maxTestRounds / 2)
     }
 }
