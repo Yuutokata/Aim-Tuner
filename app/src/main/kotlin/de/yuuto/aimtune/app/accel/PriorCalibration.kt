@@ -2,6 +2,9 @@ package de.yuuto.aimtune.app.accel
 
 import de.yuuto.aimtune.core.accel.MovementSample
 
+/** The setup of the newest acceleration round and the plain-round data stored for it. */
+data class LastCalibration(val dpi: Double, val cm360: Double, val data: PriorCalibration)
+
 /**
  * Plain-sensitivity movements from the calibration (and plain test) rounds of earlier acceleration runs, so the error
  * analysis can use rounds from several days. They count only at the sensitivity of the new run: a different one

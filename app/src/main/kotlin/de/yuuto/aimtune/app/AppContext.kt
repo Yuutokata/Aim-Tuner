@@ -10,6 +10,7 @@ import de.yuuto.aimtune.app.update.AppVersion
 import de.yuuto.aimtune.app.update.ReleaseInfo
 import de.yuuto.aimtune.app.audio.HitSounds
 import de.yuuto.aimtune.app.accel.AccelSession
+import de.yuuto.aimtune.app.accel.LastCalibration
 import de.yuuto.aimtune.app.accel.PriorCalibration
 import de.yuuto.aimtune.app.blind.AxisSummary
 import de.yuuto.aimtune.app.blind.BlindRun
@@ -19,6 +20,7 @@ import de.yuuto.aimtune.app.blind.PastRound
 import de.yuuto.aimtune.app.screens.AccelAnalysisScreen
 import de.yuuto.aimtune.app.screens.AccelBetweenScreen
 import de.yuuto.aimtune.app.screens.AccelIntroScreen
+import de.yuuto.aimtune.app.screens.AccelLastAnalysisScreen
 import de.yuuto.aimtune.app.screens.AccelResultScreen
 import de.yuuto.aimtune.app.screens.AccelSearchResultScreen
 import de.yuuto.aimtune.app.history.HistoryEntry
@@ -214,6 +216,9 @@ class AppContext(
     }
 
     fun showAccel() = switchTo(AccelIntroScreen(this))
+
+    /** The analysis of the stored calibration rounds, computed again from them. */
+    fun showLastAccelAnalysis(last: LastCalibration? = processor.lastCalibration()) = switchTo(AccelLastAnalysisScreen(this, last))
 
     /** The screen that exports the stored rounds for a researcher; the counts are read in the background. */
     fun showShareData() = switchTo(

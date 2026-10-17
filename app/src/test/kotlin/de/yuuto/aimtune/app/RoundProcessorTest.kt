@@ -67,6 +67,20 @@ class RoundProcessorTest {
         assertEquals(3, prior.rounds, "only the plain rounds of acceleration sessions count")
         assertTrue(prior.samples.isNotEmpty())
         assertEquals(PriorCalibration.NONE, processor.priorCalibration(800.0, 55.0), "another sensitivity has none")
+
+        val last = checkNotNull(processor.lastCalibration())
+        assertEquals(800.0, last.dpi)
+        assertEquals(40.0, last.cm360)
+        assertEquals(3, last.data.rounds)
+        processor.close()
+    }
+
+    @Test
+    fun `without stored acceleration rounds there is no last calibration`() {
+        val processor = RoundProcessor(Database.open(dir.resolve("d.db")))
+        processor.submit(recording(1), startedAtMs = 10, blind = false, gameId = "valorant")
+        assertNull(processor.lastCalibration())
+        assertNull(RoundProcessor(null).lastCalibration())
         processor.close()
     }
 

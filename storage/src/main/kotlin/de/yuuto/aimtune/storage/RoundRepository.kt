@@ -141,6 +141,22 @@ class RoundRepository(private val database: Database) {
         }
     }
 
+    /** DPI and cm/360 of the newest plain round of an acceleration session in one of [scenarios], or null when there is none. */
+    fun latestPlainAccelSetup(scenarios: List<String>): Pair<Double, Double>? {
+        if (scenarios.isEmpty()) return null
+        val marks = scenarios.joinToString(",") { "?" }
+        return database.transaction { c ->
+            c.prepareStatement(
+                "SELECT r.dpi, r.cm360 FROM round r JOIN session s ON s.id = r.session_id " +
+                    "WHERE s.kind = ? AND r.accel IS NULL AND r.scenario IN ($marks) ORDER BY r.started_at_ms DESC, r.id DESC LIMIT 1",
+            ).use { s ->
+                s.setString(1, SessionKind.ACCEL_AB.id)
+                scenarios.forEachIndexed { i, id -> s.setString(2 + i, id) }
+                s.executeQuery().use { rs -> if (rs.next()) rs.getDouble(1) to rs.getDouble(2) else null }
+            }
+        }
+    }
+
     /**
      * Recomputes the stored metrics of every round written with an older [METRICS_VERSION] from its raw
      * events, so a changed metric definition applies to the whole history. A round whose events cannot be

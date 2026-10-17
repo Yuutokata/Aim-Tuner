@@ -72,6 +72,8 @@ class RoundRepositoryTest {
             assertEquals(listOf(near, old), found)
             assertEquals(listOf(near), repo.plainAccelRoundIds(800.0, 40.0, listOf("flick"), tolerance = 0.03, limit = 1))
             assertEquals(emptyList(), repo.plainAccelRoundIds(800.0, 40.0, emptyList(), tolerance = 0.03, limit = 10))
+            assertEquals(400.0 to 40.0, repo.latestPlainAccelSetup(listOf("flick")), "the newest plain round decides the setup")
+            assertNull(repo.latestPlainAccelSetup(listOf("micro")))
         }
     }
 
