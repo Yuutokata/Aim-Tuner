@@ -12,8 +12,8 @@ import de.yuuto.aimtune.storage.SessionKind
 import de.yuuto.aimtune.storage.scoreInputs
 import kotlin.math.abs
 
-/** What a stored blind strength search found, computed again from its rounds. [offer] is the curve when the search excluded "no curve". */
-data class LastSearch(val dpi: Double, val cm360: Double, val rounds: Int, val result: StrengthResult?) {
+/** What the stored blind strength searches at one setup found together, computed again from their rounds. [offer] is the curve when the search excluded "no curve". */
+data class LastSearch(val dpi: Double, val cm360: Double, val rounds: Int, val sessions: Int, val result: StrengthResult?) {
     val offer: AccelFit? get() = result?.takeIf { it.excludesPlain }?.let { strengthAccel(it.strength) }
 }
 
@@ -26,6 +26,12 @@ object StoredSearches {
     private const val DECAY_TOLERANCE = 1e-9
     private const val SAME_STRENGTH = 1e-9
     private const val MIN_DISTINCT_STRENGTHS = 4
+
+    /** Share by which the sensitivity of an earlier search may differ from the newest one's, as for the pooled calibration. */
+    const val CM360_TOLERANCE = PriorCalibration.CM360_TOLERANCE
+
+    /** The newest rounds that are analysed; the optimizer's cost grows with them. */
+    const val MAX_ROUNDS = 120
 
     /** The strength a round was played with, or null when its curve is not one of the search's (e.g. a fitted curve of the error analysis). */
     fun strengthOf(accel: String?): Double? {
@@ -82,10 +88,22 @@ object StoredSearches {
         return i
     }
 
-    /** The result of the search over [rounds] (non-empty, from [searchRounds]) played with [dpi]. */
-    fun summarize(dpi: Double, rounds: List<RoundRow>, weights: MetricWeights): LastSearch {
+    /** One stored search (non-empty [rounds] from [searchRounds]) and the DPI it was played with. */
+    class SearchSession(val dpi: Double, val rounds: List<RoundRow>) {
+        val cm360: Double get() = rounds.first().cm360
+    }
+
+    /**
+     * The newest search together with the earlier ones at the same DPI and a sensitivity within [CM360_TOLERANCE] of it
+     * ([sessions] oldest first), at most the newest [MAX_ROUNDS] rounds. The strengths are played at the same sensitivity, so
+     * the rounds of several days tell the same optimizer more about which strength scores best. Null without a search.
+     */
+    fun pool(sessions: List<SearchSession>, weights: MetricWeights): LastSearch? {
+        val newest = sessions.lastOrNull() ?: return null
+        val same = sessions.filter { abs(it.dpi - newest.dpi) < 0.5 && abs(it.cm360 / newest.cm360 - 1.0) <= CM360_TOLERANCE }
+        val rounds = same.flatMap { it.rounds }.takeLast(MAX_ROUNDS)
         val search = StrengthSearch(weights, seed = 0L, plannedRounds = rounds.size)
         rounds.forEach { search.record(checkNotNull(strengthOf(it.accel)), it.scenario, it.scoreInputs()) }
-        return LastSearch(dpi, rounds.first().cm360, rounds.size, search.result())
+        return LastSearch(newest.dpi, newest.cm360, rounds.size, same.size, search.result())
     }
 }

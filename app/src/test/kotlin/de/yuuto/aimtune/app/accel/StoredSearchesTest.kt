@@ -93,6 +93,38 @@ class StoredSearchesTest {
         assertEquals(run.searchOffer != null, stored.offer != null)
     }
 
+    private fun storeSearch(processor: RoundProcessor, config: TrainerConfig, seed: Long, runKey: Long, startAt: Long): AccelRun {
+        val run = AccelRun(config, MetricWeights.DEFAULT, runKey = runKey, seed = seed, startWithSearch = true)
+        var at = startAt
+        while (run.phase == AccelPhase.SEARCH) {
+            val next = run.nextRoundConfig()
+            val round = HeadlessRound.of(next.scenario, fallingGainPlayer, next.dpi, next.cm360, next.seed, next.roundSeconds, accel = next.accel)
+            processor.submit(round, startedAtMs = ++at, blind = true, gameId = "valorant", runKey = runKey, kind = SessionKind.ACCEL_SEARCH)
+            run.recordRound(round)
+        }
+        return run
+    }
+
+    @Test
+    fun `searches of several days at the same setup are analysed together, other setups are left out`() {
+        val profile = checkNotNull(GameProfiles.load().find("valorant"))
+        val config = TrainerConfig(800.0, 34.4, profile, roundSeconds = 30, seed = 0)
+        val processor = RoundProcessor(Database.open(dir.resolve("c.db")))
+        storeSearch(processor, config.copy(cm360 = 46.0), seed = 1, runKey = 1, startAt = 0)
+        storeSearch(processor, config, seed = 2, runKey = 2, startAt = 1_000)
+        storeSearch(processor, config.copy(cm360 = 34.9), seed = 3, runKey = 3, startAt = 2_000)
+        val newest = storeSearch(processor, config, seed = 4, runKey = 4, startAt = 3_000)
+
+        val pooled = assertNotNull(processor.lastSearch(MetricWeights.DEFAULT))
+        processor.close()
+        assertEquals(3, pooled.sessions, "the three searches within 3 % of the newest one's sensitivity")
+        assertEquals(3 * newest.searchRounds, pooled.rounds)
+        assertEquals(34.4, pooled.cm360)
+        val result = assertNotNull(pooled.result)
+        assertTrue(result.strength < 1.0, "the falling player wants a falling strength, was ${result.strength}")
+        assertNotNull(pooled.offer)
+    }
+
     @Test
     fun `without a stored search there is none`() {
         val processor = RoundProcessor(Database.open(dir.resolve("b.db")))

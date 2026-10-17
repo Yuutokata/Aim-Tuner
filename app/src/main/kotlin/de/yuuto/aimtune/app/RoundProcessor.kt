@@ -143,17 +143,18 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
     }
 
     /**
-     * The newest blind strength search among the stored acceleration sessions, analysed again from its rounds; null when
+     * The stored blind strength searches at the setup of the newest one, analysed again together from their rounds; null when
      * there is none or reading fails. Read on the storage thread.
      */
     fun lastSearch(weights: MetricWeights): LastSearch? {
         val repo = repository ?: return null
         return try {
             executor.submit<LastSearch?> {
-                repo.sessions().asReversed().firstNotNullOfOrNull { session ->
+                val searches = repo.sessions().filter { it.kind != SessionKind.SENSITIVITY }.mapNotNull { session ->
                     val rounds = StoredSearches.searchRounds(session.kind, repo.rounds(session.id))
-                    if (rounds.isEmpty()) null else StoredSearches.summarize(session.dpi, rounds, weights)
+                    if (rounds.isEmpty()) null else StoredSearches.SearchSession(session.dpi, rounds)
                 }
+                StoredSearches.pool(searches, weights)
             }.get()
         } catch (e: Exception) {
             log.log(System.Logger.Level.ERROR, "reading the last search failed: ${e.message}", e)

@@ -30,6 +30,8 @@ private const val UNIT_BASELINE_LIFT = 28f
 private const val STAT_GAP = 48f
 private const val PROBLEM_GAP = 24f
 private const val RIGHT_BLOCK_TOP = 130f
+private const val FOOTER_BUTTON_HEIGHT = 64f
+private const val EXIT_BUTTON_WIDTH = 200f
 
 /** Entry screen: start the test, open settings, and see the current setting at a glance. */
 class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
@@ -58,6 +60,8 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
 
         val footer = Table()
         footer.add(ui.label(t("menu.footer"), Styles.CAPTION_MUTED)).left().bottom().padBottom(ITEM_PADDING)
+        footer.add().expandX()
+        footer.add(ui.button(t("menu.exit"), Styles.SECONDARY) { Gdx.app.exit() }).right().bottom().height(FOOTER_BUTTON_HEIGHT).minWidth(EXIT_BUTTON_WIDTH)
         return ui.frame(null, content, footer)
     }
 
