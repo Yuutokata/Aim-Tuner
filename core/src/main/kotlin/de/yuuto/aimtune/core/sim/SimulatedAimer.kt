@@ -16,6 +16,7 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.max
+import kotlin.math.pow
 import kotlin.math.roundToLong
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -119,11 +120,12 @@ class SimulatedAimer(
 
     fun step(nowNanos: Long, target: Target?): AimerStep = step(nowNanos, listOfNotNull(target))
 
-    /** One poll with all [targets] currently visible. */
-    fun step(nowNanos: Long, targets: List<Target>, flash: FlashState? = null): AimerStep {
+    /** One poll with all [targets] currently visible; [deadlineOf] says when a target disappears unless hit (speed rounds). */
+    fun step(nowNanos: Long, targets: List<Target>, flash: FlashState? = null, deadlineOf: (Target) -> Long? = { null }): AimerStep {
         if (kind == ScenarioKind.TRACKING) return trackStep(nowNanos, targets.firstOrNull())
         if (kind == ScenarioKind.FLASH && targets.isEmpty()) return flashStep(nowNanos, flash)
         val target = choose(nowNanos, targets)
+        deadlineNanos = target?.let(deadlineOf)
         val seenBefore = target != null && target.id in seenTargets
         targets.forEach { seenTargets += it.id }
         return clickStep(nowNanos, target, seenBefore)
@@ -233,10 +235,25 @@ class SimulatedAimer(
         repeat(GAIN_ITERATIONS) {
             val handInches = amplitude / (degPerCount * expected) / dpiValue
             val speed = (if (peak) PEAK_TO_MEAN_SPEED else 1.0) * handInches / seconds
-            expected = player.gainPreference(speed)
+            expected = player.gainPreference(speed) * (player.adaptation?.factor(speed) ?: 1.0)
             delivered = accelCurve?.multiplier(speed) ?: 1.0
+            lastSpeed = speed
         }
         return expected to delivered
+    }
+
+    /** The hand speed of the last [gains] call, for the adaptation after a first reach. */
+    private var lastSpeed = 0.0
+
+    /** When the chosen target disappears unless hit; null when it stays. */
+    private var deadlineNanos: Long? = null
+
+    /**
+     * The longest a first reach may take so that the correction and the click still fit before the deadline, or null
+     * without one. The player plans for one look and the click after the reach.
+     */
+    private fun reachBudgetMs(nowNanos: Long): Double? = deadlineNanos?.let { deadline ->
+        (deadline - nowNanos) / NANOS_PER_MS - player.feedbackDelayMs - player.clickDelayMs
     }
 
     /** Where the aim will be once every reach under way has finished, as the player believes. */
@@ -324,24 +341,45 @@ class SimulatedAimer(
         var delivered = accelCurve?.multiplier(0.0) ?: 1.0
         var effectiveCm360 = cm360 / (player.optimumScale * delivered)
         var durationMs = MIN_REACH_MS
+        // Under a deadline a first reach is compressed into the time left: faster, and noisier in proportion (Schmidt et al. 1979).
+        var speedup = 1.0
+        val budget = if (primary) reachBudgetMs(nowNanos) else null
         repeat(GAIN_ITERATIONS) {
             effectiveCm360 = cm360 / (player.optimumScale * delivered)
             val handCm = amplitude * effectiveCm360 / FULL_TURN
             durationMs = max(MIN_REACH_MS, fitts + handCm / player.maxHandSpeedCmPerS * MS_PER_S) * fatigue
+            speedup = 1.0
+            if (budget != null && durationMs > max(budget, MIN_REACH_MS)) {
+                val compressed = max(budget, MIN_REACH_MS)
+                speedup = durationMs / compressed
+                durationMs = compressed
+            }
             val gains = gains(amplitude, durationMs / MS_PER_S, peak = true)
             expected = gains.first
             delivered = gains.second
         }
+        // The hand learns from the gain mismatch of a first reach (it sees where the reach ended); noise is not part of it.
+        if (primary) player.adaptation?.update(lastSpeed, expected, delivered)
         val sigma = player.noiseLevel * fatigue *
-            sqrt(sq(player.signalNoise * amplitude) + sq(player.handNoiseCm * FULL_TURN / effectiveCm360))
-        val gain = if (primary) 1.0 - player.undershootBias else 1.0
+            sqrt(sq(player.signalNoise * amplitude * speedup) + sq(player.handNoiseCm * FULL_TURN / effectiveCm360))
+        val pressure = 1.0 - player.pressureUndershoot * (speedup - 1.0)
+        val gain = if (primary) (1.0 - player.undershootBias) * rangeFactor(amplitude) * max(pressure, MIN_PRESSURE_GAIN) else 1.0
         val moveX = error.x * gain + sigma * gaussian()
         val moveY = error.y * gain + sigma * gaussian()
+        if (player.noiseModel == NoiseModel.DECOUPLED && amplitude > 0.0) {
+            // Same peak speed as planned: the time stretches with the distance the noise produced along the reach.
+            val along = (moveX * error.x + moveY * error.y) / amplitude
+            durationMs *= max(along, MIN_DECOUPLED_SHARE * amplitude * gain) / (amplitude * gain)
+        }
         // Screen-plane x is yaw scaled by cos(pitch); convert back to a yaw change.
         val pitchMid = truePitch + moveY / 2.0
         reaches += Reach(nowNanos, ms(durationMs), moveX / cos(Math.toRadians(pitchMid)), moveY, 1.0 / expected)
         mode = Mode.MOVING
     }
+
+    /** The range effect's scale of a first reach over [amplitude] degrees; 1 without a range bias. */
+    private fun rangeFactor(amplitude: Double): Double =
+        if (player.rangeBias == 0.0) 1.0 else (player.rangeReferenceDegrees / max(amplitude, MIN_RANGE_AMPLITUDE)).pow(player.rangeBias)
 
     /** Hand tremor at the moment of the click: a small displacement that can turn a marginal hit into a miss. */
     private fun twitch(nowNanos: Long) {
@@ -427,6 +465,15 @@ class SimulatedAimer(
 
     private companion object {
         const val FULL_TURN = 360.0
+
+        /** Reaches shorter than this get the range effect of this length, so a tiny correction-like reach is not blown up. */
+        const val MIN_RANGE_AMPLITUDE = 2.0
+
+        /** A decoupled reach keeps at least this share of its planned time, even when the noise nearly cancels it. */
+        const val MIN_DECOUPLED_SHARE = 0.2
+
+        /** A rushed first reach is never scaled below this share of its distance by [SimulatedPlayer.pressureUndershoot]. */
+        const val MIN_PRESSURE_GAIN = 0.5
         const val MS_PER_S = 1000.0
         const val NANOS_PER_MS = 1_000_000.0
         const val NANOS_PER_MINUTE = 60_000_000_000.0

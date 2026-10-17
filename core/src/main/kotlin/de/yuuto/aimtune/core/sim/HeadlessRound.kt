@@ -70,7 +70,7 @@ object HeadlessRound {
         while (now < end) {
             now += NANOS_PER_MS
             // Same order as the trainer: the player sees the targets as of the last update, then the frame advances them.
-            val step = aimer.step(now, scenario.targets, scenario.flash)
+            val step = aimer.step(now, scenario.targets, scenario.flash, scenario::deadlineNanos)
             if (step.dx != 0 || step.dy != 0) {
                 val event = MouseEvent(now, step.dx, step.dy)
                 mouse += event

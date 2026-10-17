@@ -57,9 +57,33 @@ data class SimulatedPlayer(
     val flashReturnReactionMs: Double = 170.0,
     /** Reaction to a flash that becomes visible: the player expects flashes and is ready to turn, so this is quicker than a surprise. */
     val flashTurnReactionMs: Double = 180.0,
+    /** Whether a noisy reach is also faster ([NoiseModel.PLANNED]) or keeps its planned speed. */
+    val noiseModel: NoiseModel = NoiseModel.PLANNED,
+    /**
+     * Range effect: first reaches are scaled by `(rangeReferenceDegrees / amplitude)^rangeBias`, so short ones overshoot and
+     * long ones fall short, whatever the gain. 0 is off. A bias that depends on the distance looks like a speed-dependent
+     * gain to an analysis, because distance and speed go together.
+     */
+    val rangeBias: Double = 0.0,
+    val rangeReferenceDegrees: Double = 20.0,
+    /**
+     * Extra undershoot of a first reach that is rushed by a deadline: the reach is scaled by `1 - pressureUndershoot *
+     * (speedup - 1)`, where speedup is how much faster than unhurried it had to be. 0 (the default) means time pressure
+     * only adds noise. A real hand may do this; a speed round then looks like a wish for more gain at speed, which is the
+     * case the curve calibration cannot tell apart from a real one (docs/ALGORITHMS.md, "Speed rounds").
+     */
+    val pressureUndershoot: Double = 0.0,
+    /**
+     * Motor adaptation of the expected gain; null (the default) is a hand that never learns the curve it plays with. The
+     * instance is mutable and carries the learning from round to round, so give every simulated person its own one.
+     */
+    val adaptation: HandAdaptation? = null,
 ) {
     init {
         require(noiseLevel >= 0.0 && fatiguePerMinute >= 0.0 && optimumScale > 0.0) { "invalid player parameters" }
+        require(rangeBias >= 0.0 && rangeReferenceDegrees > 0.0) { "invalid range bias" }
+        require(undershootBias in 0.0..<1.0) { "undershoot bias must be in [0, 1)" }
+        require(pressureUndershoot >= 0.0) { "pressure undershoot must not be negative" }
         require(handNoiseCm > 0.0 && maxHandSpeedCmPerS > 0.0) { "hand parameters must be positive" }
     }
 

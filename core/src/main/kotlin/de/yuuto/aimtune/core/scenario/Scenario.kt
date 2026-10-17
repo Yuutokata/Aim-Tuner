@@ -87,6 +87,9 @@ interface Scenario {
     /** The flash the player has to deal with right now (visible, or blinding), or null; only the flash scenario has one. */
     val flash: FlashState? get() = null
 
+    /** When [target] disappears unless it is hit before, or null when it stays until hit (the default). */
+    fun deadlineNanos(target: Target): Long? = null
+
     fun isFinished(nowNanos: Long): Boolean
     fun fire(origin: Vec3, direction: Vec3, nowNanos: Long): ShotResult
 }
