@@ -409,6 +409,45 @@ class AssessmentTest {
         }
     }
 
+    /**
+     * The blind strength search with different search ranges for the strength (the app uses 0.70-1.45): where it ends up for
+     * players whose true preference lies inside, at and outside the current range, how much it gains over plain sensitivity,
+     * and how often a flat player is offered a curve.
+     */
+    @Test
+    fun strengthRange() {
+        val n = (System.getenv("AIMTUNE_PLAYERS") ?: "12").toInt()
+        val rounds = (System.getenv("AIMTUNE_ROUNDS") ?: "24").toInt()
+        val ranges = listOf("0.70-1.45" to (0.70 to 1.45), "0.60-1.70" to (0.60 to 1.70), "0.50-2.00" to (0.50 to 2.00))
+        val out = StringBuilder("== Strength search by search range, $rounds rounds, $n players per row (benefit = true score gain of the found strength over plain, 40 pairs, median) ==\n")
+        fun curveOf(pseudo: Double): AccelCurve? {
+            val r = pseudo / 100.0
+            return if (abs(r - 1.0) < 0.02) null else NaturalCurve(0.05, r)
+        }
+        for (change in listOf(-0.6, -0.5, -0.35, -0.25, -0.15, 0.0, 0.15, 0.25, 0.5, 0.75)) {
+            val player = gainPlayer(change)
+            val oracle = if (change == 0.0) 0.0 else pairedDifference(player, 55.0, oracleCurve(change), 1.0, 40, 900L).first
+            out.appendLine("-- true gain change %+4.0f%% (oracle strength x%.2f, oracle benefit %+.2f pts)".format(change * 100, 1.0 + change, oracle))
+            for ((label, bounds) in ranges) {
+                val range = SearchRange(bounds.first * 100.0, bounds.second * 100.0)
+                val rows = parallelList(n) { s ->
+                    val test = playBlindTest(player, range, rounds, 600L + s, scenarioFor = { clickKinds[it % 3] }, accelOf = ::curveOf, playedCm360 = 55.0)
+                    val result = checkNotNull(test.result)
+                    val r = result.optimumCm360 / 100.0
+                    val diff = if (abs(r - 1.0) < 0.02) 0.0 else pairedDifference(player, 55.0, NaturalCurve(0.05, r), 1.0, 40, 900L + s).first
+                    listOf(r, diff, if (result.intervalLowCm360 > 100.0 || result.intervalHighCm360 < 100.0) 1.0 else 0.0, if (result.atRangeEdge) 1.0 else 0.0, result.confidencePercent.toDouble())
+                }
+                out.appendLine(
+                    "   range %s: found x%.2f (p25 x%.2f, p75 x%.2f) | benefit %+.2f pts | excludes 'no curve' %2d of %d | at the range edge %2d of %d | confidence %.0f%%".format(
+                        label, percentile(rows.map { it[0] }, 0.5), percentile(rows.map { it[0] }, 0.25), percentile(rows.map { it[0] }, 0.75), percentile(rows.map { it[1] }, 0.5),
+                        rows.count { it[2] > 0.5 }, n, rows.count { it[3] > 0.5 }, n, rows.map { it[4] }.average(),
+                    ),
+                )
+            }
+            write("assess-strength-range.txt", out.toString())
+        }
+    }
+
     // ---------------------------------------------------------------- B3: power
 
     /** What the app offers and confirms by gain change and calibration length. */
