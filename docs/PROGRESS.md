@@ -4,6 +4,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Current
 
+- **Latest:** M14 Optimizer review fixes is implemented: curve finder v2 (bounded lookup table) is the new default. Speed rounds, the closed loop, grouped A/B and the time model missed their gates and stay off. Waiting for the user's test of the LUT export in Raw Accel.
 - **Milestone:** M11 Realistic target heights and M12 Valorant crosshair (in progress, M11 first); M10 Flash turn-away (implemented, waiting for the user's hands-on test); M9 Review fixes (implemented, waiting for the user's hands-on test); M8 Results, i18n, packaging is implemented and waiting for the user's hands-on test
 - **Task:** fixes are in (see M9 below and docs/REVIEW.md status table). The target sizes are assumptions until R1b. M7's second hands-on part (analysis, blind test, Raw Accel import) is still open, and per the review the acceleration results should not be trusted before R2.
 
@@ -141,7 +142,54 @@ Order: the four items that change the numbers first (R1-R4), then the rest.
 - [x] Tests: round trips of 17 real codes (raw and through the typed model), invalid codes, layout reference sizes and pictures, settings round trip; screenshot tour step `crosshair` (EN/DE)
 - [ ] Open (user): export two or three of your own crosshairs from Valorant, paste them into the editor and compare the rendered crosshair side by side with the game at the same resolution (pixel lengths, gaps, outline, colors); check the meaning of `m`, header `s`/`c`, a custom color without `c;8`, rounding of odd thickness on an even screen (docs/CROSSHAIR.md "Open points")
 
+### M14 Optimizer review fixes (docs/OPTIMIZER-REVIEW.md, "Umsetzung und Ergebnisse"; implemented, waiting for the user's hands-on test)
+Verdict "fix, no ML rewrite". Decisions made while reading the code:
+- The review's joint regression is not identified, because corr(ln distance, ln speed) = 0.956, so the calibration was to be decoupled through time pressure.
+- The closed loop was unproven (`assess-iterative.txt` failed before), so it got a prototype gate first.
+
+Gate for every task: tests green, before/after tables from the gated harness (`gate-*.txt`), 4 player models (default, decoupled noise, range bias, adaptive hand), and flat false positives never rising. Numbers are in ALGORITHMS.md "M14" and the review.
+
+- [x] T0 Gate harness and baseline (`GateHarness.kt`, `GateTest`, `GateNull.kt`; `NoiseModel.DECOUPLED`, `rangeBias`; review corrections).
+  - DECOUPLED leaves within-distance r = 0.06 (default 0.36). The criterion was relaxed from < 0.05 to < 0.1, because a decile still spans some distance.
+  - Finding: a 5 % range effect makes the fit offer a curve to 200 of 200 flat players.
+- [x] T1 `HandAdaptation` (two-state, Smith et al. 2006), option `SimulatedPlayer.adaptation`.
+  - Tests pass: under 50 % mismatch left after 50 reaches, an aftereffect, 25 % steady residual, a speed that is not played keeps what it learned.
+  - With adaptation the A/B test confirms almost no curve.
+- [x] T2 `evaluateAb(groupByScenario)` + `AbOutcome.scenarioId`: **gate failed**, kept off by default.
+  - 6.1 % false verdicts against 4.7 % in 1000 null runs.
+  - At alpha 0.006 it is back at 5.0 %, but with no more power.
+- [x] T3 Curve finder v2: `LookupCurve`, `boundedRecommendation`, Raw Accel `lut` export (format checked in the 1.7.1 source). **Gate passed, now the default** (`AppSettings.curveFinder`, `--curve-finder legacy|v2`).
+  - The extrapolated error falls (+30 %: 0.235 → 0.067).
+  - The exported benefit rises (-15 %: +27.7 → +33.0).
+  - Range-biased flat players get fewer exports (13 against 23 of 32).
+  - One cell lost 5 of 21 confirmations.
+- [x] T4 Speed rounds (`FlickConfig.targetLifetimeNanos`, deadline-aware simulated reach, `pressureUndershoot`, `allFirstReaches`, `analyseSpeedRounds`): **gate failed**, kept as an experiment, not in the app.
+  - The correlation falls only to 0.86-0.93.
+  - Only 3-16 % of the targets are hit.
+  - ±15 % is found in 2 of 20 runs.
+  - A hand that undershoots when rushed gives 58 of 60 false offers.
+- [x] T5 Closed-loop prototype (`ClosedLoopGateTest`): **no-go**. Less benefit than the bounded fit (-15 %: +4.6 against +33.0) and more false exports for range-biased players (28 against 13 of 32).
+- [ ] T6 Closed loop in the app: dropped (T5 no-go).
+- [x] T7 Time in the sensitivity GP (`OptimizerConfig.timeDrift`, `GpHyperParams.driftShare/driftDays`, `Observation.days`, `dayDriftDetected`, 42-day window): **gate failed**, off by default and not wired into the app (no `sensModel` setting).
+  - At 10 % drift per session: median error 14.7 % against 16.6 % (goal 9 %).
+  - At 5 % drift it is slightly worse than legacy.
+- [x] T8 Plateau: already shown (range of equivalent sensitivities). It contains the true optimum in 80-88 % of the runs at 30 rounds (`PlateauGateTest`), so nothing new was built.
+- [x] T9 Defaults switched only for the curve finder; refactor-cleaner run; ALGORITHMS, ARCHITECTURE, SPEC, ANALYSE (section F), OPTIMIZER-REVIEW ("Umsetzung und Ergebnisse") updated.
+- [ ] Open (user):
+  - load an exported lookup table into Raw Accel ("Look Up Table", Velocity) and compare its graph with the app's;
+  - judge how the bounded curve feels on fast flicks;
+  - optionally compare blind with `--curve-finder legacy` over several days.
+
 ## Last session
+
+- M14 (docs/OPTIMIZER-REVIEW.md "Umsetzung und Ergebnisse", ALGORITHMS.md "M14"): gate harness with four player models.
+  - Outcomes:
+    - curve finder v2 passed and is the default;
+    - T2, T4, T5 and T7 missed their gates and stay off (as options or experiments);
+    - T6 was dropped;
+    - T8 already existed.
+  - The biggest finding: a range effect of 5 % in the simulated hand makes the error analysis offer a curve to every flat player. The bounded curve and the A/B test limit the damage; the detection itself is not fixed.
+  - Not checked: the lookup table in the real Raw Accel.
 
 - Wider strength search range, tried in the simulation (`AssessmentTest.strengthRange`, 12 players per row; numbers in ALGORITHMS.md): the app's 0.70-1.45 pins players with a preference beyond it at the edge (-60 %: 12 of 12 at x0.70; -50 %: 11 of 12; +75 %: 9 of 12), ranges 0.60-1.70 and 0.50-2.00 find them close to the truth (-50 %: x0.52, +75 %: x1.78) with a few points more benefit, but overshoot for moderate preferences (-25 %: x0.77 / x0.71 / x0.66 for oracle x0.75; +15 %: x1.15 / x1.20 / x1.23) and do not raise the benefit there; flat players are offered a curve about equally often (3, 2, 3 of 12). The app's range is unchanged. Idea for the user's decision: widen only when a search ended at the edge (the author's real search did: x0.70), on the side of that edge, which was not simulated yet.
 

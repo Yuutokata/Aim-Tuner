@@ -20,7 +20,8 @@ deshalb sind die Aussagen zum Menschen Folgerungen aus der Literatur, keine Mess
      Fehler mit der Geschwindigkeit mit r = 0,36. Das macht die Erkennung asymmetrisch.
   3. Simulator und Analyse nehmen an, dass sich der Spieler nie an den Gain anpasst. Für Menschen stimmt das nicht.
 - Die blinde Stärkensuche ist ein generischer 1-D-Suchlauf ohne Bezug zu den gemessenen Fehlern. Bei flachen Spielern schließt
-  sie in 5 von 16 Läufen "keine Kurve" aus.
+  sie "keine Kurve" aus: mit dem App-Standard (Hälfte Flash, kopfgroße Ziele) in 1–4 von 32 Läufen, nur mit Klick-Szenarien
+  in 23 von 32 (`flash-strength-search.txt`). Korrigiert, siehe "Korrekturen nach dem Gegenlesen".
 - **ML/RL lohnt sich mit den realistisch erreichbaren Daten nicht.** Ein diagnostischer geschlossener Kreis
   (messen → gedämpft korrigieren → anpassen lassen → wieder messen) mit Lookup-Table-Export ist der bessere Weg.
 
@@ -166,7 +167,8 @@ Danach entscheidet der blinde A/B-Test mit 6–12 Paaren.
    nicht über das Fehlervorzeichen.
 
 6. **Stärkensuche.** Sie ist ein reiner Outcome-Optimierer über eine einzige Kurvenform. Der Ansatz ist nicht falsch, aber
-   nicht gezielt, mit 16–24 Runden teuer und zu gierig: Bei flachen Spielern schließt sie "keine Kurve" in 5/16 aus.
+   nicht gezielt und mit 16–24 Runden teuer. Bei flachen Spielern hängt ihre Falsch-positiv-Rate stark vom Szenario-Mix ab
+   (1–4/32 mit Flash, 23/32 nur mit Klick-Szenarien).
    Dein echtes Ergebnis (0,70 am Rand) kann ein echter Wunsch nach weniger Gain bei schnellen Bewegungen sein (weniger
    signalabhängiges Rauschen) oder dieser Bias. Unterscheiden kann das nur der A/B-Test.
 
@@ -177,6 +179,26 @@ neutralen Gain entfernt. Der Kreis erholt sich von seinem eigenen Bias, weil er 
 misst. Einschränkungen:
 - Die Tabelle musste als natural-Kurve gerendert werden (`AccelCurve` ist sealed).
 - Der Simulator passt sich nicht an, der Kreis ist also im Simulator leichter als beim Menschen.
+
+## Korrekturen nach dem Gegenlesen (vor M14)
+
+Beim Abgleich mit Code und `docs/ALGORITHMS.md` hielten drei Stellen nicht:
+
+1. **Die gemeinsame Regression aus Abschnitt 5, Punkt 2, ist nicht identifiziert.** ln(Distanz) und ln(Speed) korrelieren mit
+   0,956 (E1). Ein Fehler, der von der Distanz abhängt, und ein Gain-Wunsch, der von der Geschwindigkeit abhängt, lassen sich
+   aus den heutigen Kalibrierrunden also nicht trennen. Trennbar wird das nur, wenn bei gleicher Distanz verschiedene
+   Geschwindigkeiten vorkommen. M14 entkoppelt die Kalibrierung deshalb über Zeitdruck je Ziel (Entscheidung des Users).
+2. **Der geschlossene Kreis ist nicht belegt.** Ein früherer Refit mit eingeschalteter Kurve scheiterte (`assess-iterative.txt`:
+   steigend +1,1 statt +12 bis +20 Punkte, fallend schlechter als der einmalige Fit). E3 misst nur den Kurvenfehler, spielt
+   über eine natural-Kurve mit Sensitivity-Faktor und läuft mit einem Simulator, der sich nicht anpasst. M14 baut den Kreis
+   deshalb erst nach einem Prototyp-Gate mit Score-Nutzen.
+3. **Zwei Zahlen waren schief.**
+   - Die 5/16 der Stärkensuche stammen von den alten großen Zielen (richtig ist oben).
+   - Das Urteil "empfohlene Kurven schlechter als keine" mittelt ungewichtet über 5–40 in/s. Echte Bewegungen im Trainer
+     liegen aber im Median bei 5 in/s. Es gilt also für den extrapolierten Bereich, nicht für das, was der Spieler im Trainer
+     tut. Ob Valorant schnellere Bewegungen hat, ist unbekannt.
+   - Der Vergleich "+8 Punkte gegen < 1 Punkt" ist zum Großteil ein konstanter Versatz: Bei 6 in/s liegt eine
+     +15-%-Präferenz schon etwa 9 % über plain. Die Kernaussage bleibt: Der Simulator kennt keine Anpassung.
 
 ## 4. Alternativen
 
@@ -229,6 +251,101 @@ Kein separates ML-Projekt, sondern ein Umbau im `core/accel` hinter der bestehen
 | 4 Kreis | Iteration mit Dämpfung und Gewöhnungsrunden, gespeichert über Tage (vorhandenes Pooling wiederverwenden) | konvergiert in ≤ 24 Runden im Simulator mit Anpassung; flache Spieler ≤ 3 % Abweichung | mit Anpassung kann der messbare Nutzen fast verschwinden. Das wäre ein ehrliches Ergebnis, kein Fehler |
 | 5 Bestätigung | A/B gegen plain, optional Gefühlsvergleich (Preferential) | du testest es über 2–3 Tage | Tagesform |
 
+## Umsetzung und Ergebnisse (M14)
+
+Stand 2026-10-17. Umgesetzt wurde der Plan aus Abschnitt 6, mit den Korrekturen oben und den Entscheidungen des Users
+(Kalibrierung entkoppeln, Prototyp-Gate vor dem Kreis). Jede Aufgabe musste im Gate-Harness gegen den alten Stand bestehen,
+und zwar mit vier Spielermodellen. Das Standardmodell ist die bisherige simulierte Hand. Die drei anderen brechen je eine Annahme:
+- **ENTKOPPELT:** Das Rauschen macht eine Bewegung nicht schneller.
+- **RANGE:** Kurze Bewegungen überschießen, lange fallen kurz aus, ganz ohne Gain-Wunsch.
+- **ANPASSEND:** Die Hand lernt den gelieferten Gain (Zwei-Prozess-Modell nach Smith 2006).
+
+Das Ergebnis ist ernüchternd, aber ehrlich: Nur eine der fünf Methoden-Änderungen hat ihr Gate bestanden.
+
+### Was gebaut wurde und wie es ausging
+
+| Aufgabe | Gebaut | Gate | Folge |
+|---|---|---|---|
+| T0 Gate-Harness | Harness mit Abschnitten S/C/F/A/N/V, Spielermodelle ENTKOPPELT und RANGE | Ausgangswerte liegen vor | Befund: Das RANGE-Modell täuscht die heutige Kurvenerkennung. Flachen Spielern wird in 200 von 200 Läufen eine Kurve angeboten, bei −15 % sogar die falsche Richtung. |
+| T1 Anpassung im Simulator | `HandAdaptation`, Option ANPASSEND | bestanden (Tests) | Mit Anpassung bestätigt der A/B-Test kaum noch eine Kurve. |
+| T2 A/B mit Szenariogruppen | `AbOutcome.scenarioId`, `groupByScenario` | **nicht bestanden** | aus, nur als Option |
+| T3 Kurve begrenzt, LUT-Export | `LookupCurve`, `boundedRecommendation`, Export `lut` | **bestanden** | **neuer Standard (Curve-Finder v2)** |
+| T4 Speed-Runden | ablaufende Ziele, Zeitdruck im Simulator, Schätzer | **nicht bestanden** | Experiment, nicht in der App |
+| T5 geschlossener Kreis | Prototyp im Harness | **No-Go** | T6 entfällt |
+| T7 Zeit im Sensi-Modell | Zeitkern im GP, Drift-Hinweis, Fenster 6 Wochen | **nicht bestanden** | aus, nur als Option |
+| T8 Plateau-Anzeige | gab es schon (Bereich gleichwertiger Sensitivities) | bestanden | nichts neu gebaut |
+
+### Vorher/Nachher
+
+**Curve-Finder v2 (begrenzte Kurve) gegen den alten Fit**, kopfgroße Ziele, 15 Kalibrierrunden. Fehler = RMS von
+ln(angewandter / wahrer Gain), Nutzen = Score-Vorteil der exportierten Kurve in einem zweiten, unabhängigen A/B-Test:
+
+| Modell, Präferenz | Fehler 20–40 in/s alt → neu | exportiert alt / neu | Nutzen alt / neu (Oracle) |
+|---|---|---|---|
+| Standard −30 % | 0,162 → 0,061 | 16 / 16 von 16 | +41,9 / +45,6 (+58,6) |
+| Standard −15 % | 0,074 → 0,034 | 13 / 14 von 16 | +27,7 / +33,0 (+43,9) |
+| Standard +30 % | 0,235 → 0,067 | 6 / 9 von 16 | +7,8 / +10,8 (+45,1) |
+| ENTKOPPELT +15 % | 0,168 → 0,031 | 6 / 8 von 16 | +12,4 / +12,5 (+37,7) |
+| RANGE flach | – | 23 / 13 von 32 | +18,4 / +7,5 |
+| ANPASSEND −30 % | 0,105 → 0,116 | 5 / 6 von 16 | +5,1 / +5,5 (+24,2) |
+
+- Über den gemessenen Geschwindigkeiten ist der Fehler gleich geblieben (zum Beispiel 0,010 gegen 0,010).
+- Echte flache Spieler bekamen weder vorher noch nachher eine Kurve (0 von 200).
+- Eine Zelle ist schlechter: Beim entkoppelten Modell mit −15 % hat der A/B-Test 15 statt 20 der 21 angebotenen Kurven bestätigt.
+
+**A/B-Nulltest** (1000 Tests mit gleichen Armen): Mit Szenariogruppen gibt es 6,1 % Fehlurteile, ohne Gruppen 4,7 %. Mit einer
+strengeren Schwelle (0,006) sind es 5,0 %, dann bestätigt der Test echte Kurven aber nicht öfter. Deshalb bleibt die Bewertung
+ohne Gruppen.
+
+**Sensitivity bei Drift** (4 Sessions × 10 Runden im Abstand von 2 Tagen, 40 Spieler, Fehler gegen das aktuelle Optimum,
+Median alt / mit Zeitmodell):
+
+| Verschiebung pro Session | Fehler | Bias | 80-%-Intervall trifft |
+|---|---|---|---|
+| 0 % | 7,1 / 7,4 % | −3,8 / −3,2 % | 95 / 95 % |
+| 5 % | 11,5 / 12,5 % | −11,4 / −10,8 % | 90 / 90 % |
+| 10 % | 16,6 / 14,7 % | −16,4 / −12,5 % | 78 / 80 % |
+
+Ziel waren ≤ 9 % Fehler und ≤ 5 % Bias. Das Zeitmodell hilft kaum. Mit 10 Runden pro Session und einem so flachen Optimum ist
+eine Wanderung von 5–10 % pro Session in den Daten kaum zu sehen. Das ist eine Grenze der Information, nicht des Modells.
+
+**Recovery der Sensitivity** in einer einzelnen Session ist unverändert, weil nichts davon den Standard geändert hat. Der Median-
+Fehlerfaktor liegt bei 1,12 / 1,08 / 1,06 nach 8 / 15 / 30 Runden, das 80-%-Intervall trifft in 95–100 %. Die Konfidenz ist
+kalibriert: Ab 80 % war der wahre Verlust in allen Läufen vernachlässigbar.
+
+### Was die negativen Ergebnisse lehren
+
+1. **Fehler je Geschwindigkeit sind kein sauberes Signal für den Gain-Wunsch.** Drei andere Ursachen erzeugen dasselbe Muster:
+   - der Range-Effekt;
+   - Zeitdruck, unter dem die Hand kürzer zielt;
+   - die Anpassung, die einen Wunsch auf ein Viertel schrumpfen lässt.
+
+   Die Speed-Runden haben nur den ersten Fall gelöst und den zweiten verschärft (58 von 60 Falsch-Positive im Druck-Modell).
+2. **Für den Score zählt vor allem die Gain-Höhe bei den üblichen Geschwindigkeiten, nicht die Form.** Der geschlossene Kreis
+   traf die Form am genauesten (Fehler ≈ 0,009), brachte aber weniger als der Fit, der die Höhe über seinen Faktor setzt.
+3. **Der A/B-Test bleibt der einzige verlässliche Richter.** Was er bei der simulierten Anpassung zeigt, wirkt wie eine Warnung:
+   Gewöhnt sich die Hand an, bringt fast keine Kurve noch einen messbaren Vorteil.
+
+### Verbleibende Grenzen
+
+- Alle Zahlen kommen aus dem Simulator. Seine Modelle (Rauschen, Range-Effekt, Anpassung, Zeitdruck) sind Annahmen aus der
+  Literatur und an keinem Menschen gemessen.
+- Die Kurvenerkennung ist gegen den Range-Effekt weiter anfällig (200 von 200 Angeboten im RANGE-Modell). v2 begrenzt nur den
+  Schaden, und der A/B-Test fängt einen Teil ab (13 von 32 exportiert).
+- Der LUT-Export ist nur gegen die Raw-Accel-Quelle geprüft und noch nicht in Raw Accel geladen worden.
+- Für Drift über Tage gibt es weiter keine wirksame Korrektur.
+
+### Was du selbst testen solltest
+
+1. **LUT-Import in Raw Accel:** Eine Kalibrierung spielen, die eine Kurve findet, dann „Export for Raw Accel". Die
+   `settings.json` in Raw Accel laden und prüfen, dass Modus „Look Up Table" mit „Gain / Velocity" auf Velocity aktiv ist,
+   dass die Punkte im Graphen zur Kurve in der App passen und dass Raw Accel die Datei ohne Fehler annimmt.
+2. **Kurvenkarte:** Die Analyse-Seite und „Last analysis" müssen „Tabelle, 32 Punkte von … bis … in/s, außerhalb flach"
+   zeigen, ohne abgeschnittenen Text.
+3. **Gefühl der begrenzten Kurve:** Fühlen sich schnelle Flicks mit der Kurve normal an, oder stört die flache Obergrenze?
+4. **Alte Kurve zum Vergleich:** Mit `--curve-finder legacy` lässt sich die alte Kurvenform holen. Ein blinder Vergleich
+   über mehrere Tage wäre der erste echte Beleg.
+
 ## Verwendete Agenten und Modelle
 
 - Bewertung, Urteil und Bericht: Hauptsession, Claude Opus 5.5.
@@ -237,3 +354,10 @@ Kein separates ML-Projekt, sondern ein Umbau im `core/accel` hinter der bestehen
   general-purpose-Agent, Claude Sonnet 5.5.
 - Experimente E1–E5 (lokale Testklasse `OptimizerReviewTest`, nicht eingecheckt): general-purpose-Agent, Claude Sonnet 5.5.
 - Der architect-Agent wurde nicht eingesetzt, weil das Urteil "reparieren" und nicht "neu bauen" lautet.
+- M14:
+  - Hauptsession (Claude Opus 5.5): Entscheidungen, Gate-Bewertung, Kernalgorithmen (Anpassungsmodell, Speed-Runden-Schätzer,
+    Lookup-Kurve und Begrenzung, Prototyp des Kreises, Zeitkern).
+  - Explore (Haiku): Schnittstellen.
+  - tdd-guide (Sonnet): Tests vorab.
+  - general-purpose (Sonnet): Gate-Harness, Harness-Läufe, Verdrahtung in der App, Prüfung des LUT-Formats in der Raw-Accel-Quelle.
+  - code-reviewer (Sonnet), security-reviewer (Opus, wegen des neuen Exportformats) und refactor-cleaner (Sonnet).

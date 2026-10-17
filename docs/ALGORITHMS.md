@@ -87,6 +87,60 @@ The two terms give an interior optimum. Because everything depends on `c / optim
 
 Measured with the baseline estimator (9 grid points x 4 rounds = 36 rounds, 20-140 cm/360, 8 seeds): within a factor 1.3 of the truth in 88-100 % of the runs, median error factor 1.06-1.18 (see `core/build/reports/harness/baseline-convergence.txt`). That is the number the optimizer has to beat with fewer rounds. These tolerances describe this simulated player; they say nothing about real humans.
 
+## Player models of the gate harness (M14)
+
+The default simulated hand makes every analysis look as good as the model it was tuned on (docs/OPTIMIZER-REVIEW.md). The
+gate harness (`core/src/test/.../harness/review/GateHarness.kt`, `GateTest`, reports `gate-<tag>.txt`) therefore reruns every
+table with hands that break one assumption each. All are options of `SimulatedPlayer`; the defaults keep the old hand.
+
+- **DECOUPLED** (`noiseModel = NoiseModel.DECOUPLED`). In the default hand the endpoint noise is added to the planned distance in the planned time, so a reach that goes further is also faster. Within one target distance the signed error then correlates with the peak speed (r about 0.36 in the calibration mix). DECOUPLED stretches the duration with the distance the noise produced along the reach, so the peak speed stays the planned one (r about 0.06; `PlayerModelsTest`).
+- **RANGE** (`rangeBias = 0.05`, `rangeReferenceDegrees = 20`). The range effect: first reaches are scaled by `(20 / A)^0.05`, so a 5° reach overshoots by 7 % and a 60° reach falls short by 5 %, whatever the gain. Because distance and speed go together (corr 0.956), this looks like a gain that rises with speed.
+- **ADAPTIVE** (`adaptation = HandAdaptation.adaptedTo(preference)`). Motor adaptation, see the next section.
+- **PRESSURE** (`pressureUndershoot`). A first reach that a deadline forces to be `s` times faster than unhurried is scaled by `1 - pressureUndershoot * (s - 1)` (only in speed rounds, below).
+
+**Hand adaptation** (`HandAdaptation`, two-state model of Smith, Ghazizadeh & Shadmehr 2006, their fit values: fast retention 0.59 and rate 0.21, slow retention 0.992 and rate 0.02). The gain the hand expects at speed v is `preference(v) * exp(fast(v) + slow(v))`. After every first reach the error `ln(delivered / expected)` at its peak speed moves both states: `x <- retention^w * x + rate * w * error`, where `w` is a Gaussian weight over ln speed (width 0.35). The retention applies per exposure, so a speed that is not played keeps what was learned there. The decay toward the preference leaves a share `1 / (1 + 0.21/0.41 + 0.02/0.008) = 0.25` of any constant mismatch. A preference therefore stays measurable but at a quarter of its size, and a new curve first gives an aftereffect. `adaptedTo` starts in the steady state for plain sensitivity, which is the situation of a player who comes from the game. After a 10 % gain step the mismatch falls below half within 50 reaches (`HandAdaptationTest`). The linear sensitivity is still treated as known exactly, as before. The parameters come from reaching studies, not from mouse aiming.
+
+## M14: what the gate showed (docs/OPTIMIZER-REVIEW.md, "Umsetzung und Ergebnisse")
+
+Commands: `AIMTUNE_REVIEW=1 ./gradlew.bat :core:cleanTest :core:test --tests "*GateTest*"` (env `AIMTUNE_GATE_TAG`, `AIMTUNE_GATE_SECTIONS` = S,C,F,A,N,V, `AIMTUNE_GATE_CURVE` = legacy|bounded), `*ClosedLoopGateTest*`, `*DriftGateTest*`, `*SpeedRoundProbeTest*`, `*PlateauGateTest*`. All numbers are simulated players.
+
+**Bounded curves (curve finder v2, the default).** The detection is unchanged (BIC 8, range 1.02). The recommended family is played and exported as a Raw Accel lookup table of 32 points, evenly spaced in log speed between the 5th and 95th percentile of the used speeds. It is flat outside them (`AccelFit.boundedTo`, `boundedRecommendation`; Raw Accel 1.7.1 `common/accel-lookup.hpp` holds the first and last value, and "Gain / Velocity" false makes y the multiplier). The fitted families keep rising or falling beyond the narrow window of the data. Bounding them changes nothing where reaches happen (error over the used speeds 0.010 against 0.010 for +30 %) and removes most of the error at 20-40 in/s: +30 % 0.235 → 0.067, -30 % 0.162 → 0.061, range-biased +15 % 0.405 → 0.010 (15 rounds, `gate-t3c.txt` against `gate-t1t2.txt`).
+- Exported benefit, from 16 players per row in a second, independent A/B run (`gate-t5-closed-loop.txt`):
+  - -30 %: +45.6 against +41.9 points (oracle +58.6);
+  - -15 %: +33.0 against +27.7;
+  - +30 %: +10.8 against +7.8.
+- Flat range-biased players get a curve exported in 13 of 32 runs against 23.
+- In one cell, the decoupled hand at -15 %, the A/B test confirmed 15 against 20 of 21 offered curves.
+
+**A/B test with per-scenario baselines (T2): not taken.** In 1000 tests with identical arms (`gate-v.txt`) grouped scoring gave false verdicts in 6.1 % of the tests (30 better, 31 worse) against 4.7 % pooled. At a per-look level of 0.006 it is back at 5.0 %, but it then confirmed real curves no more often: -15 % 16 against 23 of 24, decoupled +15 % 11 against 10. `evaluateAb(groupByScenario = false)` stays the default, and `AbOutcome.scenarioId` is stored for later use.
+
+**Speed rounds (T4): not taken.** The plan was to decouple distance from speed. In normal rounds they correlate at 0.96, so a range effect cannot be told from a gain that depends on the speed. Calibration flicks whose targets vanish after `f` times the player's median time to hit (`FlickConfig.targetLifetimeNanos`) would make the hand move the same distances faster. `analyseSpeedRounds` (`core/accel/SpeedRoundAnalysis.kt`) then compares, within distance bins, the median error of rushed and normal reaches against their median log speed. Findings (`speed-round-probe.txt`, 20 players per cell, 60 flat):
+- At `f` = 0.75 the reaches are 30 % faster, but only 3-16 % of the targets are hit (unplayable for a person), and the correlation falls only to 0.86-0.93.
+- The estimate is unbiased for the default and the decoupled hand (flat slope +0.002) and resists the range effect: 1 of 60 flat players offered, against 200 of 200 for the fit.
+- It finds little. ±15 % was offered in 2 of 20 runs, +30 % in 5 of 18.
+- It cannot tell a hand that undershoots more when rushed (`pressureUndershoot` 0.1) from a wish for more gain at speed: 58 of 60 flat players were offered a curve. The literature suggests real hands do undershoot more when rushed.
+- The code stays as an experiment; the app does not use it.
+
+**Closed loop (T5): no-go.** 4 batches of 6 rounds (the first round of each batch is not measured, for getting used to the curve). After each batch the wanted gain relative to the delivered one per speed bin is added at 50 % damping to a lookup table anchored at 1 at its slowest speed (`ClosedLoopGateTest`).
+- Its curve shape is the closest to the truth (error over the used speeds about 0.009), but it reaches the player less often and with less benefit than the bounded fit:
+  - -30 %: exported 16 of 16 with +33.0 points against +45.6;
+  - -15 %: 5 of 16, +4.6 against +33.0;
+  - +30 %: 8 of 16, +5.1 against +10.8.
+- With the adaptive hand it exports almost nothing.
+- Flat range-biased players get a curve exported in 28 of 32 runs, against 13.
+- The score depends mostly on the gain level at the common speeds, which the fit sets through its factor, and the errors alone only give the shape.
+- A first version centred the table on the median reach and lost the A/B test by 25-40 points, because a shape centred there carries a different level.
+
+**Time in the sensitivity model (T7): not the default.** `OptimizerConfig(timeDrift = true)` lets the score curve move over days: kernel `k_x (1 + s exp(-|dt| / L))`, with `s` in 0.5-4 and `L` in 2/7/21 days chosen by marginal likelihood when it gains more than 1. It drops rounds older than 42 days and sets `dayDriftDetected`. Played for real with 4 sessions × 10 rounds, 2 days apart, 40 seeds (`gate-t7-drift-b.txt`):
+
+| optimum shift per session | median error, legacy / time model | p90 | median bias | 80 % interval coverage |
+| --- | --- | --- | --- | --- |
+| 0 % | 7.1 / 7.4 % | 18.1 / 17.1 % | -3.8 / -3.2 % | 95 / 95 % |
+| 5 % | 11.5 / 12.5 % | 23.1 / 25.7 % | -11.4 / -10.8 % | 90 / 90 % |
+| 10 % | 16.6 / 14.7 % | 27.3 / 31.9 % | -16.4 / -12.5 % | 78 / 80 % |
+
+The goal (median ≤ 9 %, bias ≤ 5 % with drift) was not met. With 10 rounds a session and an optimum this flat (±15 % costs under a point), a move of 5-10 % per session is hardly visible in the data, so the model can rarely tell it from noise. The drift hint fires in 5 % of the runs without drift and in 23-30 % with it. A single session gives identical results with either setting.
+
 ## Bayesian optimization (M5, implemented in `core/optimizer`)
 
 **Model.** `x = ln(cm360)`. Round scores (0-100, computed over all rounds together, see "Metrics and score") are standardized and modelled as `y = f(x) + offset(session) + noise` with a Matern 5/2 prior on `f`. The session offset (a better or worse day) is integrated out by adding a "same session" covariance `tau^2` to the kernel matrix, so rounds of many sessions give one estimate of `f` without a day-to-day shift biasing the optimum. Hyperparameters (lengthscale 0.12-0.7 times the log width of the search range, signal variance, noise variance 0.15-1.2, session variance 0 / 0.1 / 0.4, scenario variance 0 / 0.4) are picked from a small grid by marginal likelihood. The noise floor is deliberately not tiny: with few rounds a near-zero noise estimate gives an overconfident fit. Cholesky is hand-written (ADR 0004 amendment).
