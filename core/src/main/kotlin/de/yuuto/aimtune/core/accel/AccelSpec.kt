@@ -11,11 +11,13 @@ object AccelSpec {
         is ClassicCurve -> "classic;acceleration=${curve.acceleration};exponent=${curve.exponent};inputOffset=${curve.inputOffset};cap=${curve.cap}"
         is NaturalCurve -> "natural;decayRate=${curve.decayRate};limit=${curve.limit};inputOffset=${curve.inputOffset}"
         is PowerCurve -> "power;scale=${curve.scale};exponent=${curve.exponent};outputOffset=${curve.outputOffset};cap=${curve.cap}"
+        is LookupCurve -> "$LUT;points=" + curve.speeds.indices.joinToString(",") { "${curve.speeds[it]}:${curve.multipliers[it]}" }
     }
 
     /** @throws IllegalArgumentException for unknown modes, missing or invalid parameters. */
     fun decode(text: String): AccelCurve {
         val parts = text.trim().split(';')
+        if (parts.first() == LUT) return decodeLookup(text, parts)
         val values = parts.drop(1).associate { part ->
             val (name, value) = part.split('=', limit = 2).also { require(it.size == 2) { "bad parameter '$part' in '$text'" } }
             name to requireNotNull(value.toDoubleOrNull()) { "'$value' is not a number in '$text'" }
@@ -30,5 +32,18 @@ object AccelSpec {
         }
     }
 
+    /** `lut;points=speed:multiplier,speed:multiplier,...` */
+    private fun decodeLookup(text: String, parts: List<String>): LookupCurve {
+        val points = parts.getOrNull(1)?.removePrefix("points=")?.takeIf { parts.size == 2 && parts[1].startsWith("points=") }
+            ?: throw IllegalArgumentException("missing 'points' in '$text'")
+        val pairs = points.split(',').map { point ->
+            val (speed, multiplier) = point.split(':').also { require(it.size == 2) { "bad point '$point' in '$text'" } }
+            requireNotNull(speed.toDoubleOrNull()) { "'$speed' is not a number in '$text'" } to
+                requireNotNull(multiplier.toDoubleOrNull()) { "'$multiplier' is not a number in '$text'" }
+        }
+        return LookupCurve(pairs.map { it.first }, pairs.map { it.second })
+    }
+
     private const val NONE = "none"
+    private const val LUT = "lut"
 }

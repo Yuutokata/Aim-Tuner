@@ -11,7 +11,8 @@ import de.yuuto.aimtune.storage.SessionKind
 class AccelSession(private val ctx: AppContext, private val run: AccelRun) : RoundSession {
     override val label: UiText get() = run.label
     override val runKey: Long get() = run.runKey
-    override val sessionKind = SessionKind.ACCEL_AB
+    // Read when a round has been played and before the run moves on, so it is the kind of the phase that round belonged to.
+    override val sessionKind: SessionKind get() = if (run.phase == AccelPhase.SEARCH) SessionKind.ACCEL_SEARCH else SessionKind.ACCEL_AB
 
     override fun onRoundFinished(config: TrainerConfig, recording: RoundRecording) = run.recordRound(recording)
 

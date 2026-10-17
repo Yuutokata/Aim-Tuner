@@ -45,6 +45,8 @@ class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
 
         val footer = Table()
         footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
+        footer.add(ui.button(t("accel.last"), Styles.SECONDARY) { ctx.showLastAccelAnalysis() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(16f)
+        footer.add(ui.button(t("accel.last_search"), Styles.SECONDARY) { ctx.showLastSearch() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(16f)
         footer.add().expandX()
         val calibrate = ui.button(t("accel.start_calibration"), Styles.SECONDARY) { if (canStart()) ctx.startAccelRun() }
         calibrate.isDisabled = !canStart()

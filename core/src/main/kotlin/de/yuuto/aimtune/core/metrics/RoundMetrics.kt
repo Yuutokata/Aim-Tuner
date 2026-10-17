@@ -101,7 +101,7 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
         val spawn = spawns[hit.targetId] ?: return@mapIndexedNotNull null
         // The reach starts at the later of the target's spawn and the previous hit (several targets can wait at once).
         val from = maxOf(spawn.timeNanos, hitEvents.getOrNull(index - 1)?.timeNanos ?: spawn.timeNanos)
-        movementMetric(recording, track, submovements, spawn, from, hit, params)
+        movementMetric(recording, track, submovements, spawn, from, hit.timeNanos, params)
     }
     val tracking = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.TRACKING) computeTrackingMetrics(recording, track) else null
     val flash = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.FLASH) computeFlashMetrics(recording, track, submovements) else null
@@ -129,6 +129,24 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
     )
 }
 
+/**
+ * The first reach toward every target of a round with one target at a time, also toward targets that disappeared before
+ * they were hit (speed rounds, `FlickConfig.targetLifetimeNanos`): such a target's window ends where the next one
+ * appeared. [RoundMetrics.movements] keeps only hit targets; under time pressure that would keep the reaches that
+ * happened to land well and bias their error toward zero.
+ */
+fun allFirstReaches(recording: RoundRecording, params: MetricsParams = MetricsParams()): List<MovementMetric> {
+    val submovements = segmentSubmovements(recording.mouseEvents, recording.dpi, params.segmentation)
+    val track = ViewTrack(recording)
+    val hits = recording.targetEvents.filterIsInstance<TargetEvent.Hit>().associate { it.targetId to it.timeNanos }
+    val spawns = recording.targetEvents.filterIsInstance<TargetEvent.Spawned>()
+    val roundEnd = recording.mouseEvents.lastOrNull()?.timeNanos ?: return emptyList()
+    return spawns.mapIndexedNotNull { index, spawn ->
+        val end = hits[spawn.target.id] ?: spawns.getOrNull(index + 1)?.timeNanos ?: roundEnd
+        if (end <= spawn.timeNanos) null else movementMetric(recording, track, submovements, spawn, spawn.timeNanos, end, params)
+    }
+}
+
 /** Offset on the screen plane, in degrees, with yaw scaled by cos(pitch) so both axes are true angles. */
 private data class Offset(val x: Double, val y: Double) {
     val length: Double get() = hypot(x, y)
@@ -147,11 +165,11 @@ private fun movementMetric(
     submovements: List<Submovement>,
     spawn: TargetEvent.Spawned,
     fromNanos: Long,
-    hit: TargetEvent.Hit,
+    untilNanos: Long,
     params: MetricsParams,
 ): MovementMetric? {
     val t0 = fromNanos
-    val t1 = hit.timeNanos
+    val t1 = untilNanos
     val start = track.viewAt(t0)
     val (targetYaw, targetPitch) = directionAngles(spawn.target)
     val toTarget = offset(start.yawDegrees, start.pitchDegrees, targetYaw, targetPitch, targetPitch)

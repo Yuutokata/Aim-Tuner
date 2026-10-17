@@ -23,7 +23,8 @@ object CurveStrength {
     /** Strengths closer to 1 than this are played as no curve at all. */
     const val PLAIN_BAND = 0.02
 
-    private const val DECAY = 0.05
+    /** The decay rate of the natural curves the search plays; stored rounds are recognised by it. */
+    const val DECAY = 0.05
     private const val PSEUDO_SCALE = 100.0
 
     /** The range the optimizer searches, as pseudo cm/360. */

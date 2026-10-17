@@ -304,6 +304,22 @@ Folge für die Ampel: die neue Zeile „Zielverteilung (Höhe, Karte)“ bleibt 
 * **Zirkularität (D1):** Der simulierte Spieler dreht per Minimum-Jerk-Bewegung weg und reagiert auf den Pop; er hört die neuen Sounds nicht und passt sich nicht an. Alle Flash-Zahlen prüfen, ob die Mechanik und die Statistik zusammenpassen, nicht ob Menschen so reagieren.
 * **Echte Daten (D4):** weiter der entscheidende Punkt. Der Forschungsexport enthält die Flash-Ereignisse; für die Fragen aus D4 sind Aufnahmen von 10 Spielern mit Flash-Runden jetzt aussagekräftiger.
 
+## F. Umsetzung und Ergebnisse von M14 (Optimizer-Review)
+
+Stand 2026-10-17. Die Details und alle Tabellen stehen in `docs/OPTIMIZER-REVIEW.md`, Abschnitt "Umsetzung und Ergebnisse".
+Kurz:
+- **Neu im Gate:** Es rechnet jede Zeile mit vier Spielermodellen (Standard, entkoppeltes Rauschen, Range-Effekt, anpassende Hand).
+- **Range-Effekt:** Er reicht, um der Fehleranalyse bei flachen Spielern in 200 von 200 Läufen eine Kurve vorzutäuschen. Das wussten wir vorher nicht.
+- **Neuer Standard:** Die gefundene Kurve wird nur noch über den gemessenen Geschwindigkeiten angewendet und als
+  Raw-Accel-Tabelle exportiert (Curve-Finder v2). Der Fehler oberhalb des gemessenen Bereichs fällt zum Beispiel bei +30 % von
+  0,235 auf 0,067, der exportierte Nutzen steigt leicht (−15 %: +27,7 → +33,0 Punkte).
+- **Nicht übernommen, weil sie ihr Gate verfehlt haben:**
+  - A/B mit Szenariogruppen: 6,1 % statt 4,7 % Fehlurteile.
+  - Speed-Runden zur Entkopplung von Distanz und Geschwindigkeit: kaum Erkennung, unspielbar, anfällig für Zeitdruck.
+  - Der geschlossene Kreis: weniger Nutzen als der Fit.
+  - Ein Zeitmodell für Drift über Tage: 14,7 statt 16,6 % Fehler bei 10 % Drift, Ziel 9 %.
+- **Plateau-Anzeige:** Den Bereich gleichwertiger Sensitivities gab es schon; er trifft das Optimum in 80–88 % der Läufe.
+
 ## Handlungsoptionen
 
 In der Reihenfolge, die ich empfehle (Aufwand: klein / mittel / groß):

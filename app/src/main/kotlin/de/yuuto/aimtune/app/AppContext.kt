@@ -10,6 +10,9 @@ import de.yuuto.aimtune.app.update.AppVersion
 import de.yuuto.aimtune.app.update.ReleaseInfo
 import de.yuuto.aimtune.app.audio.HitSounds
 import de.yuuto.aimtune.app.accel.AccelSession
+import de.yuuto.aimtune.app.accel.LastCalibration
+import de.yuuto.aimtune.app.accel.LastSearch
+import de.yuuto.aimtune.app.accel.PriorCalibration
 import de.yuuto.aimtune.app.blind.AxisSummary
 import de.yuuto.aimtune.app.blind.BlindRun
 import de.yuuto.aimtune.app.blind.BlindSession
@@ -18,6 +21,8 @@ import de.yuuto.aimtune.app.blind.PastRound
 import de.yuuto.aimtune.app.screens.AccelAnalysisScreen
 import de.yuuto.aimtune.app.screens.AccelBetweenScreen
 import de.yuuto.aimtune.app.screens.AccelIntroScreen
+import de.yuuto.aimtune.app.screens.AccelLastAnalysisScreen
+import de.yuuto.aimtune.app.screens.AccelLastSearchScreen
 import de.yuuto.aimtune.app.screens.AccelResultScreen
 import de.yuuto.aimtune.app.screens.AccelSearchResultScreen
 import de.yuuto.aimtune.app.history.HistoryEntry
@@ -40,6 +45,7 @@ import de.yuuto.aimtune.app.screens.UiScreen
 import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.setup.SetupStep
 import de.yuuto.aimtune.app.ui.UiHolder
+import de.yuuto.aimtune.core.accel.AccelFit
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.FlashImportance
 import de.yuuto.aimtune.core.scenario.ScenarioSchedule
@@ -49,6 +55,7 @@ import de.yuuto.aimtune.core.units.AimStyle
 import de.yuuto.aimtune.core.units.searchRange
 import de.yuuto.aimtune.games.GameProfiles
 import de.yuuto.aimtune.input.RawMouseSource
+import de.yuuto.aimtune.storage.CurveFinder
 import de.yuuto.aimtune.storage.RawAccelExport
 import de.yuuto.aimtune.storage.ResearchExportResult
 import de.yuuto.aimtune.storage.SettingsException
@@ -214,6 +221,12 @@ class AppContext(
 
     fun showAccel() = switchTo(AccelIntroScreen(this))
 
+    /** The newest blind strength search, analysed again from its stored rounds. */
+    fun showLastSearch(last: LastSearch? = processor.lastSearch(metricWeights())) = switchTo(AccelLastSearchScreen(this, last))
+
+    /** The analysis of the stored calibration rounds, computed again from them. */
+    fun showLastAccelAnalysis(last: LastCalibration? = processor.lastCalibration()) = switchTo(AccelLastAnalysisScreen(this, last))
+
     /** The screen that exports the stored rounds for a researcher; the counts are read in the background. */
     fun showShareData() = switchTo(
         ShareDataScreen(this, CompletableFuture.supplyAsync { processor.storedHistory().let { StoredCounts(it.sessions.size, it.rounds.size) } }),
@@ -241,13 +254,34 @@ class AppContext(
         }
     }
 
+    /** Whether curves are bounded to the measured speeds (curve finder v2); the launch option overrides the setting. */
+    val boundedCurves: Boolean get() = (options.curveFinder ?: settings.current.curveFinder) == CurveFinder.V2
+
     /** Starts the acceleration steps at the recommended sensitivity; back to the intro if there is none yet. */
     fun startAccelRun(search: Boolean = false) {
         if (!source.hasReportTimestamps) return showAccel()
         val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
         val result = stored.result ?: return showAccel()
-        val run = AccelRun(stored.config.copy(cm360 = result.optimumCm360), stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, startWithSearch = search, flash = settings.current.flashImportance() != FlashImportance.NEVER)
+        val base = stored.config.copy(cm360 = result.optimumCm360)
+        // A run looks for the earlier rounds of what it starts with: the calibration or the search.
+        val prior = if (search) PriorCalibration.NONE else processor.priorCalibration(base.dpi, base.cm360)
+        val priorSearch = if (search) processor.priorSearch(base.dpi, base.cm360) else emptyList()
+        val run = AccelRun(
+            base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, prior = prior, startWithSearch = search,
+            flash = settings.current.flashImportance() != FlashImportance.NEVER, priorSearch = priorSearch,
+            boundedCurves = boundedCurves,
+        )
         showAccelStep(run)
+    }
+
+    /** Starts the blind test of [curve], which the stored calibration rounds gave, at the setup they were played with. */
+    fun startAccelTest(curve: AccelFit, last: LastCalibration) {
+        if (!source.hasReportTimestamps || !rawAccelConfirmed) return showAccel()
+        val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
+        val base = stored.config.copy(dpi = last.dpi, cm360 = last.cm360)
+        showAccelStep(
+            AccelRun(base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, flash = settings.current.flashImportance() != FlashImportance.NEVER, startWithTest = curve, boundedCurves = boundedCurves),
+        )
     }
 
     /** The screen that fits the run: a round while one is due, otherwise the analysis or the verdict. */
@@ -263,10 +297,13 @@ class AppContext(
     fun showAccelRound(run: AccelRun) = switchTo(TrainerScreen(this, run.nextRoundConfig(), AccelSession(this, run)))
 
     /** Writes the Raw Accel settings.json of the tested curve; the path, or the reason it failed. */
-    fun exportAccel(run: AccelRun): Result<Path> = runCatching {
-        val candidate = checkNotNull(run.candidate) { "there is no curve to export" }
+    fun exportAccel(run: AccelRun): Result<Path> = exportAccel(run.candidate, run.dpi)
+
+    /** Writes the Raw Accel settings.json of [fit] for a mouse at [dpi]; the path, or the reason it failed. */
+    fun exportAccel(fit: AccelFit?, dpi: Double): Result<Path> = runCatching {
+        val curve = checkNotNull(fit) { "there is no curve to export" }
         val dir = checkNotNull(exportDir) { "no data folder to write to" }
-        RawAccelExport.write(dir, candidate.curve, run.dpi, candidate.sensitivityFactor)
+        RawAccelExport.write(dir, curve.curve, dpi, curve.sensitivityFactor)
     }
 
     /** Number of stored blind rounds for the current setup, for the menu. */

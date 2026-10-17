@@ -2,12 +2,14 @@ package de.yuuto.aimtune.storage
 
 import de.yuuto.aimtune.core.accel.AccelCurve
 import de.yuuto.aimtune.core.accel.ClassicCurve
+import de.yuuto.aimtune.core.accel.LookupCurve
 import de.yuuto.aimtune.core.accel.NaturalCurve
 import de.yuuto.aimtune.core.accel.NoAccel
 import de.yuuto.aimtune.core.accel.PowerCurve
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -109,5 +111,20 @@ class RawAccelExportTest {
         assertEquals("settings.json", file.fileName.toString())
         assertTrue(Files.readString(file).contains("\"natural\""))
         assertTrue(Files.readString(file).endsWith("}\n"))
+    }
+
+    @Test
+    fun `a lookup curve is exported as lut with a flat x y data array and read back`() {
+        val lut = LookupCurve(listOf(2.0, 4.5, 9.0), listOf(0.9, 1.1, 1.3))
+        val args = profile(root(lut)).getValue("Whole or horizontal accel parameters").jsonObject
+        assertEquals("lut", args.getValue("mode").jsonPrimitive.content)
+        assertEquals(false, args.getValue("Gain / Velocity").jsonPrimitive.boolean)
+        val data = (args.getValue("data") as JsonArray).map { it.jsonPrimitive.double }
+        assertEquals(6, data.size)
+        assertEquals(listOf(2.0f, 0.9f, 4.5f, 1.1f, 9.0f, 1.3f), data.map { it.toFloat() })
+
+        val (curve, factor) = RawAccelExport.parse(RawAccelExport.settingsJson(lut, 800.0, 0.9))
+        assertEquals(lut, curve)
+        assertEquals(0.9, factor, 1e-9)
     }
 }

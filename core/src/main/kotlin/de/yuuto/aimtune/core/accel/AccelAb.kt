@@ -45,8 +45,8 @@ class AccelAbPlan(private val scenarios: List<ScenarioKind>, private val seed: L
     }
 }
 
-/** What one finished round contributes: its condition and the score metrics it produced. */
-data class AbOutcome(val pair: Int, val condition: AbCondition, val inputs: Map<ScoreMetric, Double>)
+/** What one finished round contributes: its condition, the score metrics it produced and the scenario it played. */
+data class AbOutcome(val pair: Int, val condition: AbCondition, val inputs: Map<ScoreMetric, Double>, val scenarioId: String? = null)
 
 enum class AbStatus { NEED_MORE_ROUNDS, ACCEL_BETTER, ACCEL_WORSE, NO_DIFFERENCE }
 
@@ -75,8 +75,16 @@ fun evaluateAb(
     maxPairs: Int = AccelAbPlan.DEFAULT_MAX_PAIRS,
     alphaPerLook: Double = DEFAULT_ALPHA_PER_LOOK,
     minEffectPoints: Double = DEFAULT_MIN_EFFECT_POINTS,
+    /**
+     * Scores against per-scenario baselines when every outcome names its scenario, as the rest of the app does. Off by
+     * default: in 1000 simulated tests with identical arms it raised the false verdicts from 4.7 % to 6.1 % at the same
+     * level, and at a level that brings them back to 5 % it confirmed real curves no more often (gate-v.txt, M14 T2).
+     */
+    groupByScenario: Boolean = false,
 ): AbVerdict {
-    val scores = ScoreCalculator(weights).scoreRounds(outcomes.map { it.inputs })
+    val scenarioIds = outcomes.map { it.scenarioId }
+    val grouped = groupByScenario && scenarioIds.all { it != null }
+    val scores = ScoreCalculator(weights).scoreRounds(outcomes.map { it.inputs }, if (grouped) scenarioIds.map { checkNotNull(it) } else null)
     val byPair = outcomes.indices.groupBy { outcomes[it].pair }
     val differences = byPair.values.mapNotNull { indices ->
         val plain = indices.firstOrNull { outcomes[it].condition == AbCondition.PLAIN }?.let { scores[it] }

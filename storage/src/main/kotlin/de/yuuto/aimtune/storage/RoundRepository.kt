@@ -16,6 +16,9 @@ import java.sql.Types
 enum class SessionKind(val id: String) {
     SENSITIVITY("sensitivity"),
     ACCEL_AB("accel_ab"),
+
+    /** The rounds of the blind strength search (sessions before this kind existed hold them inside [ACCEL_AB]). */
+    ACCEL_SEARCH("accel_search"),
     ;
 
     companion object {
@@ -115,6 +118,45 @@ class RoundRepository(private val database: Database) {
         sessions().filter { it.kind == SessionKind.SENSITIVITY && it.gameId == gameId && it.dpi == dpi }
             .flatMap { rounds(it.id) }
             .filter { it.blind }
+
+    /**
+     * Ids of the rounds of acceleration sessions that were played without a curve at this DPI, at a sensitivity within
+     * [tolerance] (a share, 0.03 = 3 %) of [cm360], in one of [scenarios], newest first and at most [limit]. They are plain-sensitivity
+     * movements like the calibration rounds, so a later run can analyse them together with the rounds it plays itself.
+     */
+    fun plainAccelRoundIds(dpi: Double, cm360: Double, scenarios: List<String>, tolerance: Double, limit: Int): List<Long> {
+        if (scenarios.isEmpty()) return emptyList()
+        val marks = scenarios.joinToString(",") { "?" }
+        return database.transaction { c ->
+            c.prepareStatement(
+                "SELECT r.id FROM round r JOIN session s ON s.id = r.session_id " +
+                    "WHERE s.kind IN ($ACCEL_KINDS) AND r.accel IS NULL AND ABS(r.dpi - ?) < 0.5 AND r.cm360 BETWEEN ? AND ? AND r.scenario IN ($marks) " +
+                    "ORDER BY r.started_at_ms DESC, r.id DESC LIMIT ?",
+            ).use { s ->
+                s.setDouble(1, dpi)
+                s.setDouble(2, cm360 * (1 - tolerance))
+                s.setDouble(3, cm360 * (1 + tolerance))
+                scenarios.forEachIndexed { i, id -> s.setString(4 + i, id) }
+                s.setInt(4 + scenarios.size, limit)
+                s.executeQuery().use { rs -> buildList { while (rs.next()) add(rs.getLong(1)) } }
+            }
+        }
+    }
+
+    /** DPI and cm/360 of the newest plain round of an acceleration session in one of [scenarios], or null when there is none. */
+    fun latestPlainAccelSetup(scenarios: List<String>): Pair<Double, Double>? {
+        if (scenarios.isEmpty()) return null
+        val marks = scenarios.joinToString(",") { "?" }
+        return database.transaction { c ->
+            c.prepareStatement(
+                "SELECT r.dpi, r.cm360 FROM round r JOIN session s ON s.id = r.session_id " +
+                    "WHERE s.kind IN ($ACCEL_KINDS) AND r.accel IS NULL AND r.scenario IN ($marks) ORDER BY r.started_at_ms DESC, r.id DESC LIMIT 1",
+            ).use { s ->
+                scenarios.forEachIndexed { i, id -> s.setString(1 + i, id) }
+                s.executeQuery().use { rs -> if (rs.next()) rs.getDouble(1) to rs.getDouble(2) else null }
+            }
+        }
+    }
 
     /**
      * Recomputes the stored metrics of every round written with an older [METRICS_VERSION] from its raw
@@ -302,6 +344,7 @@ class RoundRepository(private val database: Database) {
         }
 
     private companion object {
+        const val ACCEL_KINDS = "'accel_ab', 'accel_search'"
         const val SPAWNED = "spawned"
         const val HIT = "hit"
         const val MISS = "miss"

@@ -5,8 +5,6 @@ import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration
 import de.yuuto.aimtune.app.ui.Tokens
 import kotlin.system.exitProcess
 
-private const val WINDOW_WIDTH = 1280
-private const val WINDOW_HEIGHT = 720
 private const val SCREENSHOT_WIDTH = 1920
 private const val SCREENSHOT_HEIGHT = 1080
 private const val IDLE_FPS = 30

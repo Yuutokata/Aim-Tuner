@@ -15,9 +15,16 @@ data class FlickConfig(
     val minSeparationDegrees: Double = 15.0,
     /** When set, targets follow the game's realistic geometry (angular sizes, flick-angle mix) instead of the fixed values above. */
     val geometry: TrainerGeometry? = null,
+    /**
+     * When set, a target that is not hit within this time disappears and the next one appears (a speed round): the hand
+     * has to move faster for the same distances, which separates the speed of a reach from its distance for the curve
+     * calibration (docs/ALGORITHMS.md, "Speed rounds"). Null keeps targets until they are hit.
+     */
+    val targetLifetimeNanos: Long? = null,
 ) {
     init {
         require(durationNanos > 0) { "durationNanos must be positive" }
+        require(targetLifetimeNanos == null || targetLifetimeNanos > 0) { "targetLifetimeNanos must be positive" }
         require(minDistance > 0.0 && minDistance <= maxDistance) { "invalid distance range" }
         require(targetRadius > 0.0) { "targetRadius must be positive" }
     }
@@ -36,6 +43,7 @@ class FlickScenario(private val config: FlickConfig, seed: Long) : Scenario {
     private var current: Target? = null
     private var nextId = 0
     private var startNanos: Long? = null
+    private var spawnedAt = 0L
 
     override val targets: List<Target> get() = listOfNotNull(current)
     override val events: List<TargetEvent> get() = eventLog
@@ -50,7 +58,23 @@ class FlickScenario(private val config: FlickConfig, seed: Long) : Scenario {
         return nowNanos - start >= config.durationNanos
     }
 
+    override fun deadlineNanos(target: Target): Long? =
+        config.targetLifetimeNanos?.takeIf { target == current }?.let { spawnedAt + it }
+
+    /** Replaces targets whose lifetime ran out, at the moment it ran out, so the log does not depend on the frame rate. */
+    override fun update(nowNanos: Long) {
+        val lifetime = config.targetLifetimeNanos ?: return
+        while (true) {
+            val target = current ?: return
+            val expiry = spawnedAt + lifetime
+            if (nowNanos < expiry || isFinished(expiry)) return
+            spawn(expiry, previous = target)
+        }
+    }
+
     override fun fire(origin: Vec3, direction: Vec3, nowNanos: Long): ShotResult {
+        // A shot after a target's lifetime goes at its successor, whether or not the caller updated first.
+        if (startNanos != null) update(nowNanos)
         val target = current
         if (startNanos == null || isFinished(nowNanos) || target == null) return ShotResult.IGNORED
         if (!target.isHitBy(origin, direction)) {
@@ -72,6 +96,7 @@ class FlickScenario(private val config: FlickConfig, seed: Long) : Scenario {
             attempts++
         }
         current = candidate
+        spawnedAt = nowNanos
         eventLog += TargetEvent.Spawned(nowNanos, candidate)
     }
 

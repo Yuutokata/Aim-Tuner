@@ -48,6 +48,14 @@ class AccelAnalysis(
 
     val points: List<GainPoint>
 
+    /** The speed below which the share [q] of the used movements lie (nearest rank); 0 without movements. */
+    fun speedQuantile(q: Double): Double {
+        require(q in 0.0..1.0) { "q must be in 0..1" }
+        if (used.isEmpty()) return 0.0
+        val sorted = used.map { it.speed }.sorted()
+        return sorted[((sorted.size - 1) * q).toInt()]
+    }
+
     /** Ratio of the fastest to the slowest bin speed; a curve cannot be judged without a wide range. */
     val speedRange: Double get() = if (points.size < 2) 1.0 else points.last().speed / points.first().speed
 

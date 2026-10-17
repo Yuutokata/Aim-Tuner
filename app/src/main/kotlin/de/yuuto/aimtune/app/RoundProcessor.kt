@@ -1,10 +1,18 @@
 package de.yuuto.aimtune.app
 
+import de.yuuto.aimtune.app.accel.AccelRun
+import de.yuuto.aimtune.app.accel.LastCalibration
+import de.yuuto.aimtune.app.accel.LastSearch
+import de.yuuto.aimtune.app.accel.PriorCalibration
+import de.yuuto.aimtune.app.accel.PriorSearchRound
+import de.yuuto.aimtune.app.accel.StoredSearches
 import de.yuuto.aimtune.app.blind.AxisErrors
 import de.yuuto.aimtune.app.blind.PastRound
+import de.yuuto.aimtune.core.accel.movementSamples
 import de.yuuto.aimtune.core.metrics.RoundMetrics
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
 import de.yuuto.aimtune.core.recording.RoundRecording
+import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.storage.Database
 import de.yuuto.aimtune.storage.RoundLogFile
 import de.yuuto.aimtune.storage.RoundRepository
@@ -105,6 +113,84 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
             log.log(System.Logger.Level.ERROR, "reading earlier rounds failed: ${e.message}", e)
             emptyList()
         }
+    }
+
+    /**
+     * The plain-sensitivity movements of earlier acceleration runs at this DPI and sensitivity, read on the storage thread
+     * and analysed again from the stored raw events; nothing without a database or if reading fails.
+     */
+    fun priorCalibration(dpi: Double, cm360: Double): PriorCalibration {
+        val repo = repository ?: return PriorCalibration.NONE
+        return try {
+            executor.submit<PriorCalibration> { readPriorCalibration(repo, dpi, cm360) }.get()
+        } catch (e: Exception) {
+            log.log(System.Logger.Level.ERROR, "reading earlier calibration rounds failed: ${e.message}", e)
+            PriorCalibration.NONE
+        }
+    }
+
+    /** The calibration data at the setup of the newest acceleration round, or null when none is stored. */
+    fun lastCalibration(): LastCalibration? {
+        val repo = repository ?: return null
+        return try {
+            executor.submit<LastCalibration?> {
+                val (dpi, cm360) = repo.latestPlainAccelSetup(AccelRun.CLICK_SCENARIOS.map { it.id }) ?: return@submit null
+                LastCalibration(dpi, cm360, readPriorCalibration(repo, dpi, cm360))
+            }.get()
+        } catch (e: Exception) {
+            log.log(System.Logger.Level.ERROR, "reading the last calibration failed: ${e.message}", e)
+            null
+        }
+    }
+
+    /**
+     * The stored blind strength searches at the setup of the newest one, analysed again together from their rounds; null when
+     * there is none or reading fails. Read on the storage thread.
+     */
+    fun lastSearch(weights: MetricWeights): LastSearch? {
+        val repo = repository ?: return null
+        return try {
+            executor.submit<LastSearch?> {
+                val searches = repo.sessions().filter { it.kind != SessionKind.SENSITIVITY }.mapNotNull { session ->
+                    val rounds = StoredSearches.searchRounds(session.kind, repo.rounds(session.id))
+                    if (rounds.isEmpty()) null else StoredSearches.SearchSession(session.id, session.dpi, rounds)
+                }
+                StoredSearches.pool(searches, weights)
+            }.get()
+        } catch (e: Exception) {
+            log.log(System.Logger.Level.ERROR, "reading the last search failed: ${e.message}", e)
+            null
+        }
+    }
+
+    /** The stored search rounds at this DPI and sensitivity for a new search to build on; none without a database or if reading fails. */
+    fun priorSearch(dpi: Double, cm360: Double): List<PriorSearchRound> {
+        val repo = repository ?: return emptyList()
+        return try {
+            executor.submit<List<PriorSearchRound>> {
+                val searches = repo.sessions().filter { it.kind != SessionKind.SENSITIVITY }.mapNotNull { session ->
+                    val rounds = StoredSearches.searchRounds(session.kind, repo.rounds(session.id))
+                    if (rounds.isEmpty()) null else StoredSearches.SearchSession(session.id, session.dpi, rounds)
+                }
+                StoredSearches.priorRounds(searches, dpi, cm360)
+            }.get()
+        } catch (e: Exception) {
+            log.log(System.Logger.Level.ERROR, "reading earlier search rounds failed: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    private fun readPriorCalibration(repo: RoundRepository, dpi: Double, cm360: Double): PriorCalibration {
+        val ids = repo.plainAccelRoundIds(dpi, cm360, AccelRun.CLICK_SCENARIOS.map { it.id }, PriorCalibration.CM360_TOLERANCE, PriorCalibration.MAX_ROUNDS)
+        val metrics = ids.mapNotNull { id ->
+            val recording = repo.loadRecording(id) ?: return@mapNotNull null
+            try {
+                computeRoundMetrics(recording)
+            } catch (e: IllegalArgumentException) {
+                null
+            }
+        }
+        return PriorCalibration(metrics.size, movementSamples(metrics, dpi))
     }
 
     /** All stored sessions and rounds, read on the storage thread; empty without a database or if reading fails. */

@@ -153,6 +153,40 @@ private const val MIN_MULTIPLIER = 1e-3
 private val MAX_LOG_FACTOR = ln(1.1)
 
 /**
+ * The fit as a Raw Accel lookup table over the speeds the data measured, [low] to [high] in/s ([LOOKUP_POINTS] points,
+ * evenly spaced in log speed), and flat outside them. A family fitted to a narrow window keeps rising or falling beyond it,
+ * where the data say nothing: fitted over 4.5-8.3 in/s, a +15 % preference was exported as x1.38 at 40 in/s against a true
+ * x1.06 (docs/OPTIMIZER-REVIEW.md, E2). Holding the last measured value is the least that can be said there.
+ */
+fun AccelFit.boundedTo(low: Double, high: Double, points: Int = LOOKUP_POINTS): AccelFit {
+    require(low > 0.0 && high > low) { "need 0 < low < high" }
+    require(points in 2..LookupCurve.MAX_POINTS) { "points must be in 2..${LookupCurve.MAX_POINTS}" }
+    val speeds = (0 until points).map { low * exp(ln(high / low) * it / (points - 1)) }
+    return copy(family = "$family (table)", curve = LookupCurve(speeds, speeds.map { curve.multiplier(it) }))
+}
+
+/**
+ * The recommendation of [result] bounded to the middle [BOUND_SHARE] of the measured speeds of [analysis]
+ * (5th to 95th percentile), or null when there is none. The detection itself is unchanged. A curve is only recommended
+ * for a speed range of at least 1.5 between the bins, so the percentiles are always apart; should they not be (under
+ * [MIN_BOUND_RATIO]), there is no range to bound to and the fit is returned as it is.
+ */
+fun boundedRecommendation(result: AccelFitResult, analysis: AccelAnalysis): AccelFit? {
+    val fit = result.recommended ?: return null
+    val low = analysis.speedQuantile((1.0 - BOUND_SHARE) / 2)
+    val high = analysis.speedQuantile((1.0 + BOUND_SHARE) / 2)
+    return if (low > 0.0 && high >= low * MIN_BOUND_RATIO) fit.boundedTo(low, high) else fit
+}
+
+const val MIN_BOUND_RATIO = 1.1
+
+/** This result with its recommendation bounded to the measured speeds of [analysis] (curve finder v2, M14 T3). */
+fun AccelFitResult.bounded(analysis: AccelAnalysis): AccelFitResult = copy(recommended = boundedRecommendation(this, analysis))
+
+const val LOOKUP_POINTS = 32
+const val BOUND_SHARE = 0.9
+
+/**
  * A mild curve for a player who wants to try one although the analysis found none: the gain moves by
  * [strength] (15 % by default) from slow to fast hands, upward or downward, and the low-speed sensitivity stays
  * as it is. It is a hypothesis, not a finding; the blind test decides if it is worth keeping.

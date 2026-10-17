@@ -12,7 +12,7 @@ Size: about 70 KB compressed per 45-second round at a 1 kHz mouse (28 rounds: 2 
 
 ```
 { "format": "aimtune-research", "formatVersion": 1, "appVersion": "0.1.0", "metricsVersion": 3, "notes": "...",
-  "sessions": [ { "index": 0, "kind": "sensitivity" | "accel_ab", "gameId": "valorant", "dpi": 800.0, "dayIndex": 0,
+  "sessions": [ { "index": 0, "kind": "sensitivity" | "accel_ab" | "accel_search", "gameId": "valorant", "dpi": 800.0, "dayIndex": 0,
       "rounds": [ { "scenario": "flick", "seed": 42, "cm360": 40.0, "dpi": 800.0, "blind": true, "accel": null,
           "startOffsetSeconds": 5.0, "durationNanos": 45000000000,
           "mouse": { "dtNanos": [...], "dx": [...], "dy": [...] },

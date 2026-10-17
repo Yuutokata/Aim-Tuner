@@ -104,7 +104,7 @@ class HistoryScreen(ctx: AppContext, private val entriesFuture: CompletableFutur
                 entry.rounds.toString(),
                 entry.cm360?.let { "%.1f".format(Locale.ROOT, it) } ?: "–",
                 entry.confidencePercent?.let { "$it %" } ?: "–",
-                if (entry.kind == SessionKind.ACCEL_AB) t("history.type_accel") else t("history.type_sensitivity"),
+                if (entry.kind != SessionKind.SENSITIVITY) t("history.type_accel") else t("history.type_sensitivity"),
             )
             cells.forEachIndexed { i, text -> table.add(ui.label(text, Styles.MONO)).left().width(COLUMN_WIDTHS[i]).padBottom(ROW_GAP) }
             table.row()

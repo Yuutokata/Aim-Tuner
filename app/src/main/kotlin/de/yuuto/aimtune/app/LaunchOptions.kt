@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.app
 
+import de.yuuto.aimtune.storage.CurveFinder
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -24,6 +25,8 @@ data class LaunchOptions(
     val screenshotLanguage: String? = null,
     /** Skip the daily check for a newer release on GitHub. */
     val noUpdateCheck: Boolean = false,
+    /** Overrides the curve finder of the settings for this run; null uses the setting. */
+    val curveFinder: CurveFinder? = null,
 ) {
     companion object {
         const val USAGE = """Usage: aimtune [options]
@@ -31,13 +34,14 @@ data class LaunchOptions(
   --source <s>         auto (default), raw (Windows Raw Input) or glfw
   --no-vsync           disable vertical sync
   --no-update-check    do not look for a newer release on GitHub
+  --curve-finder <f>   legacy (fitted family) or v2 (bounded lookup table), default from the settings (v2)
   --screenshots <dir>  save a PNG of every screen into <dir> using sample data, then exit
   --language <code>    language of the screenshot tour (en or de), default en
   --record <dir>       also save every finished round into <dir> as a raw event log (regression fixture)"""
     }
 }
 
-private val VALUE_OPTIONS = setOf("--seed", "--source", "--screenshots", "--record", "--language")
+private val VALUE_OPTIONS = setOf("--seed", "--source", "--screenshots", "--record", "--language", "--curve-finder")
 
 fun parseLaunchOptions(args: Array<String>): LaunchOptions {
     val values = mutableMapOf<String, String>()
@@ -61,6 +65,12 @@ fun parseLaunchOptions(args: Array<String>): LaunchOptions {
         "glfw" -> SourceKind.GLFW
         else -> throw LaunchOptionsException("--source must be auto, raw or glfw, was '$raw'")
     }
+    val curveFinder = when (val raw = values["--curve-finder"]?.lowercase()) {
+        null -> null
+        "legacy" -> CurveFinder.LEGACY
+        "v2" -> CurveFinder.V2
+        else -> throw LaunchOptionsException("--curve-finder must be legacy or v2, was '$raw'")
+    }
     val seed = values["--seed"]?.let { it.toLongOrNull() ?: throw LaunchOptionsException("--seed must be an integer, was '$it'") }
-    return LaunchOptions(seed, source, vsync, values["--screenshots"]?.let { Paths.get(it) }, values["--record"]?.let { Paths.get(it) }, values["--language"], noUpdateCheck)
+    return LaunchOptions(seed, source, vsync, values["--screenshots"]?.let { Paths.get(it) }, values["--record"]?.let { Paths.get(it) }, values["--language"], noUpdateCheck, curveFinder)
 }

@@ -2,6 +2,7 @@ package de.yuuto.aimtune.storage
 
 import de.yuuto.aimtune.core.accel.AccelCurve
 import de.yuuto.aimtune.core.accel.ClassicCurve
+import de.yuuto.aimtune.core.accel.LookupCurve
 import de.yuuto.aimtune.core.accel.NaturalCurve
 import de.yuuto.aimtune.core.accel.NoAccel
 import de.yuuto.aimtune.core.accel.PowerCurve
@@ -81,6 +82,13 @@ object RawAccelExport {
             "classic" -> ClassicCurve(number("acceleration"), number("exponentClassic"), number("inputOffset"), cap)
             "natural" -> NaturalCurve(number("decayRate"), number("limit"), number("inputOffset"))
             "power" -> PowerCurve(number("scale"), number("exponentPower"), number("outputOffset"), cap)
+            "lut" -> {
+                // With "Gain / Velocity" true the y values would be output speeds, not multipliers.
+                require(args.getValue("Gain / Velocity").jsonPrimitive.content == "false") { "only the Velocity form of a lut is supported" }
+                val data = (args.getValue("data") as JsonArray).map { it.jsonPrimitive.double() }
+                require(data.size % 2 == 0) { "lut data must hold speed and multiplier pairs" }
+                LookupCurve(data.filterIndexed { i, _ -> i % 2 == 0 }, data.filterIndexed { i, _ -> i % 2 == 1 })
+            }
             else -> throw IllegalArgumentException("unsupported mode '$mode'")
         }
         return curve to factor
@@ -146,7 +154,11 @@ object RawAccelExport {
                 outputOffset = curve.outputOffset
                 capY = curve.cap
             }
+            is LookupCurve -> mode = "lut"
         }
+        // lut reads only "data": x1, y1, x2, y2, ... (speed in in/s, multiplier, since "Gain / Velocity" is false);
+        // wrapper.cpp takes the array's length as the table size (common/accel-lookup.hpp, v1.7.1).
+        val table = (curve as? LookupCurve)?.let { lut -> lut.speeds.indices.flatMap { listOf(lut.speeds[it], lut.multipliers[it]) } } ?: emptyList()
         return buildJsonObject {
             put("mode", mode)
             // true would be the Gain form; the curves here are sensitivity multipliers per speed.
@@ -165,7 +177,7 @@ object RawAccelExport {
             put("smooth", 0.5)
             putJsonObject("Cap / Jump") { put("x", 0.0); put("y", capY) }
             put("Cap mode", "output")
-            putJsonArray("data") {}
+            putJsonArray("data") { table.forEach { add(JsonPrimitive(it.toFloat())) } }
         }
     }
 }

@@ -4,6 +4,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Current
 
+- **Latest:** M14 Optimizer review fixes is implemented: curve finder v2 (bounded lookup table) is the new default. Speed rounds, the closed loop, grouped A/B and the time model missed their gates and stay off. Waiting for the user's test of the LUT export in Raw Accel.
 - **Milestone:** M11 Realistic target heights and M12 Valorant crosshair (in progress, M11 first); M10 Flash turn-away (implemented, waiting for the user's hands-on test); M9 Review fixes (implemented, waiting for the user's hands-on test); M8 Results, i18n, packaging is implemented and waiting for the user's hands-on test
 - **Task:** fixes are in (see M9 below and docs/REVIEW.md status table). The target sizes are assumptions until R1b. M7's second hands-on part (analysis, blind test, Raw Accel import) is still open, and per the review the acceleration results should not be trusted before R2.
 
@@ -141,7 +142,68 @@ Order: the four items that change the numbers first (R1-R4), then the rest.
 - [x] Tests: round trips of 17 real codes (raw and through the typed model), invalid codes, layout reference sizes and pictures, settings round trip; screenshot tour step `crosshair` (EN/DE)
 - [ ] Open (user): export two or three of your own crosshairs from Valorant, paste them into the editor and compare the rendered crosshair side by side with the game at the same resolution (pixel lengths, gaps, outline, colors); check the meaning of `m`, header `s`/`c`, a custom color without `c;8`, rounding of odd thickness on an even screen (docs/CROSSHAIR.md "Open points")
 
+### M14 Optimizer review fixes (docs/OPTIMIZER-REVIEW.md, "Umsetzung und Ergebnisse"; implemented, waiting for the user's hands-on test)
+Verdict "fix, no ML rewrite". Decisions made while reading the code:
+- The review's joint regression is not identified, because corr(ln distance, ln speed) = 0.956, so the calibration was to be decoupled through time pressure.
+- The closed loop was unproven (`assess-iterative.txt` failed before), so it got a prototype gate first.
+
+Gate for every task: tests green, before/after tables from the gated harness (`gate-*.txt`), 4 player models (default, decoupled noise, range bias, adaptive hand), and flat false positives never rising. Numbers are in ALGORITHMS.md "M14" and the review.
+
+- [x] T0 Gate harness and baseline (`GateHarness.kt`, `GateTest`, `GateNull.kt`; `NoiseModel.DECOUPLED`, `rangeBias`; review corrections).
+  - DECOUPLED leaves within-distance r = 0.06 (default 0.36). The criterion was relaxed from < 0.05 to < 0.1, because a decile still spans some distance.
+  - Finding: a 5 % range effect makes the fit offer a curve to 200 of 200 flat players.
+- [x] T1 `HandAdaptation` (two-state, Smith et al. 2006), option `SimulatedPlayer.adaptation`.
+  - Tests pass: under 50 % mismatch left after 50 reaches, an aftereffect, 25 % steady residual, a speed that is not played keeps what it learned.
+  - With adaptation the A/B test confirms almost no curve.
+- [x] T2 `evaluateAb(groupByScenario)` + `AbOutcome.scenarioId`: **gate failed**, kept off by default.
+  - 6.1 % false verdicts against 4.7 % in 1000 null runs.
+  - At alpha 0.006 it is back at 5.0 %, but with no more power.
+- [x] T3 Curve finder v2: `LookupCurve`, `boundedRecommendation`, Raw Accel `lut` export (format checked in the 1.7.1 source). **Gate passed, now the default** (`AppSettings.curveFinder`, `--curve-finder legacy|v2`).
+  - The extrapolated error falls (+30 %: 0.235 → 0.067).
+  - The exported benefit rises (-15 %: +27.7 → +33.0).
+  - Range-biased flat players get fewer exports (13 against 23 of 32).
+  - One cell lost 5 of 21 confirmations.
+- [x] T4 Speed rounds (`FlickConfig.targetLifetimeNanos`, deadline-aware simulated reach, `pressureUndershoot`, `allFirstReaches`, `analyseSpeedRounds`): **gate failed**, kept as an experiment, not in the app.
+  - The correlation falls only to 0.86-0.93.
+  - Only 3-16 % of the targets are hit.
+  - ±15 % is found in 2 of 20 runs.
+  - A hand that undershoots when rushed gives 58 of 60 false offers.
+- [x] T5 Closed-loop prototype (`ClosedLoopGateTest`): **no-go**. Less benefit than the bounded fit (-15 %: +4.6 against +33.0) and more false exports for range-biased players (28 against 13 of 32).
+- [ ] T6 Closed loop in the app: dropped (T5 no-go).
+- [x] T7 Time in the sensitivity GP (`OptimizerConfig.timeDrift`, `GpHyperParams.driftShare/driftDays`, `Observation.days`, `dayDriftDetected`, 42-day window): **gate failed**, off by default and not wired into the app (no `sensModel` setting).
+  - At 10 % drift per session: median error 14.7 % against 16.6 % (goal 9 %).
+  - At 5 % drift it is slightly worse than legacy.
+- [x] T8 Plateau: already shown (range of equivalent sensitivities). It contains the true optimum in 80-88 % of the runs at 30 rounds (`PlateauGateTest`), so nothing new was built.
+- [x] T9 Defaults switched only for the curve finder; refactor-cleaner run; ALGORITHMS, ARCHITECTURE, SPEC, ANALYSE (section F), OPTIMIZER-REVIEW ("Umsetzung und Ergebnisse") updated.
+- [ ] Open (user):
+  - load an exported lookup table into Raw Accel ("Look Up Table", Velocity) and compare its graph with the app's;
+  - judge how the bounded curve feels on fast flicks;
+  - optionally compare blind with `--curve-finder legacy` over several days.
+
 ## Last session
+
+- M14 (docs/OPTIMIZER-REVIEW.md "Umsetzung und Ergebnisse", ALGORITHMS.md "M14"): gate harness with four player models.
+  - Outcomes:
+    - curve finder v2 passed and is the default;
+    - T2, T4, T5 and T7 missed their gates and stay off (as options or experiments);
+    - T6 was dropped;
+    - T8 already existed.
+  - The biggest finding: a range effect of 5 % in the simulated hand makes the error analysis offer a curve to every flat player. The bounded curve and the A/B test limit the damage; the detection itself is not fixed.
+  - Not checked: the lookup table in the real Raw Accel.
+
+- Wider strength search range, tried in the simulation (`AssessmentTest.strengthRange`, 12 players per row; numbers in ALGORITHMS.md): the app's 0.70-1.45 pins players with a preference beyond it at the edge (-60 %: 12 of 12 at x0.70; -50 %: 11 of 12; +75 %: 9 of 12), ranges 0.60-1.70 and 0.50-2.00 find them close to the truth (-50 %: x0.52, +75 %: x1.78) with a few points more benefit, but overshoot for moderate preferences (-25 %: x0.77 / x0.71 / x0.66 for oracle x0.75; +15 %: x1.15 / x1.20 / x1.23) and do not raise the benefit there; flat players are offered a curve about equally often (3, 2, 3 of 12). The app's range is unchanged. Idea for the user's decision: widen only when a search ended at the edge (the author's real search did: x0.70), on the side of that edge, which was not simulated yet.
+
+- Strength search over several days (requested): a new blind search loads the stored search rounds at the same DPI and a sensitivity within 5 % (`RoundProcessor.priorSearch`, newest 120; wider than the 3 % of the calibration because a strength is a relative gain and the recommended sensitivity moved 4.5 % between two days in the author's data) and the optimizer builds on them (`StrengthSearch(prior = ...)`, `AccelRun.priorSearch`). With earlier rounds the search plans `max(8, 24 - earlier)` new rounds, may end after `max(6, 16 - earlier)`, and the between-rounds text says how many earlier rounds count. The earlier rounds go in with their session id and position, so the optimizer learns a better or worse day per session (before, "Last search" treated all rounds as one day). Effect on the author's two searches: best strength still 0.70 (edge of the range), but the range is now 0.70 to 1.42 instead of 0.70 to 0.83, so "no curve" is no longer excluded; the single-day view was too sure. "Last search" therefore shows and exports the best-guess curve whenever it is a real curve, with a stronger caution when the range still includes plain sensitivity (`LastSearch.clear`); the live search keeps its rule (offers a curve only when the range excludes plain). Open: the search range ends at 0.70, and the best strength sits at that edge in the author's data; widening it was not tried.
+
+- Exit button on the main menu (footer, bottom right, "Exit (Esc)"; Esc already left the app). "Last search" now analyses the searches of all sessions at the setup of the newest one together (same DPI, sensitivity within 3 %, newest 120 rounds; `StoredSearches.pool`), because the strengths are played at the same sensitivity and more rounds tell the optimizer more. On the user's real data: 42 rounds from 2 sessions, best strength 0.70 (edge of the range), range 0.70 to 0.83, confidence 50 %, the same answer as the newest search alone. Rounds of different days also differ in how the player played; nothing corrects for that yet. Open: start a new search with the earlier rounds as a head start (fewer new rounds), like the calibration does.
+
+- Last search (found when the "Last analysis" screen showed no curve for the user's real data: the 18-round run that gave the curve was the blind strength search, not the calibration, and "Last analysis" only analyses plain rounds): the acceleration intro has a "Last search" button (`AccelLastSearchScreen`). `StoredSearches` reads the strength back from each stored round (the search plays `NaturalCurve(CurveStrength.DECAY, strength)`, no curve is strength 1), runs `StrengthSearch` again over the stored score inputs and shows the strength card, and when the range excludes "no curve" the curve with the same export, copy and blind-test buttons as "Last analysis" (shared in `AccelFitScreen`). New sessions of the search get their own kind `accel_search` (`AccelSession.sessionKind` follows the phase); older ones hold the search and the test that followed in one `accel_ab` session, which is split heuristically (the end where rounds come in plain/curve pairs of one strength is the test; at least 16 rounds with 4 distinct strengths before it make a search). Checked on a copy of the user's real database: newest search 24 rounds, best strength 0.70 (the edge of the range, 30 % less gain at high speed), range 0.70 to 0.84, confidence 50 %. Plain rounds of search sessions now also count for the pooled calibration. Not done: a list of older searches; the heuristic can be wrong for a session whose search ended inside a pair-like pattern.
+
+- Fullscreen (requested): F11 switches between the window (1280x720) and fullscreen in the display's current mode; the choice is saved as `AppSettings.fullscreen` and applied at the next start. F11 is ignored during a running round (a window change would lose the focus and abort it) and in the screenshot tour. Only the settings round trip is tested; the switch itself needs a try in the real window (multi-monitor, the mouse gate after the switch, the UI scale after the resize). No Settings tile for it yet.
+
+- Last calibration (requested after a real 18-round run that found a good curve): the acceleration intro has a "Last analysis" button (`AccelLastAnalysisScreen`, shared curve card and reason texts in `AccelFitScreen`). It takes the setup of the newest plain acceleration round (`RoundRepository.latestPlainAccelSetup`), reads the stored plain rounds at that sensitivity (`RoundProcessor.lastCalibration`, same 3 % / 90 rounds as the pooled calibration) and fits them again, so the curve or the reason and the wanted-gain chart are available on any day without a new run. The numbers can differ slightly from the end of the run, because plain rounds of the A/B test and of other days count too. When a curve fits, the screen also offers "Export for Raw Accel" and "Copy settings.json" without a blind test first (the user wanted to export a curve they like); a caution says the blind test has not confirmed it. Not stored: the fit itself, no per-day breakdown, no list of older fits. The screen also starts the blind A/B test of that curve ("Test this curve blind": `AccelRun(startWithTest = curve)` begins in the TEST phase, `AppContext.startAccelTest`), at the DPI and sensitivity of the stored rounds; it needs the Raw Accel check of the intro and a mouse with report timestamps, otherwise the button is disabled with a hint. The result screen is the usual one (export only if better). Screenshot step `accel-last`.
+
+- Calibration over several days (requested: play on different days to strengthen the curve result): a new acceleration run loads the plain-sensitivity click rounds of earlier `accel_ab` sessions at the same DPI and a sensitivity within 3 % (`RoundRepository.plainAccelRoundIds`, newest 90, `RoundProcessor.priorCalibration` analyses them again from the stored raw events) and adds their movements to the error analysis (`AccelRun.prior`). The run then asks for fewer new rounds (15 less the earlier ones, at least 3) and the between-rounds text says how many earlier rounds count. Not pooled: the blind strength search and the A/B test, which stay per run. Tests: `RoundRepositoryTest`, `AccelRunTest`, `RoundProcessorTest`. Open: judge it in the real app; a run started with the blind search does not look for earlier rounds; stored rounds from a different sensitivity are ignored, not rescaled.
 
 - M13 Update check: `Version` (core), `UpdateChecker` (GitHub releases/latest, every failure including 404 of a private repository gives null and shows nothing), `UpdateService` (once a day, last find kept in the settings), hint with key U in the main menu, switch in Settings and `--no-update-check`, version of the build from `version.properties` (`-PappVersion`), `java.net.http` added to the packaged runtime. Tests: `VersionTest`, `UpdateCheckerTest` (local HTTP server incl. 404/403/429/500/odd JSON/no server), `UpdateServiceTest`. Open (user): after the repo is public, tag a newer version and see the hint in an older packaged app; not tried against the real GitHub API.
 
@@ -184,7 +246,7 @@ Order: the four items that change the numbers first (R1-R4), then the rest.
 
 1. User tests M8 with `gradlew.bat :app:run` (or the app image from `:app:jpackage`): Results (R) with the chart, History (H) after a few sessions, Settings → Language (Deutsch/English, applies at once, kept on Save), the packaged `AimTune.exe` (does it start, does raw input work, does it create the database).
 2. Still open from M7: the second hands-on part (analysis result, blind test, Raw Accel import of `settings.json`).
-3. Then decide about pushing M8 and what comes after the milestones (resume of an interrupted calibration, mixed-scenario confidence, refit with the curve on, see Open questions).
+3. Then decide about pushing M8 and what comes after the milestones (pooling the A/B test over days, mixed-scenario confidence, refit with the curve on, see Open questions).
 
 ## Known bugs
 
