@@ -2,13 +2,16 @@ package de.yuuto.aimtune.app
 
 import de.yuuto.aimtune.app.accel.AccelRun
 import de.yuuto.aimtune.app.accel.LastCalibration
+import de.yuuto.aimtune.app.accel.LastSearch
 import de.yuuto.aimtune.app.accel.PriorCalibration
+import de.yuuto.aimtune.app.accel.StoredSearches
 import de.yuuto.aimtune.app.blind.AxisErrors
 import de.yuuto.aimtune.app.blind.PastRound
 import de.yuuto.aimtune.core.accel.movementSamples
 import de.yuuto.aimtune.core.metrics.RoundMetrics
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
 import de.yuuto.aimtune.core.recording.RoundRecording
+import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.storage.Database
 import de.yuuto.aimtune.storage.RoundLogFile
 import de.yuuto.aimtune.storage.RoundRepository
@@ -135,6 +138,25 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
             }.get()
         } catch (e: Exception) {
             log.log(System.Logger.Level.ERROR, "reading the last calibration failed: ${e.message}", e)
+            null
+        }
+    }
+
+    /**
+     * The newest blind strength search among the stored acceleration sessions, analysed again from its rounds; null when
+     * there is none or reading fails. Read on the storage thread.
+     */
+    fun lastSearch(weights: MetricWeights): LastSearch? {
+        val repo = repository ?: return null
+        return try {
+            executor.submit<LastSearch?> {
+                repo.sessions().asReversed().firstNotNullOfOrNull { session ->
+                    val rounds = StoredSearches.searchRounds(session.kind, repo.rounds(session.id))
+                    if (rounds.isEmpty()) null else StoredSearches.summarize(session.dpi, rounds, weights)
+                }
+            }.get()
+        } catch (e: Exception) {
+            log.log(System.Logger.Level.ERROR, "reading the last search failed: ${e.message}", e)
             null
         }
     }

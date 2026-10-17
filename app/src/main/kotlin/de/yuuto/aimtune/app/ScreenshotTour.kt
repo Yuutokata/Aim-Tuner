@@ -7,6 +7,7 @@ import com.badlogic.gdx.utils.BufferUtils
 import com.badlogic.gdx.utils.ScreenUtils
 import de.yuuto.aimtune.app.accel.AccelPhase
 import de.yuuto.aimtune.app.accel.LastCalibration
+import de.yuuto.aimtune.app.accel.LastSearch
 import de.yuuto.aimtune.app.accel.PriorCalibration
 import de.yuuto.aimtune.app.accel.sampleAccelRun
 import de.yuuto.aimtune.app.blind.sampleBlindRun
@@ -54,6 +55,7 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("switching-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
         Step("accel-intro") { ctx.showAccel() },
         Step("accel-last") { accelSample(AccelPhase.ANALYSIS)?.let { ctx.showLastAccelAnalysis(LastCalibration(it.dpi, it.baseCm360, PriorCalibration(it.calibrationDone, it.calibrationSamples))) } },
+        Step("accel-last-search") { accelSample(AccelPhase.SEARCH_RESULT)?.let { ctx.showLastSearch(LastSearch(it.dpi, it.baseCm360, it.searchRounds, it.searchResult)) } },
         Step("accel-calibration") { accelSample(AccelPhase.CALIBRATION)?.let(ctx::showAccelStep) },
         Step("accel-analysis") { accelSample(AccelPhase.ANALYSIS)?.let(ctx::showAccelStep) },
         Step("accel-search") { accelSample(AccelPhase.SEARCH)?.let(ctx::showAccelStep) },

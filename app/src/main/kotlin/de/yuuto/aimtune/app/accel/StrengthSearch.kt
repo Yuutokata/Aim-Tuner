@@ -39,9 +39,12 @@ class StrengthSearch(private val weights: MetricWeights, seed: Long, val planned
     /** The strength of the next round. Blind: callers must not show it. */
     fun nextStrength(): Double = CurveStrength.fromPseudo(optimizer.suggestNext(history()).cm360)
 
-    fun record(strength: Double, scenario: ScenarioKind, metrics: RoundMetrics) {
-        inputs += metrics.scoreInputs()
-        scenarios += scenario.id
+    fun record(strength: Double, scenario: ScenarioKind, metrics: RoundMetrics) = record(strength, scenario.id, metrics.scoreInputs())
+
+    /** Takes a round by its scenario id and score inputs, e.g. from the stored rounds of an earlier search. */
+    fun record(strength: Double, scenarioId: String, scoreInputs: Map<ScoreMetric, Double>) {
+        inputs += scoreInputs
+        scenarios += scenarioId
         pseudo += CurveStrength.toPseudo(strength)
     }
 

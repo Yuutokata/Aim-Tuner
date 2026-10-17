@@ -16,6 +16,9 @@ import java.sql.Types
 enum class SessionKind(val id: String) {
     SENSITIVITY("sensitivity"),
     ACCEL_AB("accel_ab"),
+
+    /** The rounds of the blind strength search (sessions before this kind existed hold them inside [ACCEL_AB]). */
+    ACCEL_SEARCH("accel_search"),
     ;
 
     companion object {
@@ -127,15 +130,14 @@ class RoundRepository(private val database: Database) {
         return database.transaction { c ->
             c.prepareStatement(
                 "SELECT r.id FROM round r JOIN session s ON s.id = r.session_id " +
-                    "WHERE s.kind = ? AND r.accel IS NULL AND ABS(r.dpi - ?) < 0.5 AND r.cm360 BETWEEN ? AND ? AND r.scenario IN ($marks) " +
+                    "WHERE s.kind IN ($ACCEL_KINDS) AND r.accel IS NULL AND ABS(r.dpi - ?) < 0.5 AND r.cm360 BETWEEN ? AND ? AND r.scenario IN ($marks) " +
                     "ORDER BY r.started_at_ms DESC, r.id DESC LIMIT ?",
             ).use { s ->
-                s.setString(1, SessionKind.ACCEL_AB.id)
-                s.setDouble(2, dpi)
-                s.setDouble(3, cm360 * (1 - tolerance))
-                s.setDouble(4, cm360 * (1 + tolerance))
-                scenarios.forEachIndexed { i, id -> s.setString(5 + i, id) }
-                s.setInt(5 + scenarios.size, limit)
+                s.setDouble(1, dpi)
+                s.setDouble(2, cm360 * (1 - tolerance))
+                s.setDouble(3, cm360 * (1 + tolerance))
+                scenarios.forEachIndexed { i, id -> s.setString(4 + i, id) }
+                s.setInt(4 + scenarios.size, limit)
                 s.executeQuery().use { rs -> buildList { while (rs.next()) add(rs.getLong(1)) } }
             }
         }
@@ -148,10 +150,9 @@ class RoundRepository(private val database: Database) {
         return database.transaction { c ->
             c.prepareStatement(
                 "SELECT r.dpi, r.cm360 FROM round r JOIN session s ON s.id = r.session_id " +
-                    "WHERE s.kind = ? AND r.accel IS NULL AND r.scenario IN ($marks) ORDER BY r.started_at_ms DESC, r.id DESC LIMIT 1",
+                    "WHERE s.kind IN ($ACCEL_KINDS) AND r.accel IS NULL AND r.scenario IN ($marks) ORDER BY r.started_at_ms DESC, r.id DESC LIMIT 1",
             ).use { s ->
-                s.setString(1, SessionKind.ACCEL_AB.id)
-                scenarios.forEachIndexed { i, id -> s.setString(2 + i, id) }
+                scenarios.forEachIndexed { i, id -> s.setString(1 + i, id) }
                 s.executeQuery().use { rs -> if (rs.next()) rs.getDouble(1) to rs.getDouble(2) else null }
             }
         }
@@ -343,6 +344,7 @@ class RoundRepository(private val database: Database) {
         }
 
     private companion object {
+        const val ACCEL_KINDS = "'accel_ab', 'accel_search'"
         const val SPAWNED = "spawned"
         const val HIT = "hit"
         const val MISS = "miss"

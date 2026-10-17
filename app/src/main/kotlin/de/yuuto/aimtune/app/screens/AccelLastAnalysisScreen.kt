@@ -1,6 +1,5 @@
 package de.yuuto.aimtune.app.screens
 
-import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import de.yuuto.aimtune.app.AppContext
@@ -8,24 +7,16 @@ import de.yuuto.aimtune.app.accel.LastCalibration
 import de.yuuto.aimtune.app.ui.ChartActor
 import de.yuuto.aimtune.app.ui.Styles
 import de.yuuto.aimtune.app.ui.accelChart
-import de.yuuto.aimtune.app.ui.addButton
 import de.yuuto.aimtune.app.ui.button
 import de.yuuto.aimtune.app.ui.caps
 import de.yuuto.aimtune.app.ui.frame
 import de.yuuto.aimtune.app.ui.label
 import de.yuuto.aimtune.core.accel.AccelAnalysis
 import de.yuuto.aimtune.core.accel.fitAccel
-import de.yuuto.aimtune.storage.RawAccelExport
-import java.nio.file.Path
 import java.util.Locale
 
 private const val TEXT_WIDTH = 1000f
 private const val CARD_WIDTH = 900f
-
-// Curve card and export card side by side stay narrow enough for windows that are not 16:9; a wider row pushed the footer buttons out of the window.
-private const val CURVE_WIDTH = 780f
-private const val EXPORT_WIDTH = 600f
-private const val CARD_PADDING = 32f
 private const val CHART_HEIGHT = 300f
 private const val FOOTER_BUTTON_HEIGHT = 64f
 
@@ -36,7 +27,6 @@ private const val FOOTER_BUTTON_HEIGHT = 64f
 class AccelLastAnalysisScreen(ctx: AppContext, private val last: LastCalibration?) : AccelFitScreen(ctx) {
     private val analysis = last?.data?.takeIf { it.rounds > 0 }?.let { AccelAnalysis(it.samples) }
     private val fit = analysis?.let(::fitAccel)
-    private var exported: Result<Path>? = null
 
     override fun build(): Actor {
         val content = Table()
@@ -50,8 +40,8 @@ class AccelLastAnalysisScreen(ctx: AppContext, private val last: LastCalibration
             val recommended = fit.recommended
             if (recommended != null) {
                 // The export card sits next to the curve, so the screen stays within the window.
-                content.add(curveCard(recommended, fit.points, CURVE_WIDTH)).left().top().width(CURVE_WIDTH)
-                content.add(exportCard()).left().top().width(EXPORT_WIDTH).padLeft(24f).row()
+                content.add(curveCard(recommended, fit.points, SIDE_CARD_WIDTH)).left().top().width(SIDE_CARD_WIDTH)
+                content.add(exportCard("accel.last.untested")).left().top().width(EXPORT_CARD_WIDTH).padLeft(24f).row()
             } else if (fit.points.size >= 2) {
                 content.add(ui.caps(t("accel.analysis.chart_plain"))).left().padBottom(8f).row()
                 content.add(ChartActor(ui, accelChart(ui.tokens, fit.points, null))).left().width(CARD_WIDTH).height(CHART_HEIGHT).row()
@@ -61,48 +51,8 @@ class AccelLastAnalysisScreen(ctx: AppContext, private val last: LastCalibration
         val footer = Table()
         footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showAccel() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
-        if (fit?.recommended != null) {
-            footer.addButton(ui.button(t("accel.result.copy"), Styles.SECONDARY) { copy() }, minWidth = 260f).padRight(16f)
-            footer.addButton(ui.button(t("accel.result.export"), Styles.SECONDARY) { export() }, minWidth = 300f).padRight(16f)
-            val test = ui.button(t("accel.last.test"), Styles.PRIMARY) { testBlind() }
-            test.isDisabled = !canTest()
-            footer.addButton(test, minWidth = 300f)
-        }
+        fit?.recommended?.let { addCurveActions(footer, it, checkNotNull(last).dpi, last.cm360) }
         return ui.frame(null, content, footer)
-    }
-
-    /** The Raw Accel hints and, once exported, where the file went. Same texts as after the blind test, plus the note that this curve was not tested. */
-    private fun exportCard(): Table {
-        val card = Table()
-        card.background(ui.skin.getDrawable(Styles.CARD))
-        card.pad(CARD_PADDING)
-        card.add(ui.caps(t("accel.result.raw_accel_title"))).left().row()
-        card.add(ui.label(t("accel.last.untested"), Styles.CAUTION, wrap = true)).left().width(EXPORT_WIDTH - 2 * CARD_PADDING).padTop(8f).row()
-        card.add(ui.label(t("accel.result.raw_accel_text"), Styles.CAPTION_MUTED, wrap = true)).left().width(EXPORT_WIDTH - 2 * CARD_PADDING).padTop(8f).row()
-        if (!canTest()) card.add(ui.label(t("accel.last.test_blocked"), Styles.CAPTION_MUTED, wrap = true)).left().width(EXPORT_WIDTH - 2 * CARD_PADDING).padTop(16f).row()
-        exported?.let { result ->
-            val text = result.fold({ t("accel.result.saved", it) }, { t("accel.result.save_failed", it.message.orEmpty()) })
-            card.add(ui.label(text, if (result.isSuccess) Styles.OK else Styles.CAUTION, wrap = true)).left().width(EXPORT_WIDTH - 2 * CARD_PADDING).padTop(16f)
-        }
-        return card
-    }
-
-    /** The blind test compares with the plain mouse, so it needs the Raw Accel check of the intro and a mouse with report timestamps. */
-    private fun canTest() = ctx.rawAccelConfirmed && ctx.source.hasReportTimestamps
-
-    private fun testBlind() {
-        val curve = fit?.recommended ?: return
-        if (canTest()) ctx.startAccelTest(curve, checkNotNull(last))
-    }
-
-    private fun export() {
-        exported = ctx.exportAccel(fit?.recommended, checkNotNull(last).dpi)
-        rebuild()
-    }
-
-    private fun copy() {
-        val curve = fit?.recommended ?: return
-        Gdx.app.clipboard.contents = RawAccelExport.settingsJson(curve.curve, checkNotNull(last).dpi, curve.sensitivityFactor)
     }
 
     override fun onEscape() = ctx.showAccel()
