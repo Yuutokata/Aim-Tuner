@@ -21,6 +21,9 @@ data class StrengthResult(
     val excludesPlain: Boolean,
     /** True when the best strength is at an end of the searched range, so a stronger curve may do better. */
     val atEdge: Boolean,
+    /** The searched range of strengths; it is wider when the search played flash rounds. */
+    val rangeMin: Double = CurveStrength.MIN,
+    val rangeMax: Double = CurveStrength.MAX,
 )
 
 /**
@@ -42,8 +45,12 @@ class StrengthSearch(
     seed: Long,
     val plannedRounds: Int = DEFAULT_ROUNDS,
     private val prior: List<PriorSearchRound> = emptyList(),
+    /** Whether the search plays flash rounds, which widens its strength range (`CurveStrength.searchRange`). */
+    flash: Boolean = false,
 ) {
-    private val optimizer = SensitivityOptimizer(CurveStrength.searchRange, seed)
+    // Earlier rounds above the narrow range (a search that played flash rounds) widen it too, so the optimizer covers them.
+    private val range = CurveStrength.searchRange(flash || prior.any { it.strength > CurveStrength.MAX + STRENGTH_TOLERANCE })
+    private val optimizer = SensitivityOptimizer(range, seed)
     private val inputs = mutableListOf<Map<ScoreMetric, Double>>()
     private val scenarios = mutableListOf<String>()
     private val pseudo = mutableListOf<Double>()
@@ -75,7 +82,10 @@ class StrengthSearch(
         val low = CurveStrength.fromPseudo(analysis.intervalLowCm360)
         val high = CurveStrength.fromPseudo(analysis.intervalHighCm360)
         val side = low > CurveStrength.NEUTRAL || high < CurveStrength.NEUTRAL
-        return StrengthResult(strength, low, high, analysis.confidencePercent, prior.size + roundsPlayed, side && CurveStrength.isCurve(strength), analysis.atRangeEdge)
+        return StrengthResult(
+            strength, low, high, analysis.confidencePercent, prior.size + roundsPlayed, side && CurveStrength.isCurve(strength), analysis.atRangeEdge,
+            CurveStrength.fromPseudo(range.minCm360), CurveStrength.fromPseudo(range.maxCm360),
+        )
     }
 
     private fun history(): List<Observation> {
@@ -99,6 +109,8 @@ class StrengthSearch(
 
         /** The session id of this search's own rounds; stored sessions have positive ids. */
         private const val OWN_SESSION = 0L
+
+        private const val STRENGTH_TOLERANCE = 1e-9
 
         /** A round without a usable score yet only counts for the design phase. */
         private const val UNKNOWN_SCORE = 50.0

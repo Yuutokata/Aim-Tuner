@@ -36,4 +36,11 @@ class CurveStrengthTest {
         assertEquals(1.25, strengthAccel(0.8).gainRange, 1e-9)
         assertFailsWith<IllegalArgumentException> { strengthAccel(1.01) }
     }
+
+    @Test
+    fun `with flash rounds the search reaches stronger rising curves`() {
+        assertEquals(145.0, CurveStrength.searchRange(flash = false).maxCm360, 1e-9)
+        assertEquals(175.0, CurveStrength.searchRange(flash = true).maxCm360, 1e-9)
+        assertEquals(CurveStrength.searchRange(flash = false).minCm360, CurveStrength.searchRange(flash = true).minCm360, 1e-9)
+    }
 }

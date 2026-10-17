@@ -6,6 +6,7 @@ import de.yuuto.aimtune.core.accel.CurveStrength
 import de.yuuto.aimtune.core.accel.NaturalCurve
 import de.yuuto.aimtune.core.accel.NoAccel
 import de.yuuto.aimtune.core.accel.strengthAccel
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.storage.RoundRow
 import de.yuuto.aimtune.storage.SessionKind
@@ -120,7 +121,9 @@ object StoredSearches {
     fun pool(sessions: List<SearchSession>, weights: MetricWeights): LastSearch? {
         val newest = sessions.lastOrNull() ?: return null
         val rounds = priorRounds(sessions, newest.dpi, newest.cm360)
-        val result = StrengthSearch(weights, seed = 0L, plannedRounds = rounds.size, prior = rounds).result()
+        // Searches with flash rounds were played over the wider strength range, so they are analysed over it too.
+        val flash = rounds.any { it.scenarioId == ScenarioKind.FLASH.id }
+        val result = StrengthSearch(weights, seed = 0L, plannedRounds = rounds.size, prior = rounds, flash = flash).result()
         return LastSearch(newest.dpi, newest.cm360, rounds.size, rounds.map { it.sessionKey }.distinct().size, result)
     }
 }
