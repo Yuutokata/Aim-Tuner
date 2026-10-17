@@ -23,20 +23,20 @@ private const val CHART_HEIGHT = 300f
 /** What the screens that show the result of a calibration analysis have in common: the curve card and the reason text. */
 abstract class AccelFitScreen(ctx: AppContext) : UiScreen(ctx) {
     /** The fitted curve with its parameters and the chart of the wanted gain per speed next to it. */
-    protected fun curveCard(fit: AccelFit, points: List<GainPoint>): Table {
+    protected fun curveCard(fit: AccelFit, points: List<GainPoint>, width: Float = CARD_WIDTH): Table {
         val card = Table()
         card.background(ui.skin.getDrawable(Styles.CARD))
         card.pad(CARD_PADDING)
         card.add(ui.caps(t("accel.analysis.curve_title", fit.family))).left().row()
-        card.add(ui.label(parameters(fit), Styles.MONO, wrap = true)).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(8f).row()
+        card.add(ui.label(parameters(fit), Styles.MONO, wrap = true)).left().width(width - 2 * CARD_PADDING).padTop(8f).row()
         card.add(
             ui.label(
                 t("accel.analysis.curve_note", "%.2f".format(Locale.ROOT, fit.gainRange), "%.2f".format(Locale.ROOT, fit.sensitivityFactor)),
                 Styles.CAPTION_MUTED, wrap = true,
             ),
-        ).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(12f).row()
+        ).left().width(width - 2 * CARD_PADDING).padTop(12f).row()
         card.add(ui.caps(t("accel.analysis.chart_curve"))).left().padTop(24f).row()
-        card.add(ChartActor(ui, accelChart(ui.tokens, points, fit))).left().width(CARD_WIDTH - 2 * CARD_PADDING).height(CHART_HEIGHT).padTop(8f).row()
+        card.add(ChartActor(ui, accelChart(ui.tokens, points, fit))).left().width(width - 2 * CARD_PADDING).height(CHART_HEIGHT).padTop(8f).row()
         return card
     }
 

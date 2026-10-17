@@ -21,7 +21,10 @@ import java.util.Locale
 
 private const val TEXT_WIDTH = 1000f
 private const val CARD_WIDTH = 900f
-private const val EXPORT_WIDTH = 740f
+
+// Curve card and export card side by side stay narrow enough for windows that are not 16:9; a wider row pushed the footer buttons out of the window.
+private const val CURVE_WIDTH = 780f
+private const val EXPORT_WIDTH = 600f
 private const val CARD_PADDING = 32f
 private const val CHART_HEIGHT = 300f
 private const val FOOTER_BUTTON_HEIGHT = 64f
@@ -42,12 +45,12 @@ class AccelLastAnalysisScreen(ctx: AppContext, private val last: LastCalibration
             content.add(ui.label(t("accel.last.none"), Styles.BODY_MUTED, wrap = true)).left().width(TEXT_WIDTH)
         } else {
             val note = t("accel.last.note", last.data.rounds, analysis.used.size, "%.1f".format(Locale.ROOT, last.cm360))
-            content.add(ui.label(note, Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).padBottom(16f).row()
-            content.add(ui.label(reasonText(fit), Styles.BODY_MUTED, wrap = true)).left().width(TEXT_WIDTH).padBottom(24f).row()
+            content.add(ui.label(note, Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).colspan(2).padBottom(16f).row()
+            content.add(ui.label(reasonText(fit), Styles.BODY_MUTED, wrap = true)).left().width(TEXT_WIDTH).colspan(2).padBottom(24f).row()
             val recommended = fit.recommended
             if (recommended != null) {
                 // The export card sits next to the curve, so the screen stays within the window.
-                content.add(curveCard(recommended, fit.points)).left().top().width(CARD_WIDTH)
+                content.add(curveCard(recommended, fit.points, CURVE_WIDTH)).left().top().width(CURVE_WIDTH)
                 content.add(exportCard()).left().top().width(EXPORT_WIDTH).padLeft(24f).row()
             } else if (fit.points.size >= 2) {
                 content.add(ui.caps(t("accel.analysis.chart_plain"))).left().padBottom(8f).row()
