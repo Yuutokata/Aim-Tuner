@@ -43,6 +43,7 @@ import de.yuuto.aimtune.app.screens.UiScreen
 import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.setup.SetupStep
 import de.yuuto.aimtune.app.ui.UiHolder
+import de.yuuto.aimtune.core.accel.AccelFit
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.FlashImportance
 import de.yuuto.aimtune.core.scenario.ScenarioSchedule
@@ -272,10 +273,13 @@ class AppContext(
     fun showAccelRound(run: AccelRun) = switchTo(TrainerScreen(this, run.nextRoundConfig(), AccelSession(this, run)))
 
     /** Writes the Raw Accel settings.json of the tested curve; the path, or the reason it failed. */
-    fun exportAccel(run: AccelRun): Result<Path> = runCatching {
-        val candidate = checkNotNull(run.candidate) { "there is no curve to export" }
+    fun exportAccel(run: AccelRun): Result<Path> = exportAccel(run.candidate, run.dpi)
+
+    /** Writes the Raw Accel settings.json of [fit] for a mouse at [dpi]; the path, or the reason it failed. */
+    fun exportAccel(fit: AccelFit?, dpi: Double): Result<Path> = runCatching {
+        val curve = checkNotNull(fit) { "there is no curve to export" }
         val dir = checkNotNull(exportDir) { "no data folder to write to" }
-        RawAccelExport.write(dir, candidate.curve, run.dpi, candidate.sensitivityFactor)
+        RawAccelExport.write(dir, curve.curve, dpi, curve.sensitivityFactor)
     }
 
     /** Number of stored blind rounds for the current setup, for the menu. */
