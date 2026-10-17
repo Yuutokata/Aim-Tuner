@@ -2,6 +2,7 @@ package de.yuuto.aimtune.app.accel
 
 import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.core.accel.AbStatus
+import de.yuuto.aimtune.core.accel.AccelAnalysis
 import de.yuuto.aimtune.core.accel.trialAccel
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.MetricWeights
@@ -190,6 +191,53 @@ class AccelRunTest {
         assertEquals(AccelRun.MIN_CALIBRATION_ROUNDS, run.calibrationDone)
         assertNotNull(run.fit)
         assertTrue(!run.canAnalyseNow, "no early analysis once the calibration is over")
+    }
+
+    private fun playDay(rounds: Int, seed: Long): PriorCalibration {
+        val day = AccelRun(base, MetricWeights.DEFAULT, runKey = seed, seed = seed, requestedCalibrationRounds = rounds)
+        repeat(rounds) { play(day, fallingGainPlayer) }
+        return PriorCalibration(day.calibrationDone, day.calibrationSamples)
+    }
+
+    private fun runWith(prior: PriorCalibration, seed: Long) = AccelRun(base, MetricWeights.DEFAULT, runKey = seed, seed = seed, prior = prior)
+
+    @Test
+    fun `earlier rounds count toward the calibration, so fewer new rounds are due`() {
+        val run = runWith(playDay(rounds = 8, seed = 11), seed = 12)
+        assertEquals(AccelRun.DEFAULT_CALIBRATION_ROUNDS - 8, run.calibrationRounds)
+        while (run.phase == AccelPhase.CALIBRATION) play(run, fallingGainPlayer)
+        assertEquals(7, run.calibrationDone)
+        assertTrue(checkNotNull(run.fit).points.isNotEmpty())
+    }
+
+    @Test
+    fun `a day plays a few new rounds even with plenty of earlier ones`() {
+        assertEquals(AccelRun.MIN_NEW_ROUNDS, runWith(PriorCalibration(40, emptyList()), seed = 13).calibrationRounds)
+        assertEquals(AccelRun.DEFAULT_CALIBRATION_ROUNDS, runWith(PriorCalibration.NONE, seed = 14).calibrationRounds)
+    }
+
+    @Test
+    fun `with earlier rounds the analysis can start early only after a day's minimum of new rounds`() {
+        val run = runWith(PriorCalibration(6, emptyList()), seed = 15)
+        repeat(AccelRun.MIN_NEW_ROUNDS - 1) { play(run, fallingGainPlayer) }
+        assertTrue(!run.canAnalyseNow, "too few new rounds")
+        play(run, fallingGainPlayer)
+        assertTrue(run.canAnalyseNow, "3 new and 6 earlier rounds are enough for an early analysis")
+        val few = runWith(PriorCalibration(2, emptyList()), seed = 16)
+        repeat(AccelRun.MIN_NEW_ROUNDS) { play(few, fallingGainPlayer) }
+        assertTrue(!few.canAnalyseNow, "3 new and 2 earlier rounds are fewer than the 8 the analysis needs")
+    }
+
+    @Test
+    fun `the earlier days' movements go into the analysis`() {
+        val earlier = playDay(rounds = 8, seed = 21)
+        val second = runWith(earlier, seed = 22)
+        while (second.phase == AccelPhase.CALIBRATION) play(second, fallingGainPlayer)
+        assertTrue(earlier.samples.isNotEmpty())
+        val alone = AccelAnalysis(second.calibrationSamples).used.size
+        val pooled = AccelAnalysis(second.calibrationSamples + earlier.samples).used.size
+        assertTrue(pooled > alone, "the pooled analysis has more movements than the new rounds alone")
+        assertNotNull(second.fit?.recommended, "a player who expects a falling gain gets a curve from the two days together")
     }
 
     @Test

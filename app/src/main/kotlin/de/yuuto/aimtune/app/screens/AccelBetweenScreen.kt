@@ -89,6 +89,7 @@ class AccelBetweenScreen(ctx: AppContext, private val run: AccelRun) : UiScreen(
     }
 
     private fun explanation() = when {
+        calibrating && run.prior.rounds > 0 -> t("accel.between.explain_calibration", AccelRun.MIN_CALIBRATION_ROUNDS) + " " + t("accel.between.prior", run.prior.rounds)
         calibrating -> t("accel.between.explain_calibration", AccelRun.MIN_CALIBRATION_ROUNDS)
         searching -> t("accel.between.explain_search", StrengthSearch.MIN_ROUNDS)
         else -> t("accel.between.explain_test", run.maxTestRounds / 2)

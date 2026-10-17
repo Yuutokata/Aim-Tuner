@@ -10,6 +10,7 @@ import de.yuuto.aimtune.app.update.AppVersion
 import de.yuuto.aimtune.app.update.ReleaseInfo
 import de.yuuto.aimtune.app.audio.HitSounds
 import de.yuuto.aimtune.app.accel.AccelSession
+import de.yuuto.aimtune.app.accel.PriorCalibration
 import de.yuuto.aimtune.app.blind.AxisSummary
 import de.yuuto.aimtune.app.blind.BlindRun
 import de.yuuto.aimtune.app.blind.BlindSession
@@ -246,7 +247,10 @@ class AppContext(
         if (!source.hasReportTimestamps) return showAccel()
         val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
         val result = stored.result ?: return showAccel()
-        val run = AccelRun(stored.config.copy(cm360 = result.optimumCm360), stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, startWithSearch = search, flash = settings.current.flashImportance() != FlashImportance.NEVER)
+        val base = stored.config.copy(cm360 = result.optimumCm360)
+        // The search does not use the calibration, so only a run that starts with it looks for earlier rounds.
+        val prior = if (search) PriorCalibration.NONE else processor.priorCalibration(base.dpi, base.cm360)
+        val run = AccelRun(base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, prior = prior, startWithSearch = search, flash = settings.current.flashImportance() != FlashImportance.NEVER)
         showAccelStep(run)
     }
 

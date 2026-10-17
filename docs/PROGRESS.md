@@ -143,6 +143,8 @@ Order: the four items that change the numbers first (R1-R4), then the rest.
 
 ## Last session
 
+- Calibration over several days (requested: play on different days to strengthen the curve result): a new acceleration run loads the plain-sensitivity click rounds of earlier `accel_ab` sessions at the same DPI and a sensitivity within 3 % (`RoundRepository.plainAccelRoundIds`, newest 90, `RoundProcessor.priorCalibration` analyses them again from the stored raw events) and adds their movements to the error analysis (`AccelRun.prior`). The run then asks for fewer new rounds (15 less the earlier ones, at least 3) and the between-rounds text says how many earlier rounds count. Not pooled: the blind strength search and the A/B test, which stay per run. Tests: `RoundRepositoryTest`, `AccelRunTest`, `RoundProcessorTest`. Open: judge it in the real app; a run started with the blind search does not look for earlier rounds; stored rounds from a different sensitivity are ignored, not rescaled.
+
 - M13 Update check: `Version` (core), `UpdateChecker` (GitHub releases/latest, every failure including 404 of a private repository gives null and shows nothing), `UpdateService` (once a day, last find kept in the settings), hint with key U in the main menu, switch in Settings and `--no-update-check`, version of the build from `version.properties` (`-PappVersion`), `java.net.http` added to the packaged runtime. Tests: `VersionTest`, `UpdateCheckerTest` (local HTTP server incl. 404/403/429/500/odd JSON/no server), `UpdateServiceTest`. Open (user): after the repo is public, tag a newer version and see the hint in an older packaged app; not tried against the real GitHub API.
 
 - Settings layout: the new hit-sound row pushed the footer (Back, Reset, Save) half out of the window; both sound switches now share one row ("Sounds": Flash sounds, Hit sound as toggle tiles), checked in the EN and DE screenshots.
@@ -184,7 +186,7 @@ Order: the four items that change the numbers first (R1-R4), then the rest.
 
 1. User tests M8 with `gradlew.bat :app:run` (or the app image from `:app:jpackage`): Results (R) with the chart, History (H) after a few sessions, Settings → Language (Deutsch/English, applies at once, kept on Save), the packaged `AimTune.exe` (does it start, does raw input work, does it create the database).
 2. Still open from M7: the second hands-on part (analysis result, blind test, Raw Accel import of `settings.json`).
-3. Then decide about pushing M8 and what comes after the milestones (resume of an interrupted calibration, mixed-scenario confidence, refit with the curve on, see Open questions).
+3. Then decide about pushing M8 and what comes after the milestones (pooling the A/B test over days, mixed-scenario confidence, refit with the curve on, see Open questions).
 
 ## Known bugs
 

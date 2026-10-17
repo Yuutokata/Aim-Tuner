@@ -52,6 +52,30 @@ class RoundRepositoryTest {
     }
 
     @Test
+    fun `earlier plain acceleration rounds at the same setup are found, newest first`() {
+        Database.open(dir.resolve("a.db")).use { db ->
+            val repo = RoundRepository(db)
+            val accelSession = repo.createSession(1_000, "valorant", 800.0, SessionKind.ACCEL_AB)
+            val sensitivitySession = repo.createSession(1_000, "valorant", 800.0, SessionKind.SENSITIVITY)
+            fun save(session: Long, at: Long, recording: RoundRecording) =
+                repo.saveRound(session, recording, startedAtMs = at, blind = false, metrics = computeRoundMetrics(recording))
+            val plain = recording(cm360 = 40.0)
+            val old = save(accelSession, 2_000, plain)
+            val near = save(accelSession, 3_000, plain.copy(cm360 = 40.8))
+            save(accelSession, 4_000, plain.copy(accel = NaturalCurve(0.2, 1.4, inputOffset = 1.0)))
+            save(accelSession, 5_000, plain.copy(cm360 = 50.0))
+            save(accelSession, 6_000, plain.copy(scenarioId = "tracking"))
+            save(accelSession, 7_000, plain.copy(dpi = 400.0))
+            save(sensitivitySession, 8_000, plain)
+
+            val found = repo.plainAccelRoundIds(800.0, 40.0, listOf("flick", "switching"), tolerance = 0.03, limit = 10)
+            assertEquals(listOf(near, old), found)
+            assertEquals(listOf(near), repo.plainAccelRoundIds(800.0, 40.0, listOf("flick"), tolerance = 0.03, limit = 1))
+            assertEquals(emptyList(), repo.plainAccelRoundIds(800.0, 40.0, emptyList(), tolerance = 0.03, limit = 10))
+        }
+    }
+
+    @Test
     fun `a database from a newer version is refused`() {
         val file = dir.resolve("future.db")
         Database.open(file).use { }

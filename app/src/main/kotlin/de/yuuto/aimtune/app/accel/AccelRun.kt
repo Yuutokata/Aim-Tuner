@@ -12,6 +12,7 @@ import de.yuuto.aimtune.core.accel.AccelFit
 import de.yuuto.aimtune.core.accel.AccelFitResult
 import de.yuuto.aimtune.core.accel.evaluateAb
 import de.yuuto.aimtune.core.accel.CurveStrength
+import de.yuuto.aimtune.core.accel.MovementSample
 import de.yuuto.aimtune.core.accel.fitAccel
 import de.yuuto.aimtune.core.accel.strengthAccel
 import de.yuuto.aimtune.core.accel.trialAccel
@@ -60,7 +61,9 @@ class AccelRun(
     private val weights: MetricWeights,
     val runKey: Long,
     private val seed: Long,
-    val calibrationRounds: Int = DEFAULT_CALIBRATION_ROUNDS,
+    requestedCalibrationRounds: Int = DEFAULT_CALIBRATION_ROUNDS,
+    /** Plain rounds from earlier runs at this sensitivity; they count toward the calibration, so fewer new rounds are due. */
+    val prior: PriorCalibration = PriorCalibration.NONE,
     maxPairs: Int = AccelAbPlan.DEFAULT_MAX_PAIRS,
     /** Skip the calibration and begin with the blind search of the curve strength. */
     startWithSearch: Boolean = false,
@@ -75,6 +78,10 @@ class AccelRun(
 
     var verdict: AbVerdict? = null
         private set
+
+    /** New rounds to play: the requested number less the earlier rounds, but at least [MIN_NEW_ROUNDS] when there are any. */
+    val calibrationRounds: Int =
+        if (prior.rounds == 0) requestedCalibrationRounds else maxOf(requestedCalibrationRounds - prior.rounds, minOf(MIN_NEW_ROUNDS, requestedCalibrationRounds))
 
     private val calibration = mutableListOf<RoundMetrics>()
     private val testScenarios = if (flash) SCENARIOS_WITH_FLASH else CLICK_SCENARIOS
@@ -126,6 +133,9 @@ class AccelRun(
         }
 
     val calibrationDone: Int get() = calibration.size
+
+    /** The first movements of this run's own calibration rounds; a later run can build on them as [PriorCalibration]. */
+    val calibrationSamples: List<MovementSample> get() = movementSamples(calibration, dpi)
 
     val testRoundsDone: Int get() = outcomes.size
 
@@ -191,7 +201,10 @@ class AccelRun(
     }
 
     /** True once enough calibration rounds are played to analyse early, before all of them. */
-    val canAnalyseNow: Boolean get() = phase == AccelPhase.CALIBRATION && calibration.size >= minOf(MIN_CALIBRATION_ROUNDS, calibrationRounds)
+    val canAnalyseNow: Boolean
+        get() = phase == AccelPhase.CALIBRATION &&
+            calibration.size >= minOf(if (prior.rounds == 0) MIN_CALIBRATION_ROUNDS else MIN_NEW_ROUNDS, calibrationRounds) &&
+            calibration.size + prior.rounds >= minOf(MIN_CALIBRATION_ROUNDS, calibrationRounds)
 
     /** Ends the calibration with the rounds played so far; the analysis says if they were enough. */
     fun analyseNow() {
@@ -248,7 +261,7 @@ class AccelRun(
     }
 
     private fun finishCalibration() {
-        fit = fitAccel(AccelAnalysis(movementSamples(calibration, dpi)))
+        fit = fitAccel(AccelAnalysis(calibrationSamples + prior.samples))
         phase = AccelPhase.ANALYSIS
     }
 
@@ -263,6 +276,9 @@ class AccelRun(
 
         /** From this many rounds on the analysis can be started early; 8 rounds found rising curves far less often than 15 (docs/ASSESSMENT.md B3). */
         const val MIN_CALIBRATION_ROUNDS = 8
+
+        /** With earlier rounds to build on, a day still plays at least this many new ones (one pass through the click scenarios). */
+        const val MIN_NEW_ROUNDS = 3
         private const val CALIBRATION_SEED_MIX = 1_000L
         private const val SEARCH_SEED_MIX = 1_300L
 
