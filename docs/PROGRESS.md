@@ -180,7 +180,18 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
   - judge how the bounded curve feels on fast flicks;
   - optionally compare blind with `--curve-finder legacy` over several days.
 
+### M15 Range mode (branch `feature/m15-range-mode`; plan in docs/RANGE.md)
+- [x] 1 Plan: `docs/RANGE.md` written, waiting for the user's approval
+- [ ] 2 Recording kit (`tools/range-re/RECORDING.md`)
+- [ ] 3 Measurement scripts and `out/range-spec.json`
+- [ ] 4 REA pass (behaviour spec in RANGE.md)
+- [ ] 5 Integration: profile, `RangeScenario`, arena, metrics, pipeline and menu, simulator, gate (ALGORITHMS "M15")
+- [ ] 6 Docs, screenshot tour EN/DE
+- [ ] Open (user): confirm the sensitivity of the recordings (0.435 or 0.335); record the clips
+
 ## Last session
+
+- M15 step 1: created the branch off `main` and wrote the plan `docs/RANGE.md` (what to measure, module plan mapped to existing classes, tooling, risks). No code changed. Stopped for approval.
 
 - Sound and brightness settings (requested: the flash sounds were too loud and the white-out of a flash hurt the eyes): `AppSettings.flashVolumePercent` (default 60), `hitVolumePercent` (100) and `flashBrightnessPercent` (default 50, 10 to 100), edited on a new screen `SoundSettingsScreen` ("Volume and brightness", button in the footer of the settings; sliders, a Play button per sound and a swatch of the white-out level; the values are kept when the screen is left). `FlashSounds.play(event, gain)`, `HitSounds.onShot(result, gain)` and `TrainerScene.whiteOutLevel` (the white-out is now a grey of that level, 100 % is the old plain white) use them; `AppSettings.fraction` turns a percent into a safe 0..1 factor. Older settings files get the new defaults, so the flash is quieter and dimmer without any action. Tests: `SettingsStoreTest`; screenshot step `sound-settings` (EN/DE). Open (user): judge in play whether 60 % and 50 % feel right; the orb that is visible before the pop is still white.
 
