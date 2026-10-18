@@ -114,6 +114,12 @@ class AppContext(
     /** The user's confirmation, for this run, that Raw Accel is off or linear (it cannot be detected). */
     var rawAccelConfirmed = false
 
+    /**
+     * Whether a new blind strength search builds on the stored searches. Off starts it from nothing, so it tries the
+     * whole strength range again; the stored rounds are kept (their plain rounds still feed the calibration).
+     */
+    var usePriorSearch = true
+
     val isSetUp: Boolean
         get() = SetupDraft.fromSettings(settings.current).let { draft -> SetupStep.entries.all { draft.issue(it, profiles) == null } }
 
@@ -216,10 +222,10 @@ class AppContext(
     fun accelBaseline(): AccelBaseline? {
         val stored = storedAnalysis() ?: return null
         val result = stored.result ?: return null
-        return AccelBaseline(result.optimumCm360, result.confidencePercent, stored.rounds.size)
+        return AccelBaseline(result.optimumCm360, result.confidencePercent, stored.rounds.size, processor.priorSearch(stored.config.dpi, result.optimumCm360).size)
     }
 
-    fun showAccel() = switchTo(AccelIntroScreen(this))
+    fun showAccel(baseline: AccelBaseline? = accelBaseline()) = switchTo(AccelIntroScreen(this, baseline))
 
     /** The newest blind strength search, analysed again from its stored rounds. */
     fun showLastSearch(last: LastSearch? = processor.lastSearch(metricWeights())) = switchTo(AccelLastSearchScreen(this, last))
@@ -265,7 +271,7 @@ class AppContext(
         val base = stored.config.copy(cm360 = result.optimumCm360)
         // A run looks for the earlier rounds of what it starts with: the calibration or the search.
         val prior = if (search) PriorCalibration.NONE else processor.priorCalibration(base.dpi, base.cm360)
-        val priorSearch = if (search) processor.priorSearch(base.dpi, base.cm360) else emptyList()
+        val priorSearch = if (search && usePriorSearch) processor.priorSearch(base.dpi, base.cm360) else emptyList()
         val run = AccelRun(
             base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, prior = prior, startWithSearch = search,
             flash = settings.current.flashImportance() != FlashImportance.NEVER, priorSearch = priorSearch,
@@ -340,6 +346,12 @@ class AppContext(
 }
 
 /** The sensitivity the acceleration steps start from, with how sure the optimizer is about it. */
-data class AccelBaseline(val cm360: Double, val confidencePercent: Int, val rounds: Int)
+data class AccelBaseline(
+    val cm360: Double,
+    val confidencePercent: Int,
+    val rounds: Int,
+    /** Stored search rounds at this setup that a new strength search could build on. */
+    val searchRounds: Int = 0,
+)
 
 private val APP_VERSION = AppVersion.current
