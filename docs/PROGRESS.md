@@ -189,7 +189,7 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
     - block designs for the strength search;
     - a micro/flash/flick search up to 2.0 (worse after the blind test).
   - Taken: with flash rounds the strength search goes up to 1.75 instead of 1.45 (`CurveStrength.MAX_WITH_FLASH`). In the whole chain it reaches more players who gain from a curve and exported no harmful one (ALGORITHMS.md "Follow-up").
-  - Open (user): a new strength search with flash "often". Does it end near 1.75, or at the low end again as the earlier real search did (0.70)?
+  - First real run on v0.2.1 (copy of the user's database, 2026-10-18): 8 new rounds, exported curve = natural, limit 0.70 (falling), the same as before. Cause: 42 of the 50 pooled search rounds are from the two earlier searches, which stopped at the old range end 1.45 and then exploited 0.70 (26 of 50 rounds at 0.70-0.78, mean score 58 against 48 for plain and 39 for 1.2-1.4; only 2 rounds above 1.4). The warm start plans max(8, 24 - 42) = 8 new rounds, and those played only 0.70-1.00, so 1.45-1.75 was never tried. With or without the newest session the pooled result is 0.70 at 50 % confidence. Open: a way to start a search without the earlier rounds (without deleting them, since plain rounds of those sessions also feed the calibration).
 
 - M14 (docs/OPTIMIZER-REVIEW.md "Umsetzung und Ergebnisse", ALGORITHMS.md "M14"): gate harness with four player models.
   - Outcomes:
