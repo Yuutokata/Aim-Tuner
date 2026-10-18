@@ -50,6 +50,25 @@ class SettingsStoreTest {
     }
 
     @Test
+    fun `volumes and the flash brightness round trip, older files get the quieter and dimmer defaults, and percents become safe factors`() {
+        val file = dir.resolve("old-sound.json")
+        Files.writeString(file, """{"version":1,"dpi":800.0}""")
+        val old = SettingsStore(file).load()
+        assertEquals(AppSettings.DEFAULT_FLASH_VOLUME_PERCENT, old.flashVolumePercent)
+        assertEquals(AppSettings.DEFAULT_HIT_VOLUME_PERCENT, old.hitVolumePercent)
+        assertEquals(AppSettings.DEFAULT_FLASH_BRIGHTNESS_PERCENT, old.flashBrightnessPercent)
+
+        val store = store()
+        store.save(AppSettings(flashVolumePercent = 25, hitVolumePercent = 80, flashBrightnessPercent = 30))
+        val back = store.load()
+        assertEquals(listOf(25, 80, 30), listOf(back.flashVolumePercent, back.hitVolumePercent, back.flashBrightnessPercent))
+
+        assertEquals(0.25f, AppSettings.fraction(25))
+        assertEquals(1f, AppSettings.fraction(400), "a hand-edited value above 100 is not louder than the built-in level")
+        assertEquals(0f, AppSettings.fraction(-5))
+    }
+
+    @Test
     fun `unknown keys from a newer version are ignored`() {
         val file = dir.resolve("s.json")
         Files.writeString(file, """{"version":1,"dpi":800.0,"somethingNew":{"a":1}}""")

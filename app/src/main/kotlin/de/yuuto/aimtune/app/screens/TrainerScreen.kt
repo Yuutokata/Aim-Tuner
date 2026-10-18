@@ -6,6 +6,7 @@ import com.badlogic.gdx.InputAdapter
 import com.badlogic.gdx.Screen
 import com.badlogic.gdx.graphics.GL20
 import de.yuuto.aimtune.app.AppContext
+import de.yuuto.aimtune.storage.AppSettings
 import de.yuuto.aimtune.storage.activeCrosshair
 import de.yuuto.aimtune.app.Hud
 import de.yuuto.aimtune.app.RoundSession
@@ -44,7 +45,7 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
 
     init {
         trainer.onRoundStarted = { if (ctx.settings.current.hitSound) ctx.hitSounds.reset() }
-        trainer.onShot = { result -> if (ctx.settings.current.hitSound) ctx.hitSounds.onShot(result) }
+        trainer.onShot = { result -> ctx.settings.current.let { if (it.hitSound) ctx.hitSounds.onShot(result, AppSettings.fraction(it.hitVolumePercent)) } }
     }
 
     /** Exposed for the screenshot tour. */
@@ -94,6 +95,7 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
         Gdx.gl.glClearColor(bg.r, bg.g, bg.b, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
         playFlashSounds()
+        scene.whiteOutLevel = AppSettings.fraction(ctx.settings.current.flashBrightnessPercent)
         scene.render(trainer.view, trainer.activeTargets, trainer.activeFlash)
         hud.render(trainer, ctx.source, ctx.processor.report, Gdx.graphics.framesPerSecond, ctx.ui.skin.fonts)
     }
@@ -102,7 +104,8 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
     private fun playFlashSounds() {
         if (config.scenario != ScenarioKind.FLASH || !ctx.settings.current.flashSound) return
         if (trainer.phase != Phase.RUNNING) return cueTracker.reset()
-        cueTracker.update(trainer.activeFlash, trainer.nowNanos()).forEach(ctx.flashSounds::play)
+        val gain = AppSettings.fraction(ctx.settings.current.flashVolumePercent)
+        cueTracker.update(trainer.activeFlash, trainer.nowNanos()).forEach { ctx.flashSounds.play(it, gain) }
     }
 
     override fun resize(width: Int, height: Int) {

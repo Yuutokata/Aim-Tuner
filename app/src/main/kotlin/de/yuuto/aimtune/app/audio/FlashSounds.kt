@@ -27,8 +27,9 @@ class FlashSounds : Disposable {
         emptyMap()
     }
 
-    fun play(event: FlashSoundEvent) {
-        sounds[event]?.play(VOLUMES.getValue(event))
+    /** Plays [event] at its built-in volume times [gain] (0..1, the player's volume setting). */
+    fun play(event: FlashSoundEvent, gain: Float = 1f) {
+        sounds[event]?.play((VOLUMES.getValue(event) * gain).coerceIn(0f, 1f))
     }
 
     override fun dispose() {

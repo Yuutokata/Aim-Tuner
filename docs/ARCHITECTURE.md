@@ -42,6 +42,7 @@ Rounds are analysed and saved by `RoundProcessor` on a background thread. If the
 - `SettingsHolder` holds the current `AppSettings` and saves through `SettingsStore`. `SetupDraft` is the editable, validated form model for onboarding and settings.
 - `MouseGate` is the only path to mouse data: the raw source listens only while the window is focused and the active screen allows it (only the trainer).
 - UI skin: `ui/Tokens` reads `docs/design/tokens.json` (copied into resources at build time), `ui/Drawables` renders rounded rects with an SDF shader, `ui/UiSkin` + `ui/Widgets` build styles and common layouts.
+- Sound and brightness: `SoundSettingsScreen` edits `AppSettings.flashVolumePercent/hitVolumePercent/flashBrightnessPercent`; the trainer passes them as gains to `FlashSounds`/`HitSounds` and as `TrainerScene.whiteOutLevel`.
 - Games: `games` loads `GameProfile` JSON (bundled + user files); `core.SearchRange` derives the optimizer range from aim style and pad width.
 - `ScreenshotTour` (`--screenshots <dir>`) renders every screen with in-memory sample settings, for design review.
 

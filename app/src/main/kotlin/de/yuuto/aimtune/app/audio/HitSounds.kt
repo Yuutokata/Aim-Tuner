@@ -23,8 +23,14 @@ class HitSounds : Disposable {
         null
     }
 
-    fun onShot(result: ShotResult) {
-        combo.onShot(result)?.let { pitch -> sound?.play(VOLUME, pitch, 0f) }
+    /** [gain] (0..1) is the player's volume setting; the streak and its pitch go on at any volume. */
+    fun onShot(result: ShotResult, gain: Float = 1f) {
+        combo.onShot(result)?.let { pitch -> sound?.play((VOLUME * gain).coerceIn(0f, 1f), pitch, 0f) }
+    }
+
+    /** One hit sound at [pitch] for the volume preview. */
+    fun preview(gain: Float, pitch: Float = 1f) {
+        sound?.play((VOLUME * gain).coerceIn(0f, 1f), pitch, 0f)
     }
 
     /** A new round starts a new streak. */

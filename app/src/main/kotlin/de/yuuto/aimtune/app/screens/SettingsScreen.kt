@@ -96,6 +96,8 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
     private fun footer(): Table {
         val footer = Table()
         footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
+        // Next to the sound switches it would widen the left column; the footer has room.
+        footer.add(ui.button(t("settings.sound_levels"), Styles.SECONDARY) { ctx.showSoundSettings() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(16f)
         footer.add().expandX()
         message?.let { (text, ok) -> footer.add(ui.label(text, if (ok) Styles.OK else Styles.CAUTION)).right().padRight(32f) }
         footer.add(ui.button(t("settings.reset"), Styles.TEXT) { reset() }).height(FOOTER_BUTTON_HEIGHT).padRight(16f)
