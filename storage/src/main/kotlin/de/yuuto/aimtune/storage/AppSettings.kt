@@ -39,6 +39,12 @@ data class AppSettings(
     val flashSound: Boolean = true,
     /** Play a short sound for every hit; it rises with a streak of hits. */
     val hitSound: Boolean = true,
+    /** Volume of the flash cue sounds, percent of their built-in level (the pop was the loudest and hurt at 100). */
+    val flashVolumePercent: Int = DEFAULT_FLASH_VOLUME_PERCENT,
+    /** Volume of the hit sound, percent of its built-in level. */
+    val hitVolumePercent: Int = DEFAULT_HIT_VOLUME_PERCENT,
+    /** How bright the white-out of a flash is, percent of full white; it was plain white (100) and hurt the eyes. */
+    val flashBrightnessPercent: Int = DEFAULT_FLASH_BRIGHTNESS_PERCENT,
     /** Ask GitHub at most once a day whether a newer release exists, and show a hint in the menu if so. */
     val checkForUpdates: Boolean = true,
     /** When the last check ran, successful or not (epoch seconds); a private repository would otherwise be asked at every start. */
@@ -119,6 +125,15 @@ data class AppSettings(
     companion object {
         const val CURRENT_VERSION = 1
         const val DEFAULT_ROUND_SECONDS = 45
+        const val DEFAULT_FLASH_VOLUME_PERCENT = 60
+        const val DEFAULT_HIT_VOLUME_PERCENT = 100
+        const val DEFAULT_FLASH_BRIGHTNESS_PERCENT = 50
+
+        /** The lowest white-out brightness a player can set; black would make the blind round a pause. */
+        const val MIN_FLASH_BRIGHTNESS_PERCENT = 10
+
+        /** A percent setting as a factor in 0..1, whatever a hand-edited settings file holds. */
+        fun fraction(percent: Int): Float = percent.coerceIn(0, 100) / 100f
         val DEFAULT_WEIGHTS: Map<String, Double> =
             MetricWeights.DEFAULT.values.mapKeys { it.key.name } + (ScoreMetric.FLASH_DODGE.name to FlashImportance.SOMETIMES.weight)
         val DEFAULT_SCENARIOS: List<String> = listOf(ScenarioKind.FLICK.id, ScenarioKind.FLASH.id)

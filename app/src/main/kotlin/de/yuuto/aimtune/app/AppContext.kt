@@ -23,6 +23,7 @@ import de.yuuto.aimtune.app.screens.AccelBetweenScreen
 import de.yuuto.aimtune.app.screens.AccelIntroScreen
 import de.yuuto.aimtune.app.screens.AccelLastAnalysisScreen
 import de.yuuto.aimtune.app.screens.AccelLastSearchScreen
+import de.yuuto.aimtune.app.screens.SoundSettingsScreen
 import de.yuuto.aimtune.app.screens.AccelResultScreen
 import de.yuuto.aimtune.app.screens.AccelSearchResultScreen
 import de.yuuto.aimtune.app.history.HistoryEntry
@@ -224,6 +225,9 @@ class AppContext(
         val result = stored.result ?: return null
         return AccelBaseline(result.optimumCm360, result.confidencePercent, stored.rounds.size, processor.priorSearch(stored.config.dpi, result.optimumCm360).size)
     }
+
+    /** Volume of the flash and hit sounds and the brightness of the flash white-out. */
+    fun showSoundSettings() = switchTo(SoundSettingsScreen(this))
 
     fun showAccel(baseline: AccelBaseline? = accelBaseline()) = switchTo(AccelIntroScreen(this, baseline))
 

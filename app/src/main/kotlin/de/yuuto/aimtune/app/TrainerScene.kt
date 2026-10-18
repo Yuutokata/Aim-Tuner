@@ -225,11 +225,15 @@ class TrainerScene(
         return parts
     }
 
-    /** Fills the picture with white, the way a flash does. */
+    /** How bright the white-out is, 0..1 of full white (the player's setting); full white hurt the eyes. */
+    var whiteOutLevel: Float = 1f
+
+    /** Fills the picture with white at [whiteOutLevel], the way a flash does. */
     private fun whiteOut(box: PixelBox) {
         Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST)
         HdpiUtils.glScissor(box.x, box.y, box.width, box.height)
-        Gdx.gl.glClearColor(1f, 1f, 1f, 1f)
+        val level = whiteOutLevel.coerceIn(0f, 1f)
+        Gdx.gl.glClearColor(level, level, level, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
         Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST)
     }
