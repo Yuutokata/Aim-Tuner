@@ -54,6 +54,7 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("switching-ready") { showScenario(ScenarioKind.SWITCHING) },
         Step("switching-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
         Step("accel-intro") { ctx.showAccel() },
+        Step("accel-intro-prior") { ctx.showAccel(AccelBaseline(34.4, 61, 40, searchRounds = 50)) },
         Step("accel-last") { accelSample(AccelPhase.ANALYSIS)?.let { ctx.showLastAccelAnalysis(LastCalibration(it.dpi, it.baseCm360, PriorCalibration(it.calibrationDone, it.calibrationSamples))) } },
         Step("accel-last-search") { accelSample(AccelPhase.SEARCH_RESULT)?.let { ctx.showLastSearch(LastSearch(it.dpi, it.baseCm360, it.searchRounds, 2, it.searchResult)) } },
         Step("accel-calibration") { accelSample(AccelPhase.CALIBRATION)?.let(ctx::showAccelStep) },

@@ -26,8 +26,7 @@ private const val FOOTER_BUTTON_HEIGHT = 64f
  * Entry of the acceleration steps: what they are, the sensitivity they start from (the result of
  * the blind test), and the check that Raw Accel is off, since the calibration needs a plain mouse.
  */
-class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
-    private val baseline: AccelBaseline? = ctx.accelBaseline()
+class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = ctx.accelBaseline()) : UiScreen(ctx) {
     private val pointerAcceleration = WindowsPointerSettings.readAcceleration()
 
     override fun build(): Actor {
@@ -39,6 +38,7 @@ class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
         content.add(ui.label(t("accel.experimental"), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padBottom(40f).row()
         content.add(baselineCard()).left().width(CARD_WIDTH).padBottom(24f).row()
         content.add(rawAccelCheck()).left().row()
+        if (baseline != null && baseline.searchRounds > 0) content.add(priorSearchCheck(baseline.searchRounds)).left().padTop(24f).row()
         if (!ctx.source.hasReportTimestamps) {
             content.add(ui.label(t("accel.needs_raw_input", ctx.source.name), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padTop(24f)
         }
@@ -93,6 +93,17 @@ class AccelIntroScreen(ctx: AppContext) : UiScreen(ctx) {
         block.add(box).left().row()
         val windows = if (pointerAcceleration?.enabled == true) t("accel.windows_on") else ""
         if (windows.isNotEmpty()) block.add(ui.label(windows, Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padTop(8f)
+        return block
+    }
+
+    /** Lets the player start a strength search that ignores the stored ones (they are kept, not deleted). */
+    private fun priorSearchCheck(rounds: Int): Table {
+        val block = Table()
+        val box = CheckBox("  " + t("accel.use_prior", rounds), ui.skin)
+        box.isChecked = ctx.usePriorSearch
+        box.onChange { ctx.usePriorSearch = box.isChecked }
+        block.add(box).left().row()
+        block.add(ui.label(t("accel.use_prior_help"), Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).padTop(8f)
         return block
     }
 
