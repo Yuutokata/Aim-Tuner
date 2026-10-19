@@ -1,6 +1,6 @@
 # M15 Range mode
 
-Status: **plan, waiting for approval** (step 1 of `docs/PROMPT-M15-range.md`). Nothing below is measured yet; every value in this file is a plan or a guess until `tools/range-re/out/range-spec.json` exists.
+Status: **plan approved (sensitivity 0.335, first setting Medium, armor off)** (step 1 of `docs/PROMPT-M15-range.md`). Nothing below is measured yet; every value in this file is a plan or a guess until `tools/range-re/out/range-spec.json` exists.
 
 ## Goal
 
@@ -32,7 +32,7 @@ All values go to `tools/range-re/out/range-spec.json`, each with `source` (clip:
 | Eye height (stand, crouch), head height | 5 | geometry from known marker distances |
 | Fields of the end-of-run stats screen | 3 | cropped frames |
 
-Conversion: 1920x1080, horizontal FOV 103, yaw 0.07 deg/count at sensitivity 1, 800 DPI. Inputs also noted per clip: aspect ratio and letterbox, crosshair centre. Confirm the sensitivity (0.435 or 0.335) before any measuring. Recordings and the fit use Infinite Ammo on. The Python `UnitChain` mirrors the Kotlin unit chain (`UnitChainTest` in `app/src/test`), with a parity test on shared sample values. Every public source is cited with its date.
+Conversion: 1920x1080, horizontal FOV 103, yaw 0.07 deg/count at sensitivity 1, 800 DPI. Inputs also noted per clip: aspect ratio and letterbox, crosshair centre. Recording sensitivity: 0.335 (confirmed by the user; 0.435 from the prompt is not used). Recordings and the fit use Infinite Ammo on. The Python `UnitChain` mirrors the Kotlin unit chain (`UnitChainTest` in `app/src/test`), with a parity test on shared sample values. Every public source is cited with its date.
 
 ## Decisions the review added
 
@@ -70,7 +70,7 @@ All work is on `feature/m15-range-mode`; nothing is merged without the user's OK
 
 ## Open risks
 
-- **Sensitivity:** the prompt names 0.435 and 0.335; confirm which one the recordings use.
+- **Sensitivity:** the user confirmed 0.335 for the recordings. The first setting is Medium with Bot Armor off.
 - **Recording quality:** the measurements are only as good as the clips; colour-threshold detection can fail with armor, lighting or effects.
 - **Invisible rules:** armor and hit rules may not be observable; they stay `verified: false`.
 - **Lifetime and spawn timing** may depend on difficulty in ways static views do not show; full runs (clip 3) are the check.
