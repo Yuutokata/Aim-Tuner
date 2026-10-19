@@ -1,10 +1,10 @@
 # M15 Range mode
 
-Status: **plan approved (sensitivity 0.335, first setting Medium, armor off)** (step 1 of `docs/PROMPT-M15-range.md`). Nothing below is measured yet; every value in this file is a plan or a guess until `tools/range-re/out/range-spec.json` exists.
+Status: **plan approved; corrected after the first recordings** (see "Corrections after the first recordings"). Sensitivity 0.335. Nothing below is measured yet; every value in this file is a plan or a guess until `tools/range-re/out/range-spec.json` exists.
 
 ## Goal
 
-A "Range mode" that rebuilds the function of Valorant's shooting range station **Skills Test** (25 bots per run, SCORE / REMAINING board, Challenge Easy / Medium / Hard, Bot Armor on/off, Infinite Ammo on/off). It becomes the default round type for the blind sensitivity fit and the curve search; flick and flash rounds stay as optional scenarios. It also closes R1b (head size, eye height and elevation measured instead of assumed).
+A "Range mode" that rebuilds the function of Valorant's shooting range station **Skills Test** (the prompt assumed 25 bots per run and Easy / Medium / Hard; the recordings show the mode **Eliminate 100** with a TIME counter and a REMAINING counter, Bot Armor on and Infinite Ammo on, see below). It becomes the default round type for the blind sensitivity fit and the curve search; flick and flash rounds stay as optional scenarios. It also closes R1b (head size, eye height and elevation measured instead of assumed).
 
 ## Hard rules
 
@@ -34,10 +34,31 @@ All values go to `tools/range-re/out/range-spec.json`, each with `source` (clip:
 
 Conversion: 1920x1080, horizontal FOV 103, yaw 0.07 deg/count at sensitivity 1, 800 DPI. Inputs also noted per clip: aspect ratio and letterbox, crosshair centre. Recording sensitivity: 0.335 (confirmed by the user; 0.435 from the prompt is not used). Recordings and the fit use Infinite Ammo on. The Python `UnitChain` mirrors the Kotlin unit chain (`UnitChainTest` in `app/src/test`), with a parity test on shared sample values. Every public source is cited with its date.
 
+## Corrections after the first recordings
+
+The user's first two clips (`clips/`, 1920x1080, 30 fps, 800 DPI, sensitivity 0.335; OBS probably scaled a 2560x1440 game down) show a different test than the prompt assumed:
+
+- The panel reads **Challenge: Eliminate 100**, Bot Armor **enabled**, Infinite Ammo **enabled** ("Press F3 change settings"). There is no Easy / Medium / Hard in the clips, and no 25-bot run.
+- The board counts REMAINING down from 100 and shows a TIME counter. A run therefore ends after 100 bots, not 25; the old "25 bots" is dropped until a source shows it.
+- The user confirmed: the mode to copy is Eliminate 100, and the first setting is this one (armor on).
+- 30 fps limits timing to about ±33 ms and makes fast strafes coarse; the scripts report that uncertainty. Other difficulty settings only come back if the user records them.
+- Clips so far: 1 slow turn (14 s), 2 an Eliminate 100 run (67 s) with one crouch. There is no head-at-marker clip yet, so R1b stays open (head size can come from the turn clip's calibration only if a known distance is visible).
+
+## First measurement pass (preliminary)
+
+Scripts in `tools/range-re/`, run on the two clips (`out/turn.json`, `out/range-spec.json`; frames and detections are cached in the ignored `cache/`):
+
+- **Turn clip:** the integrated image shift gives a total of 337° (peak 345°) for what looks like one full turn. The 6 % shortfall fits phase correlation losing large shifts at up to 300°/s, so the FOV 103 / width assumption is plausible but not proven.
+- **Bot detection:** bots are found by their purple outline (OpenCV hue 128 to 168). Checked on a contact sheet of four frames: the boxes sit on bots. Far bots are small (about 1.5° tall).
+- **Tracking is too weak:** 7 tracks in 67 s, but the counter fell by about 20 (100 to roughly 78 at 52 s). The tracker needs at least 12 frames per bot and loses short-lived or fast bots, so lifetime (median 0.9 s), gap between bots (median 5 s) and spawn bearing are biased and not usable yet. Strafe speed has only 2 tracks.
+- **Not measurable from these clips:** head size per distance and eye height (no known distance markers, one crouch), run end, stats screen. Distances need floor markers, not head size.
+
+Next for step 3: read the REMAINING counter per frame (cropped digits, template match) to count kills and timestamp them, lower the track minimum, and ask the user for a clip with a bot standing still at marked distances.
+
 ## Decisions the review added
 
-- **One setting first.** Measure and integrate a single setting (Medium, Bot Armor off) first; the other five are added after the gate passes.
-- **Noise model.** A 25-bot run is one long, correlated observation. Before integration, decide whether a run feeds the optimizer as one value (score) or as per-bot samples, and check the repeat-round and confidence logic (`SensitivityOptimizer`) against it, including fatigue and learning inside a run.
+- **One setting first.** Measure and integrate a single setting (Eliminate 100, Bot Armor on, Infinite Ammo on) first; other settings are added after the gate passes.
+- **Noise model.** A 100-bot run is one long, correlated observation. Before integration, decide whether a run feeds the optimizer as one value (score) or as per-bot samples, and check the repeat-round and confidence logic (`SensitivityOptimizer`) against it, including fatigue and learning inside a run.
 - **Gate validity.** `SimulatedPlayer` and `NoiseModel` were tuned on flick targets. Strafing bots and kill timing need simulator parameters checked against the measured data; otherwise "no worse than flick-only" proves little.
 - **Git hygiene.** Raw clips, frames and crops stay out of git (`tools/range-re/out/` frames and the input videos are ignored). Only derived numbers (`range-spec.json`, small CSVs) are committed.
 

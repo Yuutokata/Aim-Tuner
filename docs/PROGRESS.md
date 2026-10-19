@@ -181,9 +181,9 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
   - optionally compare blind with `--curve-finder legacy` over several days.
 
 ### M15 Range mode (branch `feature/m15-range-mode`; plan in docs/RANGE.md)
-- [x] 1 Plan: `docs/RANGE.md` approved (sensitivity 0.335, first setting Medium, armor off)
+- [x] 1 Plan: `docs/RANGE.md` approved; corrected after the first clips: mode Eliminate 100, armor on, sensitivity 0.335
 - [x] 2 Recording kit (`tools/range-re/RECORDING.md`), waiting for the user's clips
-- [ ] 3 Measurement scripts and `out/range-spec.json`
+- [~] 3 Measurement scripts (`tools/range-re/`: `unitchain.py` + tests, `turn_calibration.py`, `detect_bots.py`, `analyse_tracks.py`) and a first `out/range-spec.json` from the two clips; preliminary, `verified: false` (the tracker finds only 7 of about 20 bots, see RANGE.md)
 - [ ] 4 REA pass (behaviour spec in RANGE.md)
 - [ ] 5 Integration: profile, `RangeScenario`, arena, metrics, pipeline and menu, simulator, gate (ALGORITHMS "M15")
 - [ ] 6 Docs, screenshot tour EN/DE
@@ -191,7 +191,7 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 
 ## Last session
 
-- M15 steps 1 and 2: plan approved (sensitivity 0.335, Medium, armor off); wrote the recording kit `tools/range-re/RECORDING.md` and git-ignored raw clips and frames. No code changed. Waiting for the user's clips.
+- M15 step 3 (first pass): wrote the measurement scripts and ran them on the user's two clips; results are preliminary. M15 steps 1 and 2: plan approved (sensitivity 0.335, Medium, armor off); wrote the recording kit `tools/range-re/RECORDING.md` and git-ignored raw clips and frames. No code changed. Waiting for the user's clips.
 
 - Sound and brightness settings (requested: the flash sounds were too loud and the white-out of a flash hurt the eyes): `AppSettings.flashVolumePercent` (default 60), `hitVolumePercent` (100) and `flashBrightnessPercent` (default 50, 10 to 100), edited on a new screen `SoundSettingsScreen` ("Volume and brightness", button in the footer of the settings; sliders, a Play button per sound and a swatch of the white-out level; the values are kept when the screen is left). `FlashSounds.play(event, gain)`, `HitSounds.onShot(result, gain)` and `TrainerScene.whiteOutLevel` (the white-out is now a grey of that level, 100 % is the old plain white) use them; `AppSettings.fraction` turns a percent into a safe 0..1 factor. Older settings files get the new defaults, so the flash is quieter and dimmer without any action. Tests: `SettingsStoreTest`; screenshot step `sound-settings` (EN/DE). Open (user): judge in play whether 60 % and 50 % feel right; the orb that is visible before the pop is still white.
 
