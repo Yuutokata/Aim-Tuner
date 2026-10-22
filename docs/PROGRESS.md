@@ -191,6 +191,15 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 
 ## Last session
 
+- M15 step 3, second pass on the user's new clips (60 fps):
+  - turn calibration 97.6 %;
+  - strafe move-stop-move at about 12 deg/s with 0.36 s moves and 0.2 s stops;
+  - a new bot about 1.8 s after a kill, shot bots live 1.4 s;
+  - unshot bots never despawn (no Speed selected in the panel).
+  - Eye height, head hitbox and HP are not measured; the user wants a close, not exact, reconstruction, so they stay profile assumptions.
+  - New scripts `bot_tracks.py` and `analyse_clips.py`; summary in RANGE.md.
+  - Next: M15 step 4 (behaviour spec), then M15a moving-target metrics.
+
 - M15 recording kit rewritten for the second recording session (`tools/range-re/RECORDING.md`):
   - Raw Accel off;
   - OBS at game resolution and 60-120 fps;

@@ -98,3 +98,14 @@ All work is on `feature/m15-range-mode`; nothing is merged without the user's OK
 - **Public docs** for the range may be thin or outdated.
 - **Look:** a close likeness drifts toward copying; the bot and the props stay original.
 - **Scope:** six settings exist; see "One setting first".
+
+## Second measurement pass (clips of 2026-10-22, 1920x1080, 60 fps)
+
+Preliminary, `verified: false`; details in `tools/range-re/out/range-summary.md` (git-ignored with the rest of `out/`).
+
+- Panel (read from the frame): Speed Easy/Medium/Hard exists but none was selected; Streak Eliminate 100; Bots Strafe (other option: Reset); Bot Amount 1/5/10 (5 selected); Bot Armor on; Infinite Ammo on.
+- Unshot bots do not despawn (one strafing bot stayed 44 s), so lifetime and spawn timing come from played runs only.
+- Strafe: move-stop-move, moving 12 deg/s median (p25 8, p75 16; about 2.6 m/s if the bot is 12 m away, distance assumed from a 1.8 m bot), moving segments 0.36 s, stops 0.2 s, about half of the time stopped.
+- Played run: a new bot about 1.8 s after the previous one (p25 1.25, p75 2.46, n = 19), a shot bot lives 1.4 s median; 23 kills in 39 s; bearing -51 to +81 deg; distance roughly 3-19 m (assumed bot height).
+- Turn calibration: 351.5 deg per measured turn (97.6 %), FOV 103 at 1920 px consistent.
+- Not measured: eye height (the eye-height clip is a normal run), head hitbox, HP. The user said the reconstruction need not be exact, so these stay assumptions from the profile.

@@ -48,3 +48,4 @@ bin/
 /tools/range-re/cache/
 /tools/range-re/out/frames/
 /tools/range-re/out/crops/
+/tools/range-re/__pycache__/
