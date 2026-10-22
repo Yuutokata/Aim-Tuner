@@ -91,7 +91,7 @@ All work is on `feature/m15-range-mode`; nothing is merged without the user's OK
 
 ## Open risks
 
-- **Sensitivity:** the user confirmed 0.335 for the recordings. The first setting is Medium with Bot Armor off.
+- **Sensitivity:** the user confirmed 0.335 for the recordings. The first setting is Medium, Eliminate 100, strafing bots, Bot Armor on (Speed Easy/Medium/Hard exists in the F3 panel according to valorant.fandom.com/wiki/Range; the recording kit captures all three).
 - **Recording quality:** the measurements are only as good as the clips; colour-threshold detection can fail with armor, lighting or effects.
 - **Invisible rules:** armor and hit rules may not be observable; they stay `verified: false`.
 - **Lifetime and spawn timing** may depend on difficulty in ways static views do not show; full runs (clip 3) are the check.

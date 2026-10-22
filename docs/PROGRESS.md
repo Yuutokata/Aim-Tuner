@@ -191,6 +191,19 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 
 ## Last session
 
+- M15 recording kit rewritten for the second recording session (`tools/range-re/RECORDING.md`):
+  - Raw Accel off;
+  - OBS at game resolution and 60-120 fps;
+  - idle runs per Speed Easy/Medium/Hard with strafing bots and armor on;
+  - played Medium runs;
+  - free-range clips for strafe, head hitbox, HP/armor and eye height.
+  RANGE.md's stale "Medium, armor off" corrected.
+- The user's answers to the curve audit (branch `audit/curve-finder`):
+  - the export came from "Last search";
+  - 0.335 (with Raw Accel) is their long-time main sensitivity;
+  - aim style wrist with some arm (onboarding is right).
+  Waiting for the clips.
+
 - M15 step 3 (first pass): wrote the measurement scripts and ran them on the user's two clips; results are preliminary. M15 steps 1 and 2: plan approved (sensitivity 0.335, Medium, armor off); wrote the recording kit `tools/range-re/RECORDING.md` and git-ignored raw clips and frames. No code changed. Waiting for the user's clips.
 
 - Sound and brightness settings (requested: the flash sounds were too loud and the white-out of a flash hurt the eyes): `AppSettings.flashVolumePercent` (default 60), `hitVolumePercent` (100) and `flashBrightnessPercent` (default 50, 10 to 100), edited on a new screen `SoundSettingsScreen` ("Volume and brightness", button in the footer of the settings; sliders, a Play button per sound and a swatch of the white-out level; the values are kept when the screen is left). `FlashSounds.play(event, gain)`, `HitSounds.onShot(result, gain)` and `TrainerScene.whiteOutLevel` (the white-out is now a grey of that level, 100 % is the old plain white) use them; `AppSettings.fraction` turns a percent into a safe 0..1 factor. Older settings files get the new defaults, so the flash is quieter and dimmer without any action. Tests: `SettingsStoreTest`; screenshot step `sound-settings` (EN/DE). Open (user): judge in play whether 60 % and 50 % feel right; the orb that is visible before the pop is still white.
