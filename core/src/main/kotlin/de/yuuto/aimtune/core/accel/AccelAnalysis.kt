@@ -8,9 +8,13 @@ import kotlin.math.sqrt
 /** One first movement: its peak hand speed in inches per second and its signed endpoint error (> 0 overshoot). */
 data class MovementSample(val speed: Double, val errorRatio: Double)
 
-/** The samples of rounds played without acceleration, taken from their analysed movements. */
+/**
+ * The samples of rounds played without acceleration, taken from their analysed movements. A reach toward a target that moved
+ * is left out: the hand aimed at where the target would be, so its endpoint error says nothing about the gain the hand wanted
+ * (docs/ALGORITHMS.md "Moving targets"). Only reaches toward targets that stood still enter.
+ */
 fun movementSamples(metrics: List<RoundMetrics>, dpi: Double): List<MovementSample> =
-    metrics.flatMap { it.movements }.mapNotNull { movement ->
+    metrics.flatMap { it.movements }.filterNot { it.targetMoved }.mapNotNull { movement ->
         val peak = movement.firstPeakSpeedCountsPerMs ?: return@mapNotNull null
         val error = movement.firstErrorRatio ?: return@mapNotNull null
         MovementSample(AccelProcessor.speedInPerSecond(peak, dpi), error)

@@ -191,12 +191,21 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 - [x] 1 Plan: `docs/RANGE.md` approved; corrected after the first clips: mode Eliminate 100, armor on, sensitivity 0.335
 - [x] 2 Recording kit (`tools/range-re/RECORDING.md`), waiting for the user's clips
 - [~] 3 Measurement scripts (`tools/range-re/`: `unitchain.py` + tests, `turn_calibration.py`, `detect_bots.py`, `analyse_tracks.py`) and a first `out/range-spec.json` from the two clips; preliminary, `verified: false` (the tracker finds only 7 of about 20 bots, see RANGE.md)
-- [ ] 4 REA pass (behaviour spec in RANGE.md)
+- [x] 4 REA pass (behaviour spec in RANGE.md, decided 2026-10-22)
+- [x] M15a moving-target metrics: `StrafeMotion`, scenarios `micro-strafe` and `switch-strafe` (opt-in tiles in settings), metrics against the target at the end of the reach with lead and aim components, curve-analysis filter, strafing simulated aimer; gate `M15aGateTest` passed (static metrics identical, no false offers from strafing rounds); ALGORITHMS "Moving targets"
 - [ ] 5 Integration: profile, `RangeScenario`, arena, metrics, pipeline and menu, simulator, gate (ALGORITHMS "M15")
 - [ ] 6 Docs, screenshot tour EN/DE
 - [ ] Open (user): record the clips from RECORDING.md
 
 ## Last session
+
+- M15a moving-target metrics (branch `feature/m15-range-mode`):
+  - `StrafeMotion` and the kinds `micro-strafe` / `switch-strafe` (own ids, so baselines do not mix); a moving target is hit where it is at the time of the shot;
+  - first-reach errors are measured against the target at the end of the reach, with a lead and an aim component; static rounds are bit-identical (fixture test);
+  - `movementSamples` ignores reaches toward moving targets;
+  - the simulated aimer predicts the target and can wait for a stop;
+  - gate: no false curve offers from mixed micro and micro-strafe calibration (0/40); the sensitivity optimizer with strafing rounds moves its median from 51 to 83 cm/360 in the simulation (optimum 50), so they stay opt-in;
+  - open: M15 step 5 (`RangeScenario`, M15c) and the real-play feel of the strafing speed (the simulated hit rate on micro-strafe is only 4 %, not tuned against people).
 
 - M16 Curve finder safety (requested after the audit of the user's real runs: the curves were played at the finder's low-confidence 0.474 instead of the 0.335 in the game, and "Last search" exported an unconfirmed falling curve whose range included "no curve"): see the M16 checklist. Merged into `dev`. Not tried on real data yet.
 

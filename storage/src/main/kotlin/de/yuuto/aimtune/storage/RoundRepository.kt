@@ -374,6 +374,9 @@ fun RoundMetrics.toNamedValues(): Map<String, Double> = buildMap {
     meanAbsFirstErrorHDegrees?.let { put("mean_abs_first_error_h_deg", it) }
     meanAbsFirstErrorVDegrees?.let { put("mean_abs_first_error_v_deg", it) }
     meanFirstErrorVDegrees?.let { put("mean_first_error_v_deg", it) }
+    meanLeadErrorDegrees?.let { put("mean_lead_error_deg", it) }
+    meanAbsLeadErrorDegrees?.let { put("mean_abs_lead_error_deg", it) }
+    meanAbsAimErrorDegrees?.let { put("mean_abs_aim_error_deg", it) }
 }
 
 /** The stored metrics a round's score is computed from, as [de.yuuto.aimtune.core.metrics.RoundMetrics.scoreInputs] would give them. */

@@ -84,6 +84,12 @@ class SimulatedAimer(
     private var emittedY = 0L
     private var mode = Mode.NO_TARGET
     private var targetId = -1
+
+    /** Strafing click targets: where the player has seen each target recently, and whether it times the click for a stop. */
+    private val strafing = kind.strafes
+    private val histories = HashMap<Int, ArrayDeque<Observation>>()
+    private var waitForStop = false
+    private var clickReadyNanos = 0L
     private var wakeNanos = 0L
     private var roundStartNanos = 0L
     private var sessionOffsetNanos = 0L
@@ -113,6 +119,7 @@ class SimulatedAimer(
         this.sessionOffsetNanos = sessionOffsetNanos
         seenTargets.clear()
         observations.clear()
+        histories.clear()
         nextControlNanos = nowNanos
         flashHandled = -1
         flashTurnPlanned = false
@@ -124,6 +131,7 @@ class SimulatedAimer(
     fun step(nowNanos: Long, targets: List<Target>, flash: FlashState? = null, deadlineOf: (Target) -> Long? = { null }): AimerStep {
         if (kind == ScenarioKind.TRACKING) return trackStep(nowNanos, targets.firstOrNull())
         if (kind == ScenarioKind.FLASH && targets.isEmpty()) return flashStep(nowNanos, flash)
+        if (strafing) observe(nowNanos, targets)
         val target = choose(nowNanos, targets)
         deadlineNanos = target?.let(deadlineOf)
         val seenBefore = target != null && target.id in seenTargets
@@ -268,7 +276,8 @@ class SimulatedAimer(
         return yaw to pitch
     }
 
-    private fun observationAt(timeNanos: Long): Observation? = observations.lastOrNull { it.timeNanos <= timeNanos }
+    private fun observationAt(timeNanos: Long, history: ArrayDeque<Observation> = observations): Observation? =
+        history.lastOrNull { it.timeNanos <= timeNanos }
 
     private fun anglesOf(center: Vec3): Pair<Double, Double> =
         Math.toDegrees(atan2(center.x, -center.z)) to Math.toDegrees(asin(center.y / center.length))
@@ -288,11 +297,15 @@ class SimulatedAimer(
             }
             Mode.SETTLING -> if (nowNanos >= wakeNanos) decide(nowNanos, target)
             Mode.CLICKING -> if (nowNanos >= wakeNanos) {
-                click = true
-                twitch(nowNanos)
-                // After a miss the target stays; look again shortly.
-                mode = Mode.SETTLING
-                wakeNanos = nowNanos + ms(MISS_RECHECK_MS)
+                if (holdsForStop(nowNanos, target)) {
+                    wakeNanos = nowNanos + ms(STOP_RECHECK_MS)
+                } else {
+                    click = true
+                    twitch(nowNanos)
+                    // After a miss the target stays; look again shortly.
+                    mode = Mode.SETTLING
+                    wakeNanos = nowNanos + ms(MISS_RECHECK_MS)
+                }
             }
             Mode.NO_TARGET -> Unit
         }
@@ -310,15 +323,17 @@ class SimulatedAimer(
         }
         val reaction = mean + player.reactionSdMs * gaussian()
         wakeNanos = nowNanos + ms(max(MIN_REACTION_MS * if (seenBefore) REACQUIRE_FLOOR else 1.0, reaction) * fatigue(nowNanos))
+        if (strafing) waitForStop = random.nextDouble() < player.strafeWaitForStop
     }
 
     private fun decide(nowNanos: Long, target: Target) {
-        val error = errorTo(nowNanos, target)
+        val error = aimError(nowNanos, target)
         val onTarget = hypot(error.x, error.y) <= angularRadius(target)
         if (onTarget || corrections >= player.maxCorrections) {
             mode = Mode.CLICKING
             val delay = max(0.0, player.clickDelayMs + player.clickDelaySdMs * gaussian())
             wakeNanos = nowNanos + ms(delay * fatigue(nowNanos))
+            clickReadyNanos = wakeNanos
         } else {
             corrections++
             planReach(nowNanos, target, primary = false)
@@ -326,7 +341,57 @@ class SimulatedAimer(
     }
 
     private fun planReach(nowNanos: Long, target: Target, primary: Boolean) {
-        planReachBy(nowNanos, errorTo(nowNanos, target), max(2.0 * angularRadius(target), MIN_WIDTH_DEGREES), primary)
+        planReachBy(nowNanos, aimError(nowNanos, target), max(2.0 * angularRadius(target), MIN_WIDTH_DEGREES), primary)
+    }
+
+    /** Remembers where [targets] are, for the lagged view of strafing targets; targets that are gone are forgotten. */
+    private fun observe(nowNanos: Long, targets: List<Target>) {
+        histories.keys.retainAll(targets.map { it.id }.toSet())
+        for (target in targets) {
+            val history = histories.getOrPut(target.id) { ArrayDeque() }
+            history.addLast(Observation(nowNanos, target.center))
+            while (history.size > 1 && history.first().timeNanos < nowNanos - ms(TRACK_HISTORY_MS)) history.removeFirst()
+        }
+    }
+
+    /** What the player sees of a strafing target: where it was one tracking lag ago and how fast it moved then, in degrees and degrees per second. */
+    private class Seen(val yaw: Double, val pitch: Double, val yawSpeed: Double, val pitchSpeed: Double)
+
+    private fun seenOf(nowNanos: Long, target: Target): Seen? {
+        val history = histories[target.id] ?: return null
+        val lagNanos = ms(player.trackingLagMs * fatigue(nowNanos))
+        val delayed = observationAt(nowNanos - lagNanos, history) ?: return null
+        val earlier = observationAt(nowNanos - lagNanos - ms(VELOCITY_WINDOW_MS), history) ?: delayed
+        val seen = anglesOf(delayed.center)
+        val before = anglesOf(earlier.center)
+        val seconds = (delayed.timeNanos - earlier.timeNanos) / NANOS_PER_SECOND
+        if (seconds <= 0.0) return Seen(seen.first, seen.second, 0.0, 0.0)
+        return Seen(seen.first, seen.second, (seen.first - before.first) / seconds, (seen.second - before.second) / seconds)
+    }
+
+    /**
+     * The offset to aim at: for a static target the target itself. A strafing target is seen one tracking lag late, and the
+     * player extends the motion it saw over that lag and the time the reach takes, scaled by how well it anticipates
+     * ([SimulatedPlayer.trackingPrediction]) and randomly off ([SimulatedPlayer.strafePredictionNoise]).
+     */
+    private fun aimError(nowNanos: Long, target: Target): Offset {
+        val plain = errorTo(nowNanos, target)
+        if (!strafing) return plain
+        val seen = seenOf(nowNanos, target) ?: return plain
+        val width = max(2.0 * angularRadius(target), MIN_WIDTH_DEGREES)
+        val reachMs = player.fittsInterceptMs + player.fittsSlopeMs * log2(1.0 + hypot(plain.x, plain.y) / width)
+        val lagMs = player.trackingLagMs * fatigue(nowNanos)
+        val lead = player.trackingPrediction * max(0.0, 1.0 + player.strafePredictionNoise * gaussian()) * (lagMs + reachMs) / MS_PER_S
+        val yaw = seen.yaw + seen.yawSpeed * lead
+        val pitch = seen.pitch + seen.pitchSpeed * lead
+        return Offset((yaw - trueYaw) * cos(Math.toRadians(pitch)), pitch - truePitch)
+    }
+
+    /** A player who times the click for a stop keeps waiting (for a while) as long as it sees the target move. */
+    private fun holdsForStop(nowNanos: Long, target: Target): Boolean {
+        if (!strafing || !waitForStop || nowNanos - clickReadyNanos > ms(MAX_STOP_WAIT_MS)) return false
+        val seen = seenOf(nowNanos, target) ?: return false
+        return hypot(seen.yawSpeed * cos(Math.toRadians(seen.pitch)), seen.pitchSpeed) > STOP_SPEED_DEGREES_PER_SECOND
     }
 
     /** A reach over [error] degrees (screen plane) to something [width] degrees wide. */
@@ -497,6 +562,11 @@ class SimulatedAimer(
         const val FLASH_TURN_WIDTH_DEGREES = 25.0
         const val CORRECTION_SPEEDUP = 0.6
         const val MISS_RECHECK_MS = 100.0
+
+        /** A strafing target seen moving faster than this is not stopped; the player waits at most [MAX_STOP_WAIT_MS] for it, looking again every [STOP_RECHECK_MS]. */
+        const val STOP_SPEED_DEGREES_PER_SECOND = 1.5
+        const val MAX_STOP_WAIT_MS = 800.0
+        const val STOP_RECHECK_MS = 20.0
         const val TWITCH_FRACTION = 0.25
         const val TWITCH_MS = 30.0
         val LN2 = ln(2.0)

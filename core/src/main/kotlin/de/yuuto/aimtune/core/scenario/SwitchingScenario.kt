@@ -17,6 +17,8 @@ data class SwitchingConfig(
     val minSeparationDegrees: Double = 14.0,
     /** When set, targets are head-sized angles and the separation comes from the game's geometry. */
     val geometry: TrainerGeometry? = null,
+    /** When set, every visible target strafes (move, stop, move); this is the [ScenarioKind.SWITCH_STRAFE] round. */
+    val strafe: StrafeConfig? = null,
 ) {
     init {
         require(durationNanos > 0) { "durationNanos must be positive" }
@@ -31,9 +33,10 @@ data class SwitchingConfig(
  * the player keeps choosing the next target and switching to it. Hitting any target counts.
  */
 class SwitchingScenario(private val config: SwitchingConfig, seed: Long) : Scenario {
-    override val kind = ScenarioKind.SWITCHING
+    override val kind = if (config.strafe != null) ScenarioKind.SWITCH_STRAFE else ScenarioKind.SWITCHING
 
     private val random = Random(seed)
+    private val strafing = config.strafe?.let { StrafingTargets(it, seed) }
     private val eventLog = mutableListOf<TargetEvent>()
     private val visible = mutableListOf<Target>()
     private var nextId = 0
@@ -47,6 +50,15 @@ class SwitchingScenario(private val config: SwitchingConfig, seed: Long) : Scena
         repeat(config.targetCount) { spawn(nowNanos, avoid = visible.map { it.center }) }
     }
 
+    /** Moves strafing targets to [nowNanos]; static targets do not move. */
+    override fun update(nowNanos: Long) {
+        val moving = strafing ?: return
+        if (startNanos == null) return
+        val moved = moving.advance(visible, nowNanos, eventLog)
+        visible.clear()
+        visible += moved
+    }
+
     override fun isFinished(nowNanos: Long): Boolean {
         val start = startNanos ?: return false
         return nowNanos - start >= config.durationNanos
@@ -54,6 +66,8 @@ class SwitchingScenario(private val config: SwitchingConfig, seed: Long) : Scena
 
     override fun fire(origin: Vec3, direction: Vec3, nowNanos: Long): ShotResult {
         if (startNanos == null || isFinished(nowNanos)) return ShotResult.IGNORED
+        // The shot goes at the targets where they are now, whether or not the caller updated first.
+        update(nowNanos)
         val hit = visible.firstOrNull { it.isHitBy(origin, direction) }
         if (hit == null) {
             eventLog += TargetEvent.Miss(nowNanos)
@@ -61,6 +75,7 @@ class SwitchingScenario(private val config: SwitchingConfig, seed: Long) : Scena
         }
         eventLog += TargetEvent.Hit(nowNanos, hit.id)
         visible.remove(hit)
+        strafing?.remove(hit)
         spawn(nowNanos, avoid = visible.map { it.center } + hit.center)
         return ShotResult.HIT
     }
@@ -74,6 +89,7 @@ class SwitchingScenario(private val config: SwitchingConfig, seed: Long) : Scena
         }
         visible += candidate
         eventLog += TargetEvent.Spawned(nowNanos, candidate)
+        strafing?.add(candidate, nowNanos, eventLog)
     }
 
     private val separation: Double get() = config.geometry?.switchingSeparationDegrees ?: config.minSeparationDegrees

@@ -45,6 +45,14 @@ data class SimulatedPlayer(
     val trackingLagMs: Double = 150.0,
     /** Share of the target's motion during that delay the player anticipates (0 = none, 1 = perfect). */
     val trackingPrediction: Double = 0.8,
+    /**
+     * Strafing click targets (micro-strafe, switch-strafe): the player aims at the position the target is predicted to have
+     * (the tracking lag and prediction above), and the predicted lead is off by this relative standard deviation, because a
+     * target that moves, stops and moves again is not predictable.
+     */
+    val strafePredictionNoise: Double = 0.35,
+    /** Share of strafing targets the player does not click while they are seen moving: it times the click for the stop. */
+    val strafeWaitForStop: Double = 0.4,
     /** Fraction of the remaining error corrected per control step (every 40 ms). */
     val trackingGain: Double = 0.7,
     /** Fastest the hand can move while tracking smoothly; slower than a flick, so a high cm/360 falls behind fast targets. */
@@ -84,6 +92,7 @@ data class SimulatedPlayer(
         require(rangeBias >= 0.0 && rangeReferenceDegrees > 0.0) { "invalid range bias" }
         require(undershootBias in 0.0..<1.0) { "undershoot bias must be in [0, 1)" }
         require(pressureUndershoot >= 0.0) { "pressure undershoot must not be negative" }
+        require(strafePredictionNoise >= 0.0 && strafeWaitForStop in 0.0..1.0) { "invalid strafe parameters" }
         require(handNoiseCm > 0.0 && maxHandSpeedCmPerS > 0.0) { "hand parameters must be positive" }
     }
 
