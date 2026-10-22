@@ -187,7 +187,19 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 - [x] "Last search" and "Last analysis" no longer export or copy; a "not confirmed" card and the blind-test button only; "Last search" offers a curve only when clear and explains an unclear result
 - [x] ALGORITHMS ("Curve safety", pairs 10 -> 12), SPEC updated; tests for the choice, the rule and the offer
 
+### M17 Raw Accel model and import (docs/CURVE-FINDER-AUDIT.md; model and import implemented, no UI yet, the real Raw Accel load test is open)
+- [x] `core/accel/RawAccelCurve` + `RawAccelArgs`: classic and natural in Velocity and Gain form, classic cap modes in_out / input / output, natural input offset, lut with the gain flag (and the driver's linear extension past the last point), noaccel; each formula cites `a1xd/rawaccel` v1.7.1 file:line
+- [x] `RawAccelProfile`: output DPI and device DPI kept apart, `totalMultiplier(speed) = curve * outputDpi / deviceDpi`, device DPI 0 treated as 1000
+- [x] `AccelSpec` form `rawaccel1;...` (round trip tested, the round table stores it as TEXT, no schema change)
+- [x] `storage/RawAccelImport`: lossless tree, profile list, typed profile or a list of refusal reasons, warnings (DPI, polling, devices)
+- [x] `RawAccelExport.patch` / `write`: the user's file plus one changed copy of a profile, everything else the original elements; device DPI written as an int (Raw Accel's field is an int)
+- [x] Tests: reference values from a line-by-line port of the source for every mode and cap mode, the user's profile (1e-4 table, 1e-9 closed form), import refusals and warnings, patch invariants
+- [ ] Power mode (refused on import), rotation and Y/X ratio in the trainer (refused on import), diff screen (M18)
+- [ ] Real Raw Accel load test by the user (patched file, lut)
+
 ## Last session
+
+- M17 Raw Accel model and import (branch `feature/m17-rawaccel-model`): the app now represents and simulates Raw Accel 1.7.1 profiles exactly (see the M17 checklist and ALGORITHMS "The Raw Accel profile model"), imports a settings.json losslessly with explicit refusals, and exports a patched copy that keeps the rest of the file. One finding: Raw Accel extends a lut linearly beyond its last point, `LookupCurve` holds the last value, so the finder's tables differ from the driver above their last measured speed (not changed, stored rounds depend on it). No UI yet (M18).
 
 - M16 Curve finder safety (requested after the audit of the user's real runs: the curves were played at the finder's low-confidence 0.474 instead of the 0.335 in the game, and "Last search" exported an unconfirmed falling curve whose range included "no curve"): see the M16 checklist. Not tried on real data yet.
 
