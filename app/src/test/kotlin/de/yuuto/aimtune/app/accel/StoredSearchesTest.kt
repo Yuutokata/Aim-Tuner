@@ -126,6 +126,16 @@ class StoredSearchesTest {
     }
 
     @Test
+    fun `an unclear search offers no curve`() {
+        fun last(strength: Double, low: Double, high: Double) =
+            LastSearch(800.0, 34.4, 30, 2, StrengthResult(strength, low, high, 70, 30, CurveStrength.excludesPlain(strength, low, high), atEdge = false))
+        assertNotNull(last(1.2, 1.05, 1.4).offer)
+        assertNull(last(1.2, 0.95, 1.4).offer, "the range includes no curve")
+        assertNull(last(0.8, 0.7, 0.95).offer, "a falling range that does not end below 0.90")
+        assertNotNull(last(0.8, 0.7, 0.85).offer)
+    }
+
+    @Test
     fun `a new search builds on the stored ones and needs fewer new rounds`() {
         val profile = checkNotNull(GameProfiles.load().find("valorant"))
         val config = TrainerConfig(800.0, 34.4, profile, roundSeconds = 30, seed = 0)

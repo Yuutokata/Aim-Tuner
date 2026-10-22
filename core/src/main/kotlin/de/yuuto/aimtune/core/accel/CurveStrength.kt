@@ -33,6 +33,13 @@ object CurveStrength {
 
     /** The decay rate of the natural curves the search plays; stored rounds are recognised by it. */
     const val DECAY = 0.05
+
+    /**
+     * A falling strength counts as clear only when the upper end of its credible range is below this. Falling curves are
+     * the ones the search found on noise most often (docs/CURVE-FINDER-AUDIT.md, option O2), so they need more evidence
+     * than rising ones, whose range only has to stay above 1.
+     */
+    const val FALLING_MAX_HIGH = 0.90
     private const val PSEUDO_SCALE = 100.0
 
     /** The range the optimizer searches without flash rounds, as pseudo cm/360. */
@@ -53,6 +60,15 @@ object CurveStrength {
 
     /** True when [strength] would be played as a real curve. */
     fun isCurve(strength: Double): Boolean = abs(strength - NEUTRAL) >= PLAIN_BAND
+
+    /**
+     * True when the credible range [low]..[high] of the best [strength] clearly excludes "no curve": a real curve whose
+     * range is above 1 (rising), or entirely below [FALLING_MAX_HIGH] (falling).
+     */
+    fun excludesPlain(strength: Double, low: Double, high: Double): Boolean {
+        if (!isCurve(strength)) return false
+        return low > NEUTRAL || high < FALLING_MAX_HIGH
+    }
 }
 
 /** The curve of [strength] as a candidate for the blind A/B test; the sensitivity factor stays 1 (the search included it). */

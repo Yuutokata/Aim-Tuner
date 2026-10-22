@@ -15,7 +15,7 @@ private const val FOOTER_BUTTON_HEIGHT = 64f
 
 /**
  * The newest blind strength search as it comes out when its stored rounds are analysed again: the strength and its range,
- * and, when it excluded "no curve", the curve with export, copy and the blind test against plain sensitivity.
+ * and, when it clearly excluded "no curve", the blind test of its curve against plain sensitivity (no export before that test passed).
  */
 class AccelLastSearchScreen(ctx: AppContext, private val last: LastSearch?) : AccelFitScreen(ctx) {
     override fun build(): Actor {
@@ -29,7 +29,7 @@ class AccelLastSearchScreen(ctx: AppContext, private val last: LastSearch?) : Ac
             content.add(ui.label(note, Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).colspan(2).padBottom(16f).row()
             content.add(ui.label(searchExplanation(last.result, last.clear), Styles.BODY_MUTED, wrap = true)).left().width(TEXT_WIDTH).colspan(2).padBottom(24f).row()
             last.result?.let { content.add(searchCard(it, SIDE_CARD_WIDTH)).left().top().width(SIDE_CARD_WIDTH) }
-            if (offer != null) content.add(exportCard(if (last.clear) "accel.last_search.untested" else "accel.last_search.unclear")).left().top().width(EXPORT_CARD_WIDTH).padLeft(24f)
+            if (offer != null) content.add(unconfirmedCard()).left().top().width(EXPORT_CARD_WIDTH).padLeft(24f)
         }
 
         val footer = Table()
