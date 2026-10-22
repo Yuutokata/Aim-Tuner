@@ -115,7 +115,7 @@ The real database was only read through copies; the original's SHA-256 (`9C500A2
 **What is right.** The export check found these parts correct:
 - What the A/B test plays equals what is exported for every family the app produces (classic including falling caps, natural, power, lut, strength curves), with the Raw Accel 1.7.1 formulas re-implemented from the JSON fields. The worst error is 4e-8, which is float rounding (export.txt §1).
 - The speed axis matches Raw Accel (counts·1000/DPI/ms).
-- Both lut ends are held flat, as in Raw Accel (`common/accel-lookup.hpp`, 1.7.1).
+- **Correction (found in M17):** only the lower lut end is held flat. Above its last point Raw Accel continues the line through the last two points (`common/accel-lookup.hpp` 1.7.1, `lerp` l.36-43 with t > 1, lookup l.59-90), while `LookupCurve` holds the last value. The V2 tables therefore played more (rising) or less (falling) gain than tested above their 95th-percentile speed, i.e. on the fastest flicks. `ExportAuditTest` §3 used a clamped reference and missed it. Fixed on `feature/m17-rawaccel-model` (`db59b9c`) with a flat tail point at 10000 in/s.
 
 ---
 
