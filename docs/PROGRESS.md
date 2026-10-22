@@ -187,6 +187,17 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 - [x] "Last search" and "Last analysis" no longer export or copy; a "not confirmed" card and the blind-test button only; "Last search" offers a curve only when clear and explains an unclear result
 - [x] ALGORITHMS ("Curve safety", pairs 10 -> 12), SPEC updated; tests for the choice, the rule and the offer
 
+### M17 Raw Accel model and import (docs/CURVE-FINDER-AUDIT.md; model and import implemented, no UI yet, the real Raw Accel load test is open)
+- [x] `core/accel/RawAccelCurve` + `RawAccelArgs`: classic and natural in Velocity and Gain form, classic cap modes in_out / input / output, natural input offset, lut with the gain flag (and the driver's linear extension past the last point), noaccel; each formula cites `a1xd/rawaccel` v1.7.1 file:line
+- [x] `RawAccelProfile`: output DPI and device DPI kept apart, `totalMultiplier(speed) = curve * outputDpi / deviceDpi`, device DPI 0 treated as 1000
+- [x] `AccelSpec` form `rawaccel1;...` (round trip tested, the round table stores it as TEXT, no schema change)
+- [x] `storage/RawAccelImport`: lossless tree, profile list, typed profile or a list of refusal reasons, warnings (DPI, polling, devices)
+- [x] `RawAccelExport.patch` / `write`: the user's file plus one changed copy of a profile, everything else the original elements; device DPI written as an int (Raw Accel's field is an int)
+- [x] Tests: reference values from a line-by-line port of the source for every mode and cap mode, the user's profile (1e-4 table, 1e-9 closed form), import refusals and warnings, patch invariants
+- [ ] Power mode (refused on import), rotation and Y/X ratio in the trainer (refused on import), diff screen (M18)
+- [x] Exported lookup tables get a flat tail point at 10000 in/s (`RawAccelExport.FLAT_TAIL_SPEED`): Raw Accel extends a lut linearly past its last point, the app tests the last value held; checked against `RawAccelCurve`
+- [ ] Real Raw Accel load test by the user (patched file, lut)
+
 ### M15 Range mode (branch `feature/m15-range-mode`; plan in docs/RANGE.md)
 - [x] 1 Plan: `docs/RANGE.md` approved; corrected after the first clips: mode Eliminate 100, armor on, sensitivity 0.335
 - [x] 2 Recording kit (`tools/range-re/RECORDING.md`), waiting for the user's clips
@@ -198,6 +209,8 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 - [ ] Open (user): record the clips from RECORDING.md
 
 ## Last session
+
+- M17 Raw Accel model and import: the app represents and simulates Raw Accel 1.7.1 profiles exactly (see the M17 checklist and ALGORITHMS "The Raw Accel profile model"), imports a settings.json losslessly with explicit refusals, and exports a patched copy that keeps the rest of the file. Finding: Raw Accel extends a lut linearly beyond its last point while `LookupCurve` holds the last value, so exported tables played other gain than tested on the fastest flicks; fixed with a flat tail point in the export. Merged into `dev`. No UI yet (M18).
 
 - M15a moving-target metrics (branch `feature/m15-range-mode`):
   - `StrafeMotion` and the kinds `micro-strafe` / `switch-strafe` (own ids, so baselines do not mix); a moving target is hit where it is at the time of the shot;
