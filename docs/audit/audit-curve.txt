@@ -1,0 +1,199 @@
+== CURVE AUDIT @ git 26e9195 | n = 24 seeds per row (level check 8) | user curve: Raw Accel classic gain, m 2, offset 10 in/s, cap in_out 62.5 in/s / 1.6, factor 0.75 ==
+USER_CURVE check (lookup / exact): mult(20) 1.0286/1.0286, (30) 1.0762/1.0762, (50) 1.1829/1.1829, (62.5) 1.2520/1.2520, (100) 1.3825/1.3825 (expected 1.0286 1.0762 1.1829 1.2520 1.3825)
+models: ADAPTED = flat preference, hand adapted to 0.75 x user curve, tested at plain; _RANGE = rangeBias 0.05; FLAT = no preference; RISING/FALLING = gainPlayer(+/-0.30)
+
+== 1d SENSITIVITY FINDER: 20 flick rounds, range 20-140 cm/360, 24 seeds; recommended cm/360 relative to base 55.0 ==
+model             median         p25-p75     >1.10
+ADAPTED         x1.080   x0.954-x1.185    42%
+ADAPTED_RANGE   x1.090   x0.954-x1.151    46%
+FLAT            x0.947   x0.827-x1.011    17%
+FLAT_RANGE      x0.949   x0.827-x1.015    17%
+RISING          x0.789   x0.700-x0.871     0%
+FALLING         x0.775   x0.666-x0.860     4%
+
+== 1c LEVEL CHECK: paired benefit (curve arm minus plain arm at base 55.0, 12 pairs) over 8 seeds; a fresh person per cell; 'const' = no curve, only the sensitivity factor (NoAccel curve) ==
+benefit > 0 means the arm played at base/factor with the curve scores higher than plain. Share = seeds with benefit > 0.
+condition                    model              mean   median      >0
+Natural(0.05, 0.70) f1.00    ADAPTED          -20.78   -20.63    0/8
+const f0.85 (no curve)       ADAPTED           +2.08    -1.63    3/8
+const f0.75 (no curve)       ADAPTED           -1.06    +0.13    4/8
+USER_CURVE f0.75             ADAPTED           -0.54    +0.39    4/8
+Natural(0.05, 1.30) f0.80    ADAPTED          +14.91   +16.00    8/8
+Natural(0.05, 0.70) f1.00    FLAT             -52.53   -53.47    0/8
+const f0.85 (no curve)       FLAT              -4.06    -2.94    2/8
+const f0.75 (no curve)       FLAT              -6.40    -6.30    2/8
+USER_CURVE f0.75             FLAT              -6.79    -6.20    2/8
+Natural(0.05, 1.30) f0.80    FLAT             -45.03   -44.74    0/8
+
+-- aftereffect of the ADAPTED hand: HandAdaptation.factor(v) (factor on the expected gain) at the start and after 15 plain rounds at base, mean of 8 seeds; USER_DELIVERED(v) shown for reference
+v in/s               3       10       20       30       50
+delivered        0.750    0.750    0.771    0.807    0.887
+factor start     0.806    0.806    0.823    0.851    0.914
+factor after15   0.998    0.984    0.869    0.858    0.914
+
+== 1a/2 ERROR ANALYSIS (15 plain calibration rounds, then fit; A/B = alpha 0.01 pooled/ungrouped, max 12 pairs; benefit = independent 12-pair paired difference) ==
+offer = curve offered; fallO = falling offered (of n); expor = offered and A/B ACCEL_BETTER; fallE = falling exports; right = exports in the right direction (RISING: rising, FALLING: falling);
+medBen = median paired benefit of exports (score pts); harmE = exports with benefit < 0; harmOffer = offered curves with A/B worse or benefit < 0; slope = median d ln(wanted gain)/d ln(speed)
+variant                model           n | offer fallO | expor fallE right | medBen harmE | harmOffer | slope
+E legacy               ADAPTED         24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.023
+E bounded              ADAPTED         24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.023
+E legacy O1e rise-only ADAPTED         24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.023
+E bounded O1e rise-only ADAPTED         24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.023
+E legacy O2e fall 2xBIC ADAPTED         24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.023
+E bounded O2e fall 2xBIC ADAPTED         24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.023
+
+E legacy               ADAPTED_RANGE   24 |  96%   0% |  75%   0%    - | +22.01   0% |   0% | +0.110
+E bounded              ADAPTED_RANGE   24 |  96%   0% |  54%   0%    - | +21.71   0% |   0% | +0.110
+E legacy O1e rise-only ADAPTED_RANGE   24 |  96%   0% |  75%   0%    - | +22.01   0% |   0% | +0.110
+E bounded O1e rise-only ADAPTED_RANGE   24 |  96%   0% |  54%   0%    - | +21.71   0% |   0% | +0.110
+E legacy O2e fall 2xBIC ADAPTED_RANGE   24 |  96%   0% |  75%   0%    - | +22.01   0% |   0% | +0.110
+E bounded O2e fall 2xBIC ADAPTED_RANGE   24 |  96%   0% |  54%   0%    - | +21.71   0% |   0% | +0.110
+
+E legacy               FLAT            24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.007
+E bounded              FLAT            24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.007
+E legacy O1e rise-only FLAT            24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.007
+E bounded O1e rise-only FLAT            24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.007
+E legacy O2e fall 2xBIC FLAT            24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.007
+E bounded O2e fall 2xBIC FLAT            24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.007
+
+E legacy               FLAT_RANGE      24 | 100%   0% |  50%   0%    - | +17.37   0% |   0% | +0.113
+E bounded              FLAT_RANGE      24 | 100%   0% |   8%   0%    - | +14.99   0% |  38% | +0.113
+E legacy O1e rise-only FLAT_RANGE      24 | 100%   0% |  50%   0%    - | +17.37   0% |   0% | +0.113
+E bounded O1e rise-only FLAT_RANGE      24 | 100%   0% |   8%   0%    - | +14.99   0% |  38% | +0.113
+E legacy O2e fall 2xBIC FLAT_RANGE      24 | 100%   0% |  50%   0%    - | +17.37   0% |   0% | +0.113
+E bounded O2e fall 2xBIC FLAT_RANGE      24 | 100%   0% |   8%   0%    - | +14.99   0% |  38% | +0.113
+
+E legacy               RISING          24 |  79%   0% |  21%   0%  21% | +33.33   0% |  13% | +0.070
+E bounded              RISING          24 |  79%   0% |  17%   0%  17% | +31.58   0% |  13% | +0.070
+E legacy O1e rise-only RISING          24 |  79%   0% |  21%   0%  21% | +33.33   0% |  13% | +0.070
+E bounded O1e rise-only RISING          24 |  79%   0% |  17%   0%  17% | +31.58   0% |  13% | +0.070
+E legacy O2e fall 2xBIC RISING          24 |  79%   0% |  21%   0%  21% | +33.33   0% |  13% | +0.070
+E bounded O2e fall 2xBIC RISING          24 |  79%   0% |  17%   0%  17% | +31.58   0% |  13% | +0.070
+
+E legacy               FALLING         24 | 100% 100% |  83%  83%  83% | +42.86   0% |   0% | -0.111
+E bounded              FALLING         24 | 100% 100% | 100% 100% 100% | +49.85   0% |   0% | -0.111
+E legacy O1e rise-only FALLING         24 |   0%   0% |   0%   0%   0% |      -   0% |   0% | -0.111
+E bounded O1e rise-only FALLING         24 |   0%   0% |   0%   0%   0% |      -   0% |   0% | -0.111
+E legacy O2e fall 2xBIC FALLING         24 | 100% 100% |  83%  83%  83% | +42.86   0% |   0% | -0.111
+E bounded O2e fall 2xBIC FALLING         24 | 100% 100% | 100% 100% 100% | +49.85   0% |   0% | -0.111
+
+== 1b/2 STRENGTH SEARCH (24 blind click rounds at base 55.0 cm/360, pseudo cm/360 = 100 x strength; A/B of the found curve at factor 1) ==
+live offer = interval excludes strength 1.00 and best is a curve; last = best is a curve (Last search screen, exported without A/B); lastHarm = last-offered with A/B worse or benefit < 0; lastBen = median benefit of last-offered;
+O2 asym = falling offered only if interval upper end < 0.90; O3 = falling export needs A/B mean >= 4 pts; O4 = sensitivity search first (20 rounds, 20-140), strength search then played at the found cm/360; O5 = mandatory A/B: export% of every live/last row is the O5 rate (last% is the no-A/B rate)
+low = best <= range low + 0.02
+variant                model           n | offer fallO | expor fallE right | medBen harmE | harmOffer | best median (p25-p75) | edge/direction | last-offer stats
+S 0.70-1.75 live       ADAPTED         24 |  25%   4% |   8%   0%    - | +23.16   0% |   4% | x1.11 (0.97-1.67) | low   4% fall  29% rise  63% | last  92% lastHarm  29% lastBen +13.10
+S 0.70-1.45 live       ADAPTED         24 |  21%   8% |   4%   0%    - | +14.17   0% |   8% | x1.00 (0.93-1.05) | low   0% fall  46% rise  33% | last  79% lastHarm  46% lastBen  -9.83
+S O1 1.00-1.75         ADAPTED         24 |  88%   0% |  33%   0%    - | +19.28   0% |   4% | x1.34 (1.19-1.60) | low  13% fall   0% rise  88% | last  88% lastHarm   4% lastBen +18.69
+S O2 asym interval     ADAPTED         24 |  21%   0% |   8%   0%    - | +23.16   0% |   0% | x1.11 (0.97-1.67) | low   4% fall  29% rise  63% | last  92% lastHarm  29% lastBen +13.10
+S O3 fall needs 4pts   ADAPTED         24 |  25%   4% |   8%   0%    - | +23.16   0% |   4% | x1.11 (0.97-1.67) | low   4% fall  29% rise  63% | last  92% lastHarm  29% lastBen +13.10
+S O4 two-stage         ADAPTED         24 |  50%   0% |   8%   0%    - | +27.57   0% |   4% | x1.27 (1.09-1.59) | low   0% fall   0% rise  96% | last  96% lastHarm   4% lastBen +18.38
+
+S 0.70-1.75 live       ADAPTED_RANGE   24 |  42%   0% |   0%   0%    - |      -   0% |   0% | x1.20 (0.98-1.75) | low   4% fall  25% rise  71% | last  96% lastHarm  25% lastBen +10.95
+S 0.70-1.45 live       ADAPTED_RANGE   24 |  46%   8% |   0%   0%    - |      -   0% |   4% | x1.28 (1.01-1.45) | low   4% fall  21% rise  67% | last  88% lastHarm  17% lastBen +13.80
+S O1 1.00-1.75         ADAPTED_RANGE   24 |  96%   0% |   0%   0%    - |      -   0% |   0% | x1.56 (1.25-1.75) | low   4% fall   0% rise  96% | last  96% lastHarm   0% lastBen +17.70
+S O2 asym interval     ADAPTED_RANGE   24 |  42%   0% |   0%   0%    - |      -   0% |   0% | x1.20 (0.98-1.75) | low   4% fall  25% rise  71% | last  96% lastHarm  25% lastBen +10.95
+S O3 fall needs 4pts   ADAPTED_RANGE   24 |  42%   0% |   0%   0%    - |      -   0% |   0% | x1.20 (0.98-1.75) | low   4% fall  25% rise  71% | last  96% lastHarm  25% lastBen +10.95
+S O4 two-stage         ADAPTED_RANGE   24 |  46%   0% |  21%   0%    - | +20.18   0% |   0% | x1.75 (1.21-1.75) | low   0% fall   0% rise  96% | last  96% lastHarm   4% lastBen +17.57
+
+S 0.70-1.75 live       FLAT            24 |  38%   4% |   0%   0%    - |      -   0% |  29% | x1.03 (1.00-1.06) | low   0% fall   8% rise  54% | last  63% lastHarm  42% lastBen  -2.17
+S 0.70-1.45 live       FLAT            24 |  29%   4% |   4%   0%    - |  -0.55   4% |  17% | x1.03 (1.00-1.04) | low   0% fall   8% rise  63% | last  71% lastHarm  46% lastBen  -0.55
+S O1 1.00-1.75         FLAT            24 |  25%   0% |   0%   0%    - |      -   0% |  13% | x1.00 (1.00-1.01) | low  75% fall   0% rise  25% | last  25% lastHarm  13% lastBen  -2.87
+S O2 asym interval     FLAT            24 |  33%   0% |   0%   0%    - |      -   0% |  25% | x1.03 (1.00-1.06) | low   0% fall   8% rise  54% | last  63% lastHarm  42% lastBen  -2.17
+S O3 fall needs 4pts   FLAT            24 |  38%   4% |   0%   0%    - |      -   0% |  29% | x1.03 (1.00-1.06) | low   0% fall   8% rise  54% | last  63% lastHarm  42% lastBen  -2.17
+S O4 two-stage         FLAT            24 |  13%   0% |   0%   0%    - |      -   0% |   4% | x1.03 (1.00-1.04) | low   0% fall  13% rise  58% | last  71% lastHarm  46% lastBen  -7.88
+
+S 0.70-1.75 live       FLAT_RANGE      24 |  29%   4% |   0%   0%    - |      -   0% |   4% | x1.03 (0.99-1.04) | low   0% fall   8% rise  63% | last  71% lastHarm  21% lastBen  +3.01
+S 0.70-1.45 live       FLAT_RANGE      24 |  13%   0% |   0%   0%    - |      -   0% |   4% | x1.00 (0.99-1.04) | low   0% fall  13% rise  29% | last  42% lastHarm  29% lastBen -10.29
+S O1 1.00-1.75         FLAT_RANGE      24 |  17%   0% |   0%   0%    - |      -   0% |   4% | x1.00 (1.00-1.00) | low  83% fall   0% rise  17% | last  17% lastHarm   4% lastBen +10.18
+S O2 asym interval     FLAT_RANGE      24 |  25%   0% |   0%   0%    - |      -   0% |   0% | x1.03 (0.99-1.04) | low   0% fall   8% rise  63% | last  71% lastHarm  21% lastBen  +3.01
+S O3 fall needs 4pts   FLAT_RANGE      24 |  29%   4% |   0%   0%    - |      -   0% |   4% | x1.03 (0.99-1.04) | low   0% fall   8% rise  63% | last  71% lastHarm  21% lastBen  +3.01
+S O4 two-stage         FLAT_RANGE      24 |  33%   0% |   0%   0%    - |      -   0% |  17% | x1.05 (1.00-1.07) | low   4% fall   8% rise  71% | last  79% lastHarm  42% lastBen  -0.97
+
+S 0.70-1.75 live       RISING          24 | 100%   0% | 100%   0% 100% | +49.27   0% |   0% | x1.75 (1.40-1.75) | low   0% fall   0% rise 100% | last 100% lastHarm   0% lastBen +49.27
+S 0.70-1.45 live       RISING          24 | 100%   0% |  96%   0%  96% | +47.43   0% |   0% | x1.45 (1.25-1.45) | low   0% fall   0% rise 100% | last 100% lastHarm   0% lastBen +46.50
+S O1 1.00-1.75         RISING          24 | 100%   0% | 100%   0% 100% | +48.20   0% |   0% | x1.62 (1.41-1.75) | low   0% fall   0% rise 100% | last 100% lastHarm   0% lastBen +48.20
+S O2 asym interval     RISING          24 | 100%   0% | 100%   0% 100% | +49.27   0% |   0% | x1.75 (1.40-1.75) | low   0% fall   0% rise 100% | last 100% lastHarm   0% lastBen +49.27
+S O3 fall needs 4pts   RISING          24 | 100%   0% | 100%   0% 100% | +49.27   0% |   0% | x1.75 (1.40-1.75) | low   0% fall   0% rise 100% | last 100% lastHarm   0% lastBen +49.27
+S O4 two-stage         RISING          24 |  88%   0% |  42%   0%  42% | +34.68   0% |   0% | x1.57 (1.40-1.75) | low   0% fall   0% rise 100% | last 100% lastHarm   4% lastBen +34.62
+
+S 0.70-1.75 live       FALLING         24 | 100% 100% | 100% 100% 100% | +60.33   0% |   0% | x0.70 (0.70-0.72) | low  71% fall 100% rise   0% | last 100% lastHarm   0% lastBen +60.33
+S 0.70-1.45 live       FALLING         24 | 100% 100% | 100% 100% 100% | +60.56   0% |   0% | x0.70 (0.70-0.73) | low  67% fall 100% rise   0% | last 100% lastHarm   0% lastBen +60.56
+S O1 1.00-1.75         FALLING         24 |   4%   0% |   0%   0%   0% |      -   0% |   4% | x1.00 (1.00-1.00) | low  96% fall   0% rise   4% | last   4% lastHarm   4% lastBen -31.77
+S O2 asym interval     FALLING         24 | 100% 100% | 100% 100% 100% | +60.33   0% |   0% | x0.70 (0.70-0.72) | low  71% fall 100% rise   0% | last 100% lastHarm   0% lastBen +60.33
+S O3 fall needs 4pts   FALLING         24 | 100% 100% | 100% 100% 100% | +60.33   0% |   0% | x0.70 (0.70-0.72) | low  71% fall 100% rise   0% | last 100% lastHarm   0% lastBen +60.33
+S O4 two-stage         FALLING         24 | 100% 100% |  92%  92%  92% | +52.49   0% |   0% | x0.70 (0.70-0.72) | low  71% fall 100% rise   0% | last 100% lastHarm   0% lastBen +52.49
+
+== 3. REAL LEVEL MISMATCH: hand adapted to 0.530 x user curve (curve rounds were played at 34.4 cm/360, plain tests at 48.7 -> relative gain 0.75 x 34.4/48.7); tested at base 55.0 ==
+== 1d SENSITIVITY FINDER: 20 flick rounds, range 20-140 cm/360, 24 seeds; recommended cm/360 relative to base 55.0 ==
+model             median         p25-p75     >1.10
+ADAPTED_HIGH    x1.418   x1.273-x1.641    92%
+ADAPTED_HIGH_RANGE  x1.401   x1.251-x1.616    83%
+
+-- 3 level check: paired benefit (12 pairs, base 55.0) over 8 seeds
+condition                    model                    mean   median      >0
+Natural(0.05, 0.70) f1.00    ADAPTED_HIGH            -3.65    -1.50    3/8
+const f0.85 (no curve)       ADAPTED_HIGH            +6.14    +5.88    8/8
+const f0.70 (no curve)       ADAPTED_HIGH            +8.39    +8.51    8/8
+const f0.55 (no curve)       ADAPTED_HIGH            +5.29    +5.89    7/8
+USER_CURVE f0.530            ADAPTED_HIGH            +6.43    +5.75    6/8
+Natural(0.05, 1.30) f0.60    ADAPTED_HIGH            +6.64    +7.06    8/8
+Natural(0.05, 0.70) f1.00    ADAPTED_HIGH_RANGE      -1.24    +0.43    4/8
+const f0.85 (no curve)       ADAPTED_HIGH_RANGE      +5.16    +5.59    8/8
+const f0.70 (no curve)       ADAPTED_HIGH_RANGE      +6.31    +6.01    8/8
+const f0.55 (no curve)       ADAPTED_HIGH_RANGE      +3.27    +4.04    7/8
+USER_CURVE f0.530            ADAPTED_HIGH_RANGE      +2.41    +3.28    6/8
+Natural(0.05, 1.30) f0.60    ADAPTED_HIGH_RANGE      +6.98    +6.04    8/8
+-- adaptation factor of ADAPTED_HIGH at start and after 15 plain rounds (mean of 8 seeds); delivered = 0.530 x user curve
+v in/s               3       10       20       30       50
+delivered        0.530    0.530    0.545    0.570    0.627
+factor start     0.621    0.621    0.634    0.656    0.704
+factor after15   0.998    0.969    0.729    0.676    0.704
+
+== 1a/2 ERROR ANALYSIS (15 plain calibration rounds, then fit; A/B = alpha 0.01 pooled/ungrouped, max 12 pairs; benefit = independent 12-pair paired difference) ==
+offer = curve offered; fallO = falling offered (of n); expor = offered and A/B ACCEL_BETTER; fallE = falling exports; right = exports in the right direction (RISING: rising, FALLING: falling);
+medBen = median paired benefit of exports (score pts); harmE = exports with benefit < 0; harmOffer = offered curves with A/B worse or benefit < 0; slope = median d ln(wanted gain)/d ln(speed)
+variant                model           n | offer fallO | expor fallE right | medBen harmE | harmOffer | slope
+E legacy               ADAPTED_HIGH    24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.002
+E bounded              ADAPTED_HIGH    24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.002
+E legacy O1e rise-only ADAPTED_HIGH    24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.002
+E bounded O1e rise-only ADAPTED_HIGH    24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.002
+E legacy O2e fall 2xBIC ADAPTED_HIGH    24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.002
+E bounded O2e fall 2xBIC ADAPTED_HIGH    24 |   0%   0% |   0%   0%    - |      -   0% |   0% | -0.002
+
+E legacy               ADAPTED_HIGH_RANGE  24 |  63%   0% |  42%   0%    - | +24.47   0% |   0% | +0.119
+E bounded              ADAPTED_HIGH_RANGE  24 |  63%   0% |  46%   0%    - | +21.69   4% |   4% | +0.119
+E legacy O1e rise-only ADAPTED_HIGH_RANGE  24 |  63%   0% |  42%   0%    - | +24.47   0% |   0% | +0.119
+E bounded O1e rise-only ADAPTED_HIGH_RANGE  24 |  63%   0% |  46%   0%    - | +21.69   4% |   4% | +0.119
+E legacy O2e fall 2xBIC ADAPTED_HIGH_RANGE  24 |  63%   0% |  42%   0%    - | +24.47   0% |   0% | +0.119
+E bounded O2e fall 2xBIC ADAPTED_HIGH_RANGE  24 |  63%   0% |  46%   0%    - | +21.69   4% |   4% | +0.119
+
+== 1b/2 STRENGTH SEARCH (24 blind click rounds at base 55.0 cm/360, pseudo cm/360 = 100 x strength; A/B of the found curve at factor 1) ==
+live offer = interval excludes strength 1.00 and best is a curve; last = best is a curve (Last search screen, exported without A/B); lastHarm = last-offered with A/B worse or benefit < 0; lastBen = median benefit of last-offered;
+O2 asym = falling offered only if interval upper end < 0.90; O3 = falling export needs A/B mean >= 4 pts; O4 = sensitivity search first (20 rounds, 20-140), strength search then played at the found cm/360; O5 = mandatory A/B: export% of every live/last row is the O5 rate (last% is the no-A/B rate)
+low = best <= range low + 0.02
+variant                model           n | offer fallO | expor fallE right | medBen harmE | harmOffer | best median (p25-p75) | edge/direction | last-offer stats
+S 0.70-1.75 live       ADAPTED_HIGH    24 |  29%  21% |   0%   0%    - |      -   0% |  21% | x0.98 (0.71-1.12) | low  29% fall  50% rise  42% | last  92% lastHarm  50% lastBen -21.90
+S 0.70-1.45 live       ADAPTED_HIGH    24 |  38%  29% |   0%   0%    - |      -   0% |  29% | x0.96 (0.80-1.06) | low  13% fall  58% rise  38% | last  96% lastHarm  58% lastBen -24.79
+S O1 1.00-1.75         ADAPTED_HIGH    24 |  71%   0% |  13%   0%    - | +21.55   0% |   0% | x1.39 (1.01-1.66) | low  29% fall   0% rise  71% | last  71% lastHarm   0% lastBen +17.88
+S O2 asym interval     ADAPTED_HIGH    24 |  13%   4% |   0%   0%    - |      -   0% |   4% | x0.98 (0.71-1.12) | low  29% fall  50% rise  42% | last  92% lastHarm  50% lastBen -21.90
+S O3 fall needs 4pts   ADAPTED_HIGH    24 |  29%  21% |   0%   0%    - |      -   0% |  21% | x0.98 (0.71-1.12) | low  29% fall  50% rise  42% | last  92% lastHarm  50% lastBen -21.90
+S O4 two-stage         ADAPTED_HIGH    24 |  75%   0% |  63%   0%    - | +31.47   0% |   0% | x1.29 (1.08-1.74) | low   0% fall   4% rise  88% | last  92% lastHarm   4% lastBen +28.02
+
+S 0.70-1.75 live       ADAPTED_HIGH_RANGE  24 |  21%  13% |   4%   0%    - | +11.48   0% |  13% | x1.00 (0.79-1.33) | low  21% fall  46% rise  46% | last  92% lastHarm  46% lastBen  +1.95
+S 0.70-1.45 live       ADAPTED_HIGH_RANGE  24 |  25%  21% |   0%   0%    - |      -   0% |  21% | x0.99 (0.83-1.20) | low  13% fall  50% rise  46% | last  96% lastHarm  50% lastBen  -4.94
+S O1 1.00-1.75         ADAPTED_HIGH_RANGE  24 |  79%   0% |   4%   0%    - | +12.39   0% |   0% | x1.54 (1.05-1.73) | low  21% fall   0% rise  79% | last  79% lastHarm   0% lastBen +16.88
+S O2 asym interval     ADAPTED_HIGH_RANGE  24 |  21%  13% |   4%   0%    - | +11.48   0% |  13% | x1.00 (0.79-1.33) | low  21% fall  46% rise  46% | last  92% lastHarm  46% lastBen  +1.95
+S O3 fall needs 4pts   ADAPTED_HIGH_RANGE  24 |  21%  13% |   4%   0%    - | +11.48   0% |  13% | x1.00 (0.79-1.33) | low  21% fall  46% rise  46% | last  92% lastHarm  46% lastBen  +1.95
+S O4 two-stage         ADAPTED_HIGH_RANGE  24 |  63%   0% |  38%   0%    - | +20.85   0% |   0% | x1.39 (1.12-1.75) | low   0% fall   8% rise  92% | last 100% lastHarm   8% lastBen +18.88
+
+== NOTES ==
+- Strength search plays click rounds only (flash rounds are not simulated), range 0.70-1.75 is the app range with flash but without the flash rounds.
+- A/B uses alpha 0.01 ungrouped (app default), min effect 2.0 pts, max 12 pairs, looked at after every pair; benefit = independent paired difference (12 pairs) of the same curve on the same continuing person.
+- Search, A/B and benefit rounds of one seed are played by the same simulated person (adaptation state carries on); the error analysis replays the calibration for every distinct curve so each curve meets the same hand.
+- Slope = regression of the binned wanted log gain on ln(speed) (unweighted), median over seeds.
+- O2e is applied as a post-filter: a falling best fit needs bicGain >= 2 x 8.0 (equivalent to a second fitAccel run with the doubled threshold for falling fits). O1e drops fits whose unbounded curve falls between 5 and 30 in/s and re-picks the best remaining family (same thresholds).
+- Falling/rising of an offered curve: multiplier(30) < multiplier(5) of the offered (bounded) curve; for strengths: best < 1.
+- O3 is a re-judging of the same A/B rounds with minEffectPoints 4 for falling curves. O4 benefit is vs plain at the found cm/360, not at base. O5 (mandatory A/B) equals the expor column; the Last search no-A/B rate is the 'last' column.
+- In the strength 'right' column RISING needs a rising export, FALLING a falling export; ADAPTED/FLAT rows have no right direction.
+- Level check conditions with 'const' play a NoAccel curve at base/factor.

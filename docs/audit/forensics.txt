@@ -1,0 +1,201 @@
+weights={ACCURACY=40.0, TIME_TO_HIT=30.0, TRACKING=20.0, FLASH_DODGE=15.0}  settings: dpi=800.0 game=valorant sens=0.335 style=WRIST
+
+=== A. INVENTORY ===
+sessions=16 rounds=117 per kind: [sensitivity=4 sessions/11 rounds, accel_ab=11 sessions/98 rounds, accel_search=1 sessions/8 rounds]
+s1 2026-10-13T00:06Z sensitivity dpi=800 n=2 [flick=2] cm360=[40.8x2] accel=0 blind=0
+s2 2026-10-13T13:27Z sensitivity dpi=800 n=2 [flick=2] cm360=[48.5x1,32.7x1] accel=0 blind=2
+s3 2026-10-13T13:29Z sensitivity dpi=800 n=3 [flick=3] cm360=[57.1x1,68.0x1,47.1x1] accel=0 blind=3
+s4 2026-10-13T14:22Z sensitivity dpi=800 n=4 [flick=1,micro=1,switching=1,tracking=1] cm360=[32.9x1,44.5x1,46.9x1,48.5x1] accel=0 blind=4
+s5 2026-10-13T15:48Z accel_ab dpi=800 n=4 [flick=2,switching=1,micro=1] cm360=[46.5x4] accel=0 blind=4
+s6 2026-10-13T16:00Z accel_ab dpi=800 n=5 [flick=2,switching=2,micro=1] cm360=[46.5x5] accel=0 blind=5
+s7 2026-10-13T21:13Z accel_ab dpi=800 n=8 [flick=3,switching=3,micro=2] cm360=[32.9x8] accel=0 blind=8
+s8 2026-10-15T23:15Z accel_ab dpi=800 n=4 [flick=2,switching=1,micro=1] cm360=[32.9x4] accel=4 blind=4
+s9 2026-10-15T23:20Z accel_ab dpi=800 n=2 [flick=1,flash=1] cm360=[32.9x2] accel=2 blind=2
+s10 2026-10-16T01:18Z accel_ab dpi=800 n=1 [flick=1] cm360=[32.9x1] accel=1 blind=1
+s11 2026-10-16T13:00Z accel_ab dpi=800 n=2 [flick=1,flash=1] cm360=[34.4x2] accel=2 blind=2
+s12 2026-10-17T14:02Z accel_ab dpi=800 n=18 [flick=3,flash=9,switching=3,micro=3] cm360=[34.4x18] accel=17 blind=18
+s13 2026-10-17T14:28Z accel_ab dpi=800 n=48 [flick=8,flash=24,switching=8,micro=8] cm360=[34.4x48] accel=36 blind=48
+s14 2026-10-18T18:06Z accel_search dpi=800 n=8 [flick=2,flash=4,switching=1,micro=1] cm360=[34.4x8] accel=7 blind=8
+s15 2026-10-18T21:08Z accel_ab dpi=800 n=1 [flick=1] cm360=[34.4x1] accel=0 blind=1
+s16 2026-10-19T17:42Z accel_ab dpi=800 n=5 [flick=2,switching=2,micro=1] cm360=[33.1x5] accel=0 blind=5
+rounds with accel != null: 69; by decoded spec (family: params -> n):
+  natural decay=0.050 off=0.00 limit=0.70 -> 22 (sessions 12,13,14)
+  natural decay=0.050 off=0.00 limit=0.71 -> 1 (sessions 13)
+  natural decay=0.050 off=0.00 limit=0.72 -> 6 (sessions 12,13,14)
+  natural decay=0.050 off=0.00 limit=0.73 -> 2 (sessions 13)
+  natural decay=0.050 off=0.00 limit=0.75 -> 2 (sessions 12,14)
+  natural decay=0.050 off=0.00 limit=0.76 -> 1 (sessions 12)
+  natural decay=0.050 off=0.00 limit=0.77 -> 4 (sessions 8,12,13)
+  natural decay=0.050 off=0.00 limit=0.78 -> 1 (sessions 12)
+  natural decay=0.050 off=0.00 limit=0.81 -> 1 (sessions 13)
+  natural decay=0.050 off=0.00 limit=0.84 -> 2 (sessions 8,13)
+  natural decay=0.050 off=0.00 limit=0.86 -> 1 (sessions 10)
+  natural decay=0.050 off=0.00 limit=0.87 -> 3 (sessions 11,12)
+  natural decay=0.050 off=0.00 limit=0.92 -> 1 (sessions 14)
+  natural decay=0.050 off=0.00 limit=0.94 -> 1 (sessions 13)
+  natural decay=0.050 off=0.00 limit=0.96 -> 1 (sessions 8)
+  natural decay=0.050 off=0.00 limit=1.03 -> 1 (sessions 13)
+  natural decay=0.050 off=0.00 limit=1.04 -> 1 (sessions 12)
+  natural decay=0.050 off=0.00 limit=1.05 -> 1 (sessions 11)
+  natural decay=0.050 off=0.00 limit=1.06 -> 1 (sessions 9)
+  natural decay=0.050 off=0.00 limit=1.22 -> 1 (sessions 13)
+  natural decay=0.050 off=0.00 limit=1.24 -> 1 (sessions 13)
+  natural decay=0.050 off=0.00 limit=1.25 -> 2 (sessions 9,12)
+  natural decay=0.050 off=0.00 limit=1.27 -> 1 (sessions 12)
+  natural decay=0.050 off=0.00 limit=1.31 -> 2 (sessions 12)
+  natural decay=0.050 off=0.00 limit=1.32 -> 2 (sessions 12)
+  natural decay=0.050 off=0.00 limit=1.34 -> 1 (sessions 13)
+  natural decay=0.050 off=0.00 limit=1.35 -> 1 (sessions 13)
+  natural decay=0.050 off=0.00 limit=1.36 -> 1 (sessions 12)
+  natural decay=0.050 off=0.00 limit=1.37 -> 2 (sessions 8,12)
+  natural decay=0.050 off=0.00 limit=1.45 -> 2 (sessions 13)
+
+=== B. SEARCHES (scores pooled over all search rounds, per-scenario baselines) ===
+s5 accel_ab: 4 rounds, no search part
+s6 accel_ab: 5 rounds, no search part
+s7 accel_ab: 8 rounds, no search part
+s8 accel_ab: 4 rounds, no search part
+s9 accel_ab: 2 rounds, no search part
+s10 accel_ab: 1 rounds, no search part
+s11 accel_ab: 2 rounds, no search part
+s12 accel_ab: search rounds=18/18 distinctStrengths=15 flashShare=0.50 cm360=34.42
+   0.70:n1/57.8 0.72:n1/58.7 0.75:n1/16.3 0.76:n1/70.1 0.77:n1/53.0 0.78:n1/59.6 0.87:n2/23.1 1.00:n1/24.3
+   1.04:n1/15.0 1.25:n1/38.8 1.27:n1/3.9 1.31:n2/45.6 1.32:n2/41.3 1.36:n1/28.9 1.37:n1/50.0
+s13 accel_ab: search rounds=24/48 distinctStrengths=14 flashShare=0.50 cm360=34.42
+   0.70:n6/67.8 0.71:n1/38.7 0.72:n3/57.9 0.73:n2/68.5 0.77:n2/49.9 0.81:n1/21.3 0.84:n1/89.8 0.94:n1/33.2
+   1.03:n1/43.9 1.22:n1/32.7 1.24:n1/51.0 1.34:n1/45.6 1.35:n1/43.2 1.45:n2/55.4
+s14 accel_search: search rounds=8/8 distinctStrengths=5 flashShare=0.50 cm360=34.42
+   0.70:n3/59.6 0.72:n2/61.8 0.75:n1/45.7 0.92:n1/79.0 1.00:n1/71.1
+s15 accel_ab: 1 rounds, no search part
+s16 accel_ab: 5 rounds, no search part
+cutoff 2026-10-18 20:15 Europe/Berlin = 2026-10-18T18:15:00Z
+(1) ALL rounds via RoundProcessor.lastSearch: dpi=800 cm360=34.42 rounds=50 sessions=3
+   best=0.700 ci=[0.700,1.750] conf=50% excludesPlain=false clear=false atEdge=true range=0.70..1.75
+   offer=natural (strength search) natural;decayRate=0.05;limit=0.7000000000000003;inputOffset=0.0
+(2) rounds before cutoff via StoredSearches.pool: dpi=800 cm360=34.42 rounds=50 sessions=3
+   best=0.700 ci=[0.700,1.750] conf=50% excludesPlain=false clear=false atEdge=true range=0.70..1.75
+   offer=natural (strength search) natural;decayRate=0.05;limit=0.7000000000000003;inputOffset=0.0
+search rounds started after cutoff: 0
+exported file: natural decay 0.05 limit 0.70. Reconstructed (2) offer: natural;decayRate=0.05;limit=0.7000000000000003;inputOffset=0.0 -> matches(limit within 0.005 and decay 0.05)=true
+current (1) offer limit=0.700; Velocity output / DPI 800 are not stored in the DB (not checkable)
+
+=== C. A/B TESTS (tail of accel_ab sessions after the search part, plain vs curve pairs) ===
+s5: searchPart=0 tail=4 pairs=0 distinctCurves=0 [] verdict=n/a (<2 pairs)
+s6: searchPart=0 tail=5 pairs=0 distinctCurves=0 [] verdict=n/a (<2 pairs)
+s7: searchPart=0 tail=8 pairs=0 distinctCurves=0 [] verdict=n/a (<2 pairs)
+s8: searchPart=0 tail=4 pairs=0 distinctCurves=0 [] verdict=n/a (<2 pairs)
+s9: searchPart=0 tail=2 pairs=0 distinctCurves=0 [] verdict=n/a (<2 pairs)
+s10: searchPart=0 tail=1 pairs=0 distinctCurves=0 [] verdict=n/a (<2 pairs)
+s11: searchPart=0 tail=2 pairs=0 distinctCurves=0 [] verdict=n/a (<2 pairs)
+s12: searchPart=18 tail=0 pairs=0 distinctCurves=0 [] verdict=n/a (<2 pairs)
+s13: searchPart=24 tail=24 pairs=12 distinctCurves=1 [natural;decayRate=0.05;limit=0.7000000000000003;inputOffset=] verdict=NO_DIFFERENCE mean=-5.79 ci=[-20.96,9.37]
+s15: searchPart=0 tail=1 pairs=0 distinctCurves=0 [] verdict=n/a (<2 pairs)
+s16: searchPart=0 tail=5 pairs=0 distinctCurves=0 [] verdict=n/a (<2 pairs)
+total pairs across accel_ab sessions=12; accel_search sessions contain no A/B test by design
+
+=== D. ERROR ANALYSIS (lastCalibration path) ===
+setup dpi=800 cm360=33.05 rounds=13 samples=665 sessions=[16, 7] scenarios={switching=5, flick=5, micro=3}
+used=429 (of 665); speed in/s min=3.04 p5=3.23 median=6.69 p95=12.86 max=21.46 binRange=4.05
+bins (speed center in/s, n, wanted logGain, gain, se):
+   3.23  n=42  log=-0.012  gain=0.988  se=0.034
+   3.92  n=43  log=-0.012  gain=0.988  se=0.037
+   4.74  n=43  log=0.010  gain=1.010  se=0.055
+   5.31  n=43  log=0.014  gain=1.014  se=0.045
+   6.38  n=43  log=-0.006  gain=0.994  se=0.027
+   7.02  n=43  log=-0.001  gain=0.999  se=0.039
+   7.89  n=43  log=0.003  gain=1.003  se=0.036
+   9.03  n=43  log=0.002  gain=1.002  se=0.042
+   10.54  n=43  log=0.012  gain=1.012  se=0.030
+   13.10  n=43  log=-0.013  gain=0.987  se=0.032
+fitAccel: reason=NOT_BETTER_THAN_NONE value=0 "No curve fits clearly better than no acceleration."
+   fit classic: bicGain=-9.2 sensFactor=1.022 gainRange=1.000 chi2=0.71 null=0.74 | classic;acceleration=0.20934186376291347;exponent=1.5;inputOffset=0.0;cap=0.97692869756026... | mult@3/6/12/25/50 in/s=0.977/0.977/0.977/0.977/0.977
+   fit natural: bicGain=-6.8 sensFactor=0.909 gainRange=1.011 chi2=0.59 null=0.74 | natural;decayRate=0.0654644558202707;limit=1.1009166957769512;inputOffset=0.0 | mult@3/6/12/25/50 in/s=1.087/1.099/1.101/1.101/1.101
+   fit power: bicGain=-6.9 sensFactor=0.998 gainRange=1.000 chi2=0.71 null=0.74 | power;scale=0.02231301601484299;exponent=0.05;outputOffset=1.0;cap=0.0 | mult@3/6/12/25/50 in/s=1.000/1.000/1.000/1.003/1.022
+best family by bicGain: natural; recommended=none
+LEGACY (unbounded) recommendation: none
+BOUNDED recommendation: none
+
+=== E. CONFOUNDS ===
+--- dataset: D plain click rounds: rounds=13 movements=665 used=429
+E1 corr(ln dist, ln speed)=0.761  corr(ln speed, err)=0.032
+   partial, corr(speed, err) within distance quintiles: [2-11deg n85 r=0.33] [11-16deg n86 r=0.61] [16-23deg n86 r=0.56] [24-33deg n86 r=0.21] [33-81deg n86 r=0.42] mean r=0.427
+E2 slow reaches <3 in/s: 234 of 665; mean signed err by speed: [0-3 n234 mean=-0.042 med=-0.054] [3-6 n182 mean=0.039 med=0.016] [6-12 n210 mean=0.057 med=0.016] [12-25 n39 mean=0.640 med=0.040] [25-inf n0 mean=nan med=nan]
+E3 err per speed quintile (used): [3.0-4.3 in/s mean=0.077] [4.3-5.7 in/s mean=0.005] [5.7-7.5 in/s mean=0.032] [7.5-9.7 in/s mean=0.073] [9.7-21.5 in/s mean=0.063]
+   err per distance quintile (used): [2.3-10.8 deg mean=0.168] [10.8-16.1 deg mean=0.071] [16.2-23.5 deg mean=0.031] [23.5-33.1 deg mean=-0.003] [33.2-81.1 deg mean=-0.016]
+--- dataset: search rounds (all, post-curve errors): rounds=50 movements=1644 used=1006
+E1 corr(ln dist, ln speed)=0.910  corr(ln speed, err)=0.117
+   partial, corr(speed, err) within distance quintiles: [3-12deg n201 r=0.34] [12-17deg n201 r=0.51] [17-29deg n201 r=0.18] [30-68deg n201 r=0.28] [68-162deg n202 r=0.06] mean r=0.274
+E2 slow reaches <3 in/s: 637 of 1644; mean signed err by speed: [0-3 n637 mean=-0.051 med=-0.054] [3-6 n391 mean=-0.004 med=-0.013] [6-12 n334 mean=0.009 med=-0.008] [12-25 n131 mean=0.027 med=-0.002] [25-inf n151 mean=0.045 med=0.013]
+E3 err per speed quintile (used): [3.0-4.3 in/s mean=-0.024] [4.3-6.2 in/s mean=-0.006] [6.3-8.9 in/s mean=0.008] [8.9-18.6 in/s mean=0.028] [18.6-47.4 in/s mean=0.036]
+   err per distance quintile (used): [2.7-11.7 deg mean=0.033] [11.7-17.4 deg mean=0.014] [17.5-29.4 deg mean=-0.017] [29.7-67.7 deg mean=-0.019] [67.9-161.7 deg mean=0.031]
+--- dataset: search rounds, plain only: rounds=2 movements=25 used=25
+E1 corr(ln dist, ln speed)=0.723  corr(ln speed, err)=0.230
+   partial, corr(speed, err) within distance quintiles: [43-66deg n5 r=0.96] [68-91deg n5 r=0.89] [93-100deg n5 r=0.67] [102-122deg n5 r=0.44] [127-159deg n5 r=-0.01] mean r=0.591
+E2 slow reaches <3 in/s: 0 of 25; mean signed err by speed: [0-3 n0 mean=nan med=nan] [3-6 n0 mean=nan med=nan] [6-12 n3 mean=-0.096 med=-0.049] [12-25 n5 mean=0.156 med=0.212] [25-inf n17 mean=0.097 med=0.043]
+E3 err per speed quintile (used): [9.1-20.6 in/s mean=0.035] [21.8-25.3 in/s mean=0.033] [26.1-27.7 in/s mean=0.172] [30.4-32.1 in/s mean=0.155] [32.3-39.5 in/s mean=0.034]
+   err per distance quintile (used): [42.5-65.5 deg mean=0.206] [67.7-91.1 deg mean=0.088] [93.1-100.3 deg mean=0.149] [101.9-121.6 deg mean=0.062] [126.8-158.7 deg mean=-0.076]
+E4 scenario mix per strength band (search rounds): n | scenario counts | mean score per scenario
+   <=0.80 n=26 | flash:11 flick:5 micro:5 switching:5 | flash:58.4 flick:58.1 micro:59.7 switching:57.8
+   0.80-0.90 n=4 | flash:3 flick:1 | flash:44.6 flick:23.3
+   0.90-0.98 n=2 | flash:2 | flash:56.1
+   plain n=2 | flash:2 | flash:47.7
+   1.02-1.10 n=2 | flash:1 flick:1 | flash:15.0 flick:43.9
+   1.10-1.25 n=2 | flash:1 switching:1 | flash:51.0 switching:32.7
+   >1.25 n=12 | flash:5 flick:2 micro:3 switching:2 | flash:40.4 flick:52.3 micro:40.2 switching:33.8
+E5 report timestamps of accel rounds (consecutive recorded events): share<=0ms, median ms, p99 ms, share>2ms
+   all accel rounds (69): events=1226232 zero/neg=0.00% med=1.01 p99=21.00 >2ms=18.9%
+   plain rounds (48) for comparison: events=1068184 zero/neg=0.00% med=1.00 p99=14.00 >2ms=15.7%
+   s8 (4): events=60457 zero/neg=0.00% med=1.01 p99=31.96 >2ms=26.2%
+   s9 (2): events=38284 zero/neg=0.00% med=1.00 p99=18.00 >2ms=17.3%
+   s10 (1): events=16528 zero/neg=0.00% med=1.01 p99=27.00 >2ms=26.7%
+   s11 (2): events=36402 zero/neg=0.00% med=1.00 p99=23.01 >2ms=16.4%
+   s12 (17): events=304326 zero/neg=0.00% med=1.01 p99=21.01 >2ms=18.3%
+   s13 (36): events=648356 zero/neg=0.00% med=1.01 p99=19.99 >2ms=18.6%
+   s14 (7): events=121879 zero/neg=0.00% med=1.01 p99=21.97 >2ms=18.9%
+   worst round by zero share: r29: events=14617 zero/neg=0.00% med=1.01 p99=39.03 >2ms=25.3%
+E6 drift per session (scores per E-scoring: search rounds pooled, others per session): n, slope score/round, slope meanFirstErr/round, mean score first/last third
+   s7 accel_ab n=6 slopeScore=-3.611 slopeErr=-0.0457 first3rd=50.1 last3rd=27.8
+   s12 accel_ab n=18 slopeScore=1.125 slopeErr=-0.0030 first3rd=34.9 last3rd=48.7
+   s13 accel_ab n=48 slopeScore=-0.094 slopeErr=-0.0010 first3rd=54.2 last3rd=43.6
+   s14 accel_search n=8 slopeScore=-1.134 slopeErr=-0.0009 first3rd=62.3 last3rd=56.9
+E7 level test: score vs effective mean gain delivered (distance-weighted mean of curve multiplier over reports)
+   n=50 effGain min=0.731 mean=0.949 max=1.322
+   linear score = 47.8 + -39.5 * ln(g)  r=-0.322
+   quadratic a2=-4.3 (concave=true); argmax effGain=0.010 inObservedRange=false
+   for comparison, quadratic in ln(strength): argmax strength=none (convex)  corr(ln strength, ln effGain)=0.884
+   scenario flick n=9: slope=-28.6 r=-0.197
+   scenario flash n=25: slope=-33.3 r=-0.349
+   scenario switching n=8: slope=-79.8 r=-0.473
+   scenario micro n=8: slope=-170.0 r=-0.393
+   effGain per band: <=0.80:0.835 0.80-0.90:0.866 0.90-0.98:0.932 plain:1.000 1.02-1.10:1.033 1.10-1.25:1.167 >1.25:1.169
+   speed distribution search rounds: <5=20.5% 5-10=13.3% 10-20=23.2% 20-40=39.3% >40=3.8% (raw pre-curve speed, distance weighted)
+   speed distribution D rounds:      <5=58.0% 5-10=30.4% 10-20=11.4% 20-40=0.3% >40=0.0% (raw pre-curve speed, distance weighted)
+   speed distribution search/flick: <5=65.9% 5-10=27.0% 10-20=6.9% 20-40=0.1% >40=0.1% (raw pre-curve speed, distance weighted)
+   speed distribution search/flash: <5=11.5% 5-10=10.5% 10-20=26.0% 20-40=47.4% >40=4.6% (raw pre-curve speed, distance weighted)
+   speed distribution search/switching: <5=51.5% 5-10=34.1% 10-20=14.1% 20-40=0.2% >40=0.1% (raw pre-curve speed, distance weighted)
+   speed distribution search/micro: <5=99.5% 5-10=0.5% 10-20=0.0% 20-40=0.0% >40=0.0% (raw pre-curve speed, distance weighted)
+
+=== F. GROSS FIRST-ERROR (plain rounds, accel == null; signed ratio, <0 undershoot, >0 overshoot) ===
+all plain: rounds=48 movements=2264 mean=0.009 median=-0.007 | used(1753) mean=0.011 median=-0.000
+   flash n=92 mean=0.014 median=-0.005 usedMean=0.016
+   flick n=1015 mean=0.018 median=-0.001 usedMean=-0.002
+   micro n=503 mean=-0.025 median=-0.044 usedMean=0.048
+   switching n=654 mean=0.019 median=-0.002 usedMean=0.020
+sensitivity-kind: rounds=11 movements=534 mean=-0.006 median=-0.005 | used(508) mean=-0.009 median=-0.004
+   flick n=402 mean=-0.007 median=-0.003 usedMean=-0.015
+   micro n=61 mean=-0.019 median=-0.064 usedMean=0.023
+   switching n=71 mean=0.011 median=-0.001 usedMean=0.011
+accel-session plain: rounds=37 movements=1730 mean=0.013 median=-0.008 | used(1245) mean=0.019 median=0.001
+   flash n=92 mean=0.014 median=-0.005 usedMean=0.016
+   flick n=613 mean=0.035 median=-0.000 usedMean=0.010
+   micro n=442 mean=-0.026 median=-0.044 usedMean=0.056
+   switching n=583 mean=0.020 median=-0.003 usedMean=0.021
+
+=== G. BLIND SENSITIVITY FINDER (kind sensitivity) ===
+sessions=4 rounds=11 blind=9 byScenario={flick=8, micro=1, switching=1, tracking=1} games=[null, valorant] dpis=[800]
+played cm360: min=32.71 max=68.03 median=46.92 distinct(0.1)=9
+current setting: sens=0.335 -> cm360=48.74
+blind rounds for game=valorant dpi=800: 9; search range 20.00..77.99
+optimum cm360=33.05 (Valorant sens 0.494) ci=[21.17,46.82] cm360 = sens [0.349,0.771] conf=17% atEdge=false drift=false regret=5.93 moreRounds=true
+flick first-movement peak speed in/s (n=402): p10=8.2 p50=13.4 p90=22.3
+all click scenarios (n=534): p10=4.5 p50=12.2 p90=21.3
