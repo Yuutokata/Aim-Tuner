@@ -180,7 +180,16 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
   - judge how the bounded curve feels on fast flicks;
   - optionally compare blind with `--curve-finder legacy` over several days.
 
+### M16 Curve finder safety (docs/CURVE-FINDER-AUDIT.md; implemented, waiting for the user's hands-on test)
+- [x] Curve runs are played at the configured game sensitivity (cm/360° from the settings); the finder's optimum only with confidence >= 50 % and the intro checkbox (`AccelBaseline`, `FinderResult`, `AppContext.useFinderResult`, not persisted); starting needs a configured setup, not a stored blind result
+- [x] The intro's baseline card shows cm/360° and the game sensitivity and whether it is the game's or the finder's; prior search and calibration rounds are looked up at the chosen sensitivity
+- [x] Falling strengths count as clear only with the upper end of the range below `CurveStrength.FALLING_MAX_HIGH` (0.90), `CurveStrength.excludesPlain`, used by `StrengthSearch.result()`
+- [x] "Last search" and "Last analysis" no longer export or copy; a "not confirmed" card and the blind-test button only; "Last search" offers a curve only when clear and explains an unclear result
+- [x] ALGORITHMS ("Curve safety", pairs 10 -> 12), SPEC updated; tests for the choice, the rule and the offer
+
 ## Last session
+
+- M16 Curve finder safety (requested after the audit of the user's real runs: the curves were played at the finder's low-confidence 0.474 instead of the 0.335 in the game, and "Last search" exported an unconfirmed falling curve whose range included "no curve"): see the M16 checklist. Not tried on real data yet.
 
 - Sound and brightness settings (requested: the flash sounds were too loud and the white-out of a flash hurt the eyes): `AppSettings.flashVolumePercent` (default 60), `hitVolumePercent` (100) and `flashBrightnessPercent` (default 50, 10 to 100), edited on a new screen `SoundSettingsScreen` ("Volume and brightness", button in the footer of the settings; sliders, a Play button per sound and a swatch of the white-out level; the values are kept when the screen is left). `FlashSounds.play(event, gain)`, `HitSounds.onShot(result, gain)` and `TrainerScene.whiteOutLevel` (the white-out is now a grey of that level, 100 % is the old plain white) use them; `AppSettings.fraction` turns a percent into a safe 0..1 factor. Older settings files get the new defaults, so the flash is quieter and dimmer without any action. Tests: `SettingsStoreTest`; screenshot step `sound-settings` (EN/DE). Open (user): judge in play whether 60 % and 50 % feel right; the orb that is visible before the pop is still white.
 

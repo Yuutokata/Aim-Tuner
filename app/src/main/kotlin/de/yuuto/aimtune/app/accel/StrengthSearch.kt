@@ -17,7 +17,7 @@ data class StrengthResult(
     val high: Double,
     val confidencePercent: Int,
     val rounds: Int,
-    /** True when the credible range lies on one side of "no curve" and the strength is a real curve. */
+    /** True when the credible range clearly excludes "no curve" ([CurveStrength.excludesPlain]: above 1, or below the falling limit). */
     val excludesPlain: Boolean,
     /** True when the best strength is at an end of the searched range, so a stronger curve may do better. */
     val atEdge: Boolean,
@@ -81,9 +81,8 @@ class StrengthSearch(
         val strength = CurveStrength.fromPseudo(analysis.optimumCm360)
         val low = CurveStrength.fromPseudo(analysis.intervalLowCm360)
         val high = CurveStrength.fromPseudo(analysis.intervalHighCm360)
-        val side = low > CurveStrength.NEUTRAL || high < CurveStrength.NEUTRAL
         return StrengthResult(
-            strength, low, high, analysis.confidencePercent, prior.size + roundsPlayed, side && CurveStrength.isCurve(strength), analysis.atRangeEdge,
+            strength, low, high, analysis.confidencePercent, prior.size + roundsPlayed, CurveStrength.excludesPlain(strength, low, high), analysis.atRangeEdge,
             CurveStrength.fromPseudo(range.minCm360), CurveStrength.fromPseudo(range.maxCm360),
         )
     }

@@ -121,6 +121,9 @@ class AppContext(
      */
     var usePriorSearch = true
 
+    /** Whether the curve runs are played at the finder's result instead of the game sensitivity; only honoured when that result is confident. */
+    var useFinderResult = false
+
     val isSetUp: Boolean
         get() = SetupDraft.fromSettings(settings.current).let { draft -> SetupStep.entries.all { draft.issue(it, profiles) == null } }
 
@@ -219,11 +222,21 @@ class AppContext(
 
     private class StoredAnalysis(val config: TrainerConfig, val weights: MetricWeights, val rounds: List<PastRound>, val result: OptimizationResult?)
 
-    /** The sensitivity the acceleration steps start from: the optimizer's result over the stored blind rounds, if there is one. */
+    /**
+     * The sensitivity the acceleration steps are played at: the configured game sensitivity, plus the finder's result for
+     * the player to choose; null until the setup is complete.
+     */
     fun accelBaseline(): AccelBaseline? {
-        val stored = storedAnalysis() ?: return null
-        val result = stored.result ?: return null
-        return AccelBaseline(result.optimumCm360, result.confidencePercent, stored.rounds.size, processor.priorSearch(stored.config.dpi, result.optimumCm360).size)
+        val config = trainerConfig() ?: return null
+        val setup = settings.current
+        val sensitivity = setup.inGameSensitivity ?: return null
+        val finder = storedAnalysis()?.let { stored ->
+            stored.result?.let {
+                val sensitivity = config.profile.formatSensitivity(config.profile.sensitivityFor(config.dpi, it.optimumCm360))
+                FinderResult(it.optimumCm360, it.confidencePercent, stored.rounds.size, sensitivity, processor.priorSearch(config.dpi, it.optimumCm360).size)
+            }
+        }
+        return AccelBaseline(config.cm360, config.profile.formatSensitivity(sensitivity), config.profile.name, finder, processor.priorSearch(config.dpi, config.cm360).size)
     }
 
     /** Volume of the flash and hit sounds and the brightness of the flash white-out. */
@@ -267,17 +280,17 @@ class AppContext(
     /** Whether curves are bounded to the measured speeds (curve finder v2); the launch option overrides the setting. */
     val boundedCurves: Boolean get() = (options.curveFinder ?: settings.current.curveFinder) == CurveFinder.V2
 
-    /** Starts the acceleration steps at the recommended sensitivity; back to the intro if there is none yet. */
+    /** Starts the acceleration steps at the game sensitivity (or the finder's confident result, if chosen); onboarding until the setup is complete. */
     fun startAccelRun(search: Boolean = false) {
         if (!source.hasReportTimestamps) return showAccel()
-        val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
-        val result = stored.result ?: return showAccel()
-        val base = stored.config.copy(cm360 = result.optimumCm360)
+        val baseline = accelBaseline() ?: return showOnboarding(afterFinish = ::showMenu)
+        val config = trainerConfig() ?: return showOnboarding(afterFinish = ::showMenu)
+        val base = config.copy(cm360 = baseline.cm360(useFinderResult))
         // A run looks for the earlier rounds of what it starts with: the calibration or the search.
         val prior = if (search) PriorCalibration.NONE else processor.priorCalibration(base.dpi, base.cm360)
         val priorSearch = if (search && usePriorSearch) processor.priorSearch(base.dpi, base.cm360) else emptyList()
         val run = AccelRun(
-            base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, prior = prior, startWithSearch = search,
+            base, metricWeights(), runKey = System.currentTimeMillis(), seed = nextSeed++, prior = prior, startWithSearch = search,
             flash = settings.current.flashImportance() != FlashImportance.NEVER, priorSearch = priorSearch,
             boundedCurves = boundedCurves,
         )
@@ -348,14 +361,5 @@ class AppContext(
 
     val currentScreen: Screen? get() = game.screen
 }
-
-/** The sensitivity the acceleration steps start from, with how sure the optimizer is about it. */
-data class AccelBaseline(
-    val cm360: Double,
-    val confidencePercent: Int,
-    val rounds: Int,
-    /** Stored search rounds at this setup that a new strength search could build on. */
-    val searchRounds: Int = 0,
-)
 
 private val APP_VERSION = AppVersion.current
