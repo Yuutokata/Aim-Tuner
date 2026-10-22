@@ -43,6 +43,9 @@ object RawAccelExport {
     const val RAW_ACCEL_VERSION = "1.7.1"
     const val PROFILE_NAME = "AimTune"
 
+    /** Speed (in/s) of the extra lut point that holds the last value; far beyond any hand movement. */
+    const val FLAT_TAIL_SPEED = 10_000.0
+
     private val pretty = Json { prettyPrint = true }
 
     /** Raw Accel writes its own file with two-space indentation. */
@@ -244,7 +247,13 @@ object RawAccelExport {
         }
         // lut reads only "data": x1, y1, x2, y2, ... (speed in in/s, multiplier, since "Gain / Velocity" is false);
         // wrapper.cpp takes the array's length as the table size (common/accel-lookup.hpp, v1.7.1).
-        val table = (curve as? LookupCurve)?.let { lut -> lut.speeds.indices.flatMap { listOf(lut.speeds[it], lut.multipliers[it]) } } ?: emptyList()
+        // Above its last point Raw Accel continues the line through the last two points (lerp with t > 1,
+        // accel-lookup.hpp:36-43, 83-89), while LookupCurve holds the last value; a far point with the same
+        // value makes the last segment flat, so the driver plays what was tested.
+        val table = (curve as? LookupCurve)?.let { lut ->
+            val points = lut.speeds.indices.flatMap { listOf(lut.speeds[it], lut.multipliers[it]) }
+            if (lut.speeds.size < LookupCurve.MAX_POINTS && lut.speeds.last() < FLAT_TAIL_SPEED) points + listOf(FLAT_TAIL_SPEED, lut.multipliers.last()) else points
+        } ?: emptyList()
         return buildJsonObject {
             put("mode", mode)
             // true would be the Gain form; the curves here are sensitivity multipliers per speed.

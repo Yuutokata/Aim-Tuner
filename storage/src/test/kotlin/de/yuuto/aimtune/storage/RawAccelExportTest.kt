@@ -120,11 +120,19 @@ class RawAccelExportTest {
         assertEquals("lut", args.getValue("mode").jsonPrimitive.content)
         assertEquals(false, args.getValue("Gain / Velocity").jsonPrimitive.boolean)
         val data = (args.getValue("data") as JsonArray).map { it.jsonPrimitive.double }
-        assertEquals(6, data.size)
-        assertEquals(listOf(2.0f, 0.9f, 4.5f, 1.1f, 9.0f, 1.3f), data.map { it.toFloat() })
+        // The three points plus the flat tail that keeps Raw Accel from extrapolating past the last one.
+        assertEquals(listOf(2.0f, 0.9f, 4.5f, 1.1f, 9.0f, 1.3f, RawAccelExport.FLAT_TAIL_SPEED.toFloat(), 1.3f), data.map { it.toFloat() })
 
         val (curve, factor) = RawAccelExport.parse(RawAccelExport.settingsJson(lut, 800.0, 0.9))
-        assertEquals(lut, curve)
+        for (speed in listOf(1.0, 3.0, 9.0, 40.0, 400.0)) assertEquals(lut.multiplier(speed), curve.multiplier(speed), 1e-6)
         assertEquals(0.9, factor, 1e-9)
+    }
+
+    @Test
+    fun `raw accel plays an exported lookup curve as tested, also above its last point`() {
+        val lut = LookupCurve(listOf(2.0, 4.5, 9.0), listOf(0.9, 1.1, 1.3))
+        val file = RawAccelImport.parse(RawAccelExport.settingsJson(lut, 800.0, 1.0))
+        val driver = (RawAccelImport.profile(file, RawAccelExport.PROFILE_NAME) as RawAccelImportResult.Imported).profile.curve
+        for (speed in listOf(1.0, 2.0, 3.0, 9.0, 12.0, 40.0, 400.0)) assertEquals(lut.multiplier(speed), driver.multiplier(speed), 1e-6, "at $speed in/s")
     }
 }

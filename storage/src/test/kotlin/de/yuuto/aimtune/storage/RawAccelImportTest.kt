@@ -148,7 +148,8 @@ class RawAccelImportTest {
         val text = RawAccelExport.settingsJson(LookupCurve(listOf(2.0, 4.5, 9.0), listOf(0.9, 1.1, 1.3)), 800.0, 0.9)
         val result = assertIs<RawAccelImportResult.Imported>(RawAccelImport.profile(RawAccelImport.parse(text), RawAccelExport.PROFILE_NAME, 800.0))
         assertEquals(RawAccelMode.LUT, result.profile.args.mode)
-        assertEquals(listOf(2f, 0.9f, 4.5f, 1.1f, 9f, 1.3f), result.profile.args.lut)
+        // The export appends a flat tail point (RawAccelExport.FLAT_TAIL_SPEED) so the driver does not extrapolate.
+        assertEquals(listOf(2f, 0.9f, 4.5f, 1.1f, 9f, 1.3f, RawAccelExport.FLAT_TAIL_SPEED.toFloat(), 1.3f), result.profile.args.lut)
         assertEquals(0.9f.toDouble() * 0.9, result.profile.totalMultiplier(2.0), 1e-9) // table y at 2 in/s times 720 / 800
     }
 }
