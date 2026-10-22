@@ -109,3 +109,17 @@ Preliminary, `verified: false`; details in `tools/range-re/out/range-summary.md`
 - Played run: a new bot about 1.8 s after the previous one (p25 1.25, p75 2.46, n = 19), a shot bot lives 1.4 s median; 23 kills in 39 s; bearing -51 to +81 deg; distance roughly 3-19 m (assumed bot height).
 - Turn calibration: 351.5 deg per measured turn (97.6 %), FOV 103 at 1920 px consistent.
 - Not measured: eye height (the eye-height clip is a normal run), head hitbox, HP. The user said the reconstruction need not be exact, so these stay assumptions from the profile.
+
+## Behaviour spec (step 4, decided 2026-10-22)
+
+The user asked for a close reconstruction, not an exact one. Values marked (m) are measured from the clips of 2026-10-22, (a) are assumptions, all `verified: false` in the profile.
+
+- **Round:** a Range round is one AimTune round (`ROUND_SECONDS`, 45 s) of continuous Eliminate: bots keep coming until the time is up; the round's REMAINING-style counter shows kills. A full Eliminate 100 run is not a round (it would take about 3 minutes and give the optimizer one value); a later "Range challenge" menu entry can play 100 bots for fun without feeding the finders.
+- **Bots alive:** one at a time (m: one visible in idle and almost always in the run).
+- **Next spawn:** 0.4 s after a kill, spread 0.2-0.8 s (m: spawn-to-spawn 1.8 s median minus shot lifetime 1.4 s).
+- **Lifetime when not killed:** none by default (m: an unshot bot stayed 44 s with no Speed selected). Speed presets for later: Easy 3.0 s, Medium 2.0 s, Hard 1.2 s (a, not measured; a bot that despawns counts as a miss).
+- **Position:** bearing uniform -50 to +80 deg from the counter's forward direction (m: -51 to 81), distance 5-20 m, log-uniform (m, rough: median 6.8, 3-19), standing on the floor (eye height 1.6 m, a).
+- **Strafe (Bots = Strafe):** move-stop-move: moving segments 0.25-0.5 s (m: median 0.36), stops 0.1-0.3 s (m: 0.2), direction reverses with probability 0.6 after each stop, otherwise continues; speed 2.5 m/s (m: about 12 deg/s at about 12 m; a: the distance), strafe stays within +-2 m of the spawn point. "Reset" bots stand still (m).
+- **Hitboxes and kill rule:** humanoid of 1.8 m (a), head sphere about 0.25 m wide (profile `clickTargetDiameterDegrees` decides the angular size per distance as today, a). Bot Armor on: a head hit kills; body hits kill after 4 (a: Vandal against 100 HP + 50 armor). Armor off: 3 body hits (a).
+- **Metrics per bot:** time to kill (spawn to kill), first-reach error against the target position at the end of the reach (needs M15a), first-shot head accuracy, shots per kill; per round: kills and mean time to kill. Score metrics: ACCURACY (first-shot head hits) and TIME_TO_HIT (time to kill) as for flicks, with a `range` scenario baseline.
+- **Curve finder:** Range rounds go into the score-based searches (strength search, A/B). Their reaches enter the error analysis only when the bot was stopped during the whole first reach (M15a filter).
