@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.app.accel
 
+import de.yuuto.aimtune.core.accel.RawAccelCapMode
 import de.yuuto.aimtune.core.accel.RawAccelMode
 import de.yuuto.aimtune.core.accel.RawAccelProfile
 import java.util.Locale
@@ -28,7 +29,10 @@ object RefineDiff {
         val lines = mutableListOf("${a.mode.json} (${if (a.gain) "Gain" else "Velocity"})")
         when (a.mode) {
             RawAccelMode.CLASSIC -> {
-                lines += "inputOffset ${number(a.inputOffset)}  acceleration ${number(a.acceleration)}  exponent ${number(a.exponentClassic)}"
+                // With cap mode in_out Raw Accel ignores the file's acceleration and derives it from the cap point.
+                val acceleration = profile.curve.derivedAcceleration ?: a.acceleration
+                val derived = if (a.capMode == RawAccelCapMode.IN_OUT) " (from the cap)" else ""
+                lines += "inputOffset ${number(a.inputOffset)}  acceleration ${number(acceleration)}$derived  exponent ${number(a.exponentClassic)}"
                 lines += "cap ${number(a.capX)} / ${number(a.capY)} (${a.capMode.json})"
             }
             RawAccelMode.NATURAL -> lines += "inputOffset ${number(a.inputOffset)}  decayRate ${number(a.decayRate)}  limit ${number(a.limit)}"
