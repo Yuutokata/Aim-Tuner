@@ -211,7 +211,7 @@ More rounds are recommended while the confidence is under 85 %; "about N more ro
 
 ## Range mode (M15c)
 
-**Scenario.** `RangeScenario` (`ScenarioKind.RANGE`, id `range`, opt-in, not in the default schedule) plays the behaviour spec of docs/RANGE.md: one bot at a time, the first at the start of the round, the next 0.2-0.8 s after a kill (or a despawn) at a bearing of -50 to +80 degrees from the forward direction (uniform) and 5-20 m on the floor (log-uniform), standing on the floor (head centre 1.675 m above the feet, eye height 1.6 m of the profile). With Bots = Strafe it moves with `StrafeMotion` (same planned legs, logged as waypoints of the head, seeded from the round seed and the bot id), with Reset it stands. Speed presets make an unshot bot leave after 3.0 (Easy), 2.0 (Medium) or 1.2 s (Hard); the default is no limit. All values are in the profile's `trainer.range` block, each with a source note and `verified: false` (the loader refuses a block without a note per value, and a game without the block has no Range mode).
+**Scenario.** `RangeScenario` (`ScenarioKind.RANGE`, id `range`, opt-in until M15d, now part of the default set for games with a Range block, see "Range mode (M15d)") plays the behaviour spec of docs/RANGE.md: one bot at a time, the first at the start of the round, the next 0.2-0.8 s after a kill (or a despawn) at a bearing of -50 to +80 degrees from the forward direction (uniform) and 5-20 m on the floor (log-uniform), standing on the floor (head centre 1.675 m above the feet, eye height 1.6 m of the profile). With Bots = Strafe it moves with `StrafeMotion` (same planned legs, logged as waypoints of the head, seeded from the round seed and the bot id), with Reset it stands. Speed presets make an unshot bot leave after 3.0 (Easy), 2.0 (Medium) or 1.2 s (Hard); the default is no limit. All values are in the profile's `trainer.range` block, each with a source note and `verified: false` (the loader refuses a block without a note per value, and a game without the block has no Range mode).
 
 **Hit model.** The `Target` of the scenario is the head sphere (0.25 m wide, so its angular size follows from the distance, 0.7-2.9 degrees; the click targets of the other scenarios draw the angular size independently of the distance, the bot does not). Below it `BotShape` puts a body capsule (radius 0.2 m, from the soles to a neck gap under the head) for torso and legs, and the renderer draws the same proportions. A shot is tested at the bot where it is at the time of the shot (as in "Moving targets"): head first, then body. A head hit kills; a body hit kills with the 4th hit (armor on) or the 3rd (armor off, not in the settings yet), otherwise it is only counted.
 
@@ -253,6 +253,29 @@ flat            with range: micro/flash/range/flick               1.67  14/16
 ```
 
 Reading it honestly: (a) the DEFAULT flat player gets no false curve offer in any arm (0 of 30), and none of the roughly 24 range movements per mixed run reaches the analysis (the filter works). The flat player with a range effect (`rangeBias` 0.05) is a false offer in 30 of 30 runs already without range rounds and in 29 of 30 with them, so range rounds do not cause it: this is the known weakness of the legacy analysis against a range effect that flick, switching and micro rounds already trigger (the app uses the V2 finder by default, which this gate does not run); the requirement "0 of n" is therefore met for the default player and not for the range-effect player, with or without range. (b) Range rounds alone find the sensitivity badly (median 112.8 for an optimum of 50, error factor 2.26, confidence 46): only 4-7 kills per round give a noisy score, and the simulated hand favours slow movements against strafing bots (as for micro-strafe in M15a). Mixed with flick the median is 55.1 (factor 1.24) against 49.6 (factor 1.10) for flick only, so range rounds make the sensitivity search worse in the simulation and should stay opt-in until real rounds show otherwise (M15d). (c) Rising and falling gain (+-30 %) is found in 16 of 16 searches without range rounds and in 15 and 16 of 16 with them; the flat player gets a false direction in 9 of 16 searches without and 14 of 16 with range rounds (both high: the rough thresholds 1.15 and 0.90 are inside what a 24-round search can resolve, and the range rounds push the found strength up, median 1.67 against 1.14). So detection is not harmed, but range rounds raise the false-direction rate of the strength search in the simulation; this is to be checked with real rounds before range becomes the default.
+
+## Range mode (M15d)
+
+**Defaults.** A game with a `trainer.range` block starts with the scenarios flick, range and flash (flash plays by its importance setting, as before); a game without it keeps flick and flash. Fresh settings, "Reset to defaults" and onboarding use this; a settings file that already holds scenarios keeps them (no migration), and the settings tile still switches Range. The main menu entry "Range mode" starts the normal blind sensitivity test with the schedule range + flick (50 % each, no flash, no tracking) independent of the saved toggles; rounds are stored in the same session kind and enter the sensitivity model like any blind round.
+
+**The curve finder stays without Range.** The M15c gate gave more false directions for flat players when range rounds were in the strength search (9 of 16 without, 14 of 16 with). `AccelRun` and `RefineEngine` therefore keep their fixed lists (flick, switching, micro, flash), and `AccelRunTest` guards that none contains `RANGE`.
+
+**Gate again with the slower strafe** (bots move 40 % of the time at 2.2 m/s with 0.3-0.7 s stops; `M15cGateTest` at git 14c83dc plus uncommitted M15d changes). The gate builds its scenarios from `RangeGeometry()` defaults, which still held the old strafe (2.5 m/s, stops 0.1-0.3 s) when the strafe fix went into `valorant.json` only: a first re-run reproduced the old numbers exactly, so the defaults were aligned with the profile and the gate was run again. Old (919f59b) against new:
+
+| measure | old strafe | slower strafe |
+| --- | --- | --- |
+| false offers, default flat player (legacy analysis), any arm | 0/30 | 0/30 |
+| range-effect player, flick/switching/micro, with range | 30/30, 29/30 | 30/30, 30/30 |
+| kills per range round | 6.1-6.2 | 15.1-15.2 |
+| range movements per mixed run / entering the analysis | 24.2 / 0.0 | 59.0 / 2.9 |
+| (b) range only, median for 50 (error factor) | 112.8 (x2.26) | 86.8 (x1.74) |
+| (b) flick + range, median (error factor, confidence) | 55.1 (x1.24, 46) | 60.3 (x1.22, 49) |
+| (b) flick only | 49.6 (x1.10, 64) | 49.6 (x1.10, 64) |
+| (c) rising +30 %, with range: median, direction | 2.00, 15/16 | 1.59, 15/16 |
+| (c) falling -30 %, with range | 0.73, 16/16 | 0.76, 16/16 |
+| (c) flat, false direction without / with range | 9/16 / 14/16 | 9/16 / 14/16 |
+
+Reading it: the default flat player still gets no false offer (0/30), so nothing was tuned. With the slower bots the simulated player kills 2.5 times as many (15 per round, still above the real 1.4 s per bot only by a factor of about 3 in time), and 2.9 range movements per run (reaches toward a bot that stood the whole reach) now enter the analysis; they did not produce a false offer for the default player. Flick + range finds the optimum as before (55 to 60 against 50, the flick-only result stays better), and the false directions of the strength search with range rounds are unchanged, which is why the curve finder excludes them. The aimer is still not calibrated against real play.
 
 ## Flash turn-away (M10)
 

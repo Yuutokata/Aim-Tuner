@@ -213,11 +213,13 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 - [x] 4 REA pass (behaviour spec in RANGE.md, decided 2026-10-22)
 - [x] M15a moving-target metrics: `StrafeMotion`, scenarios `micro-strafe` and `switch-strafe` (opt-in tiles in settings), metrics against the target at the end of the reach with lead and aim components, curve-analysis filter, strafing simulated aimer; gate `M15aGateTest` passed (static metrics identical, no false offers from strafing rounds); ALGORITHMS "Moving targets"
 - [x] 5 Integration, part M15c Range scenario: `trainer.range` profile block (all `verified: false`), `RangeScenario`, bot hit model, range metrics and score inputs, humanoid bot and lanes in the trainer, settings tile (speed, bots), simulated aimer, gate `M15cGateTest` run once (ALGORITHMS "Range mode (M15c)")
-- [ ] 5b M15d: make Range the default round type, menu entry "Range mode" with the flows, after the user's test
+- [x] 5b M15d: Range is in the default scenarios of games with a Range block (existing settings keep theirs), menu entry "Range mode" (M) starts a blind test of range + flick, the curve finder stays without Range (test-guarded), gate re-run with the slower strafe: default flat player 0/30 (ALGORITHMS "Range mode (M15d)")
 - [ ] 6 Docs, screenshot tour EN/DE
 - [ ] Open (user): record the clips from RECORDING.md
 
 ## Last session
+
+- M15d Range mode as a standard round (branch `feature/m15d-range-default`): defaults flick + range + flash for games with a range block (`AppSettings.defaultScenarios`, used by reset; onboarding drops range for games without it; saved settings are not migrated), main menu entry "Range mode" (M, pre-test notice with the speed/bots line, `AppContext.startBlindTest(rangeMode = true)` reuses the blind run with schedule range + flick), curve finder untouched and guarded by `AccelRunTest`. The M15c gate first reproduced the old numbers because `RangeGeometry()` defaults still had the old strafe; aligned them with the profile and re-ran: default flat player 0/30, flick + range median 60.3 (was 55.1), strength-search false directions with range 14/16 (unchanged). Main menu items are now 72 high with 8 gaps so that seven fit at 1080p. Open: armor setting not exposed, aimer not calibrated, head hitbox and eye height unmeasured, real play of the default mix not yet judged by the user.
 
 - Layout fix (reported: the buttons of the acceleration screen were below the screen): the screen frame (`Widgets.frame`) puts the content into a vertical scroll pane with a thin knob (style `Styles.FRAME_SCROLL`, wheel works on hover, no drag scrolling), so the footer always stays visible on small screens or with UI scaling; the acceleration intro has two columns (text and "Refine my Raw Accel curve" left, starting point and checks right). Settings with the range rows now scrolls. Range rounds are not part of the curve finder (its scenarios are fixed: flick, switching, micro and flash).
 
