@@ -36,7 +36,7 @@ data class AppSettings(
     val roundSeconds: Int = DEFAULT_ROUND_SECONDS,
     val metricWeights: Map<String, Double> = DEFAULT_WEIGHTS,
     /** Ids of the scenarios a blind test plays ([ScenarioKind.id]); how often each is played follows [metricWeights]. */
-    val scenarios: List<String> = DEFAULT_SCENARIOS,
+    val scenarios: List<String> = DEFAULT_SCENARIOS_WITH_RANGE,
     /** Play the cue sounds of the flash scenario (alert, whine, pop, ringing). */
     val flashSound: Boolean = true,
     /** Play a short sound for every hit; it rises with a streak of hits. */
@@ -147,6 +147,14 @@ data class AppSettings(
         fun fraction(percent: Int): Float = percent.coerceIn(0, 100) / 100f
         val DEFAULT_WEIGHTS: Map<String, Double> =
             MetricWeights.DEFAULT.values.mapKeys { it.key.name } + (ScoreMetric.FLASH_DODGE.name to FlashImportance.SOMETIMES.weight)
+
+        /** The default scenarios of a game without a Range mode: flick, and flash (its importance decides how often it plays). */
         val DEFAULT_SCENARIOS: List<String> = listOf(ScenarioKind.FLICK.id, ScenarioKind.FLASH.id)
+
+        /** The default scenarios of a game with a Range mode (M15d): flick, range and flash. */
+        val DEFAULT_SCENARIOS_WITH_RANGE: List<String> = listOf(ScenarioKind.FLICK.id, ScenarioKind.RANGE.id, ScenarioKind.FLASH.id)
+
+        /** The default scenarios for a game that has a Range mode ([hasRange]) or not. */
+        fun defaultScenarios(hasRange: Boolean): List<String> = if (hasRange) DEFAULT_SCENARIOS_WITH_RANGE else DEFAULT_SCENARIOS
     }
 }

@@ -4,6 +4,7 @@ import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.core.accel.AbStatus
 import de.yuuto.aimtune.core.accel.AccelAnalysis
 import de.yuuto.aimtune.core.accel.AccelFit
+import de.yuuto.aimtune.core.accel.AccelScenarios
 import de.yuuto.aimtune.core.accel.LookupCurve
 import de.yuuto.aimtune.core.accel.trialAccel
 import de.yuuto.aimtune.core.scenario.ScenarioKind
@@ -21,6 +22,13 @@ import kotlin.test.assertTrue
 
 class AccelRunTest {
     private val base = TrainerConfig(800.0, 55.0, checkNotNull(GameProfiles.load().find("valorant")), roundSeconds = 30, seed = 0)
+
+    @Test
+    fun `the curve finder never plays range rounds`() {
+        // The M15c gate: range rounds in the strength search raised the false directions for flat players (9/16 to 14/16).
+        val lists = listOf(AccelRun.CLICK_SCENARIOS, AccelRun.SCENARIOS_WITH_FLASH, AccelScenarios.of(true), AccelScenarios.of(false))
+        lists.forEach { assertFalse(ScenarioKind.RANGE in it) }
+    }
 
     private fun newRun() = AccelRun(base, MetricWeights.DEFAULT, runKey = 1, seed = 3)
 
