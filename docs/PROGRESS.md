@@ -4,7 +4,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Current
 
-- **Latest:** M14 Optimizer review fixes is implemented: curve finder v2 (bounded lookup table) is the new default. Speed rounds, the closed loop, grouped A/B and the time model missed their gates and stay off. Waiting for the user's test of the LUT export in Raw Accel.
+- **Latest:** M18 Refine my Raw Accel curve is implemented (null gate met, level gate missed, see below). Before that: M14 Optimizer review fixes is implemented: curve finder v2 (bounded lookup table) is the new default. Speed rounds, the closed loop, grouped A/B and the time model missed their gates and stay off. Waiting for the user's test of the LUT export in Raw Accel.
 - **Milestone:** M11 Realistic target heights and M12 Valorant crosshair (in progress, M11 first); M10 Flash turn-away (implemented, waiting for the user's hands-on test); M9 Review fixes (implemented, waiting for the user's hands-on test); M8 Results, i18n, packaging is implemented and waiting for the user's hands-on test
 - **Task:** fixes are in (see M9 below and docs/REVIEW.md status table). The target sizes are assumptions until R1b. M7's second hands-on part (analysis, blind test, Raw Accel import) is still open, and per the review the acceleration results should not be trusted before R2.
 
@@ -197,8 +197,18 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 - [ ] Power mode (refused on import), rotation and Y/X ratio in the trainer (refused on import), diff screen (M18)
 - [ ] Real Raw Accel load test by the user (patched file, lut)
 
+### M18 Refine my Raw Accel curve (docs/CURVE-FINDER-AUDIT.md; implemented, level gate missed, waiting for the user's hands-on test)
+- [x] Core: `RefineParameter` (LEVEL, HIGH_GAIN, TRANSITION), `RawAccelProfile.adjusted/supports/played`, `RefineSearch`, `RefineEngine` (warm-up 8, stages of 12, test vs the imported profile; `AbCondition.PLAIN` is the control arm), tests
+- [x] Storage: `SessionKind.ACCEL_REFINE` (`accel_refine`), rounds store the played curve as `rawaccel1`; stored searches, prior calibration and "Last search" ignore it (no schema change needed)
+- [x] App: import screen (clipboard or `<data dir>/imports/`, profile choice, parsed values, chart, refusals, warnings, DPI check), between-rounds, stage result and result screens, patch export to `<data dir>/exports/rawaccel/` with the list of changed fields, button on the acceleration intro, i18n en/de, screenshot steps `refine-import` and `refine-stage`
+- [x] Gate `RefineGateTest` (500 runs): REFINE_NULL exports 0 / 500 (target <= 5 % met); LEVEL +-15 targets missed (right side 64 % / 55 % instead of >= 70 %, exported 0 % / 1 % instead of >= 50 %), 0 harmful exports at 12-round stages (2 of 9 at 24 rounds); cause: the simulated score changes by about 1 point over a 15 % level change against a round sd of 13 (ALGORITHMS "Refine my Raw Accel curve")
+- [ ] Open (user): complete the level part and the test on the real profile; judge whether real hands show a clearer level optimum than the simulated one; load an exported file into Raw Accel
+- [ ] Open: IMPORT is the import screen, not a phase of the run object; the intro's "Refine" button needs the Raw Accel check ticked on the import screen itself; power mode, rotation and Y/X ratio are still refused
+
 ## Last session
 
+
+- M18 Refine my Raw Accel curve (branch `feature/m18-refine-curve`): new mode behind a button on the acceleration intro, see the M18 checklist and ALGORITHMS "Refine my Raw Accel curve". Import of the player's settings.json, 8 warm-up rounds with their curve, blind stages for level, high-speed gain and transition, blind test against their own curve, patched-copy export with a list of changed fields. The null gate passes (0 / 500 exports); the level gate does not (a 15 % level change is about 1 score point against a round sd of 13), reported as it is and no threshold changed. Not tried on the real mouse yet.
 - M17 Raw Accel model and import (branch `feature/m17-rawaccel-model`): the app now represents and simulates Raw Accel 1.7.1 profiles exactly (see the M17 checklist and ALGORITHMS "The Raw Accel profile model"), imports a settings.json losslessly with explicit refusals, and exports a patched copy that keeps the rest of the file. One finding: Raw Accel extends a lut linearly beyond its last point, `LookupCurve` holds the last value, so the finder's tables differ from the driver above their last measured speed (not changed, stored rounds depend on it). No UI yet (M18).
 
 - M16 Curve finder safety (requested after the audit of the user's real runs: the curves were played at the finder's low-confidence 0.474 instead of the 0.335 in the game, and "Last search" exported an unconfirmed falling curve whose range included "no curve"): see the M16 checklist. Not tried on real data yet.

@@ -46,6 +46,15 @@ Main menu ─ Start test ─▶ [first launch: Onboarding 1-4] ─▶ Pre-test n
 
 Keyboard: menu hotkeys as shown, Enter to confirm, Esc to pause/back, Tab navigation in all forms.
 
+### Refine my Raw Accel curve (M18)
+
+New screens, all in the existing style (cards, mono for parameters, the shared chart):
+
+- **Import** (`refine-import`): left column with the intro, "Paste from clipboard", up to four file buttons from the import folder and its path, profile buttons, and the Raw Accel check box; right card "What was read" with the parameters in mono, the total factor and the multiplier chart (curve times output DPI / device DPI against hand speed, line at 1). A refused profile gets a caution card with the reasons; "Start refining" stays disabled until a profile is playable and the check is ticked.
+- **Between rounds**: the usual progress bar, with "Skip warm-up" and "End this part now" as secondary buttons; never a value or an arm.
+- **Stage result** (`refine-stage`): heading "Level: result", one card with the best change as a signed percent, its range, confidence and rounds, and one sentence saying whether it is carried on; footer "Skip the rest, go to the test" and "Next: ...".
+- **Result**: verdict, and for "better" a card listing the changed fields as `field: old -> new` with the export button; after saving the card says where the file is.
+
 ## Trainer visual style
 
 Minimal, high contrast, low distraction: dark room, soft horizon, no decoration. Targets use the accent ramp (fill `#b5abfc`, ring accent 700), crosshair is a small neutral cross. HUD text is mono for numbers and sits in the 72 px margins, away from the center.
