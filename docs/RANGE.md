@@ -1,6 +1,6 @@
 # M15 Range mode
 
-Status: **plan approved; corrected after the first recordings** (see "Corrections after the first recordings"). Sensitivity 0.335. Nothing below is measured yet; every value in this file is a plan or a guess until `tools/range-re/out/range-spec.json` exists.
+Status: **step 5 done as M15c (see "M15c Range scenario" at the end; not the default yet, that is M15d)**; earlier status: **plan approved; corrected after the first recordings** (see "Corrections after the first recordings"). Sensitivity 0.335. Nothing below is measured yet; every value in this file is a plan or a guess until `tools/range-re/out/range-spec.json` exists.
 
 ## Goal
 
@@ -123,3 +123,13 @@ The user asked for a close reconstruction, not an exact one. Values marked (m) a
 - **Hitboxes and kill rule:** humanoid of 1.8 m (a), head sphere about 0.25 m wide (profile `clickTargetDiameterDegrees` decides the angular size per distance as today, a). Bot Armor on: a head hit kills; body hits kill after 4 (a: Vandal against 100 HP + 50 armor). Armor off: 3 body hits (a).
 - **Metrics per bot:** time to kill (spawn to kill), first-reach error against the target position at the end of the reach (M15a, done), first-shot head accuracy, shots per kill; per round: kills and mean time to kill. Score metrics: ACCURACY (first-shot head hits) and TIME_TO_HIT (time to kill) as for flicks, with a `range` scenario baseline.
 - **Curve finder:** Range rounds go into the score-based searches (strength search, A/B). Their reaches enter the error analysis only when the bot was stopped during the whole first reach (M15a filter, done: `movementSamples` drops every reach whose target moved; ALGORITHMS "Moving targets").
+
+## M15c Range scenario (step 5, done 2026-10-23)
+
+`RangeScenario` plays the behaviour spec above; details, metrics, the aimer and the gate numbers are in docs/ALGORITHMS.md "Range mode (M15c)". What is measured and what is assumed, per value, is in the `trainer.range.valueNotes` of `games/valorant.json` (all `verified: false`):
+
+- measured (rough, 60 fps clips): spawn delay about 0.4 s (spread assumed), bearing -51..+81, distance 3-19 m (partly circular, the bot height was assumed), strafe segments and stops, no despawn of an unshot bot;
+- assumed: speed presets Easy 3.0 / Medium 2.0 / Hard 1.2 s, bot height 1.8 m, head hit sphere 0.25 m, kill rule (head kills, 4 body hits with armor, 3 without), strafe reverse probability and offset limit, uniform bearing and log-uniform distance;
+- deviation from the spec: the head is a real-size sphere at its distance, not a click-target diameter drawn independently of the distance;
+- the settings offer speed (none, Easy, Medium, Hard) and Bots (Strafe, Stand still); armor stays on;
+- the simulated aimer is far slower against strafing bots than the real clips (4-7 kills per 45 s round, about 7 s per kill, against about 1.4 s in the clips), so the gate numbers say little about people.

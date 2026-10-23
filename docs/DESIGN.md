@@ -67,6 +67,10 @@ LibGDX `I18NBundle`: `assets/i18n/messages.properties` (English default) and `me
 - Fonts: Inter 4.1 (Regular, Medium) and JetBrains Mono 2.304 (Regular), both SIL OFL 1.1, are bundled in `app/src/main/resources/assets/fonts/` with their license files and rasterized with gdx-freetype at the exact pixel size of the framebuffer (`Fonts.kt`), rebuilt when the window height changes by more than 8%. Scaling a bitmap font instead blurs the text.
 - Charts are custom actors drawn with `ShapeRenderer` (lines, filled band with alpha, dashed segments, dots), not Scene2D widgets.
 
+### Range mode (M15c)
+
+Original geometry, no assets of any game. The bot is a head sphere in sand (`#e6d9b8`) on an ochre torso and pelvis (`#c79a55`) with darker limbs (`#8f7048`), boxes only, turned to face the player; its proportions are those of the hit model (`BotShape`: 1.8 m, head 0.25 m, body capsule radius 0.2 m), so what is drawn is what is hit. The colours are warm so the bot stands out from the blue-grey room. In front of the player stands a low counter (1.6 x 0.4 m, 0.8 m high); on the floor, lit lines mark a lane every 10 degrees of bearing from -50 to +80 degrees and arcs at 5, 12.5 and 20 m (the near, middle and far distance of the profile). Corners and doorways are left out in Range mode. The HUD shows "Kills n   Shots m" at the top right instead of "Hits / Misses". Settings: the "Range mode" tile appears only for games with Range mode; when it is on, one row of two selects (speed, bots) sits under the tiles, and the update-check switch moved to the footer to make room.
+
 ## Deviations
 
 | Mockup | Planned implementation | Reason |

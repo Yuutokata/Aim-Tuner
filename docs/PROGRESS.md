@@ -204,12 +204,18 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 - [~] 3 Measurement scripts (`tools/range-re/`: `unitchain.py` + tests, `turn_calibration.py`, `detect_bots.py`, `analyse_tracks.py`) and a first `out/range-spec.json` from the two clips; preliminary, `verified: false` (the tracker finds only 7 of about 20 bots, see RANGE.md)
 - [x] 4 REA pass (behaviour spec in RANGE.md, decided 2026-10-22)
 - [x] M15a moving-target metrics: `StrafeMotion`, scenarios `micro-strafe` and `switch-strafe` (opt-in tiles in settings), metrics against the target at the end of the reach with lead and aim components, curve-analysis filter, strafing simulated aimer; gate `M15aGateTest` passed (static metrics identical, no false offers from strafing rounds); ALGORITHMS "Moving targets"
-- [~] M15c Range scenario (step 5, in progress): profile `trainer.range`, `RangeScenario`, metrics, range aimer done in core; app rendering, settings and gate follow
-- [ ] 5 Integration: profile, `RangeScenario`, arena, metrics, pipeline and menu, simulator, gate (ALGORITHMS "M15")
+- [x] 5 Integration, part M15c Range scenario: `trainer.range` profile block (all `verified: false`), `RangeScenario`, bot hit model, range metrics and score inputs, humanoid bot and lanes in the trainer, settings tile (speed, bots), simulated aimer, gate `M15cGateTest` run once (ALGORITHMS "Range mode (M15c)")
+- [ ] 5b M15d: make Range the default round type, menu entry "Range mode" with the flows, after the user's test
 - [ ] 6 Docs, screenshot tour EN/DE
 - [ ] Open (user): record the clips from RECORDING.md
 
 ## Last session
+
+- M15c Range scenario (branch `feature/m15-range-mode`):
+  - `RangeScenario` + `BotShape` (head sphere, body capsule), `trainer.range` block in valorant.json with a source note per value, `Despawned` and `BodyHit` events stored without a schema change, range metrics (kills, median time to kill, shots per kill), scoring by first-shot head hits and time to kill with the `range` baseline; opt-in tile and a row of two options in the settings; original bot, counter and lane lines in the trainer; screenshot tour steps `range-ready`, `range-running`, `settings-range`;
+  - the simulated aimer follows range bots instead of the look-reach-look loop (the old one killed one bot in 7-40 s); still only 4-7 kills per 45 s round against strafing bots;
+  - gate: no false offers for the default flat player (0/30), range reaches never enter the analysis; the range-effect player is a false offer with and without range rounds (30/30, 29/30, legacy analysis); range alone finds the sensitivity badly (median 112.8 for 50), flick + range 55.1 against 49.6 for flick only; strength search finds rising and falling gain as before but gives more false directions for flat players with range rounds (14/16 against 9/16);
+  - open: range stays opt-in until real rounds exist (M15d); the aimer is not calibrated against the clips; armor setting not exposed.
 
 - M17 Raw Accel model and import: the app represents and simulates Raw Accel 1.7.1 profiles exactly (see the M17 checklist and ALGORITHMS "The Raw Accel profile model"), imports a settings.json losslessly with explicit refusals, and exports a patched copy that keeps the rest of the file. Finding: Raw Accel extends a lut linearly beyond its last point while `LookupCurve` holds the last value, so exported tables played other gain than tested on the fastest flicks; fixed with a flat tail point in the export. Merged into `dev`. No UI yet (M18).
 
