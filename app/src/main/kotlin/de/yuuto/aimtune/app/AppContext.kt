@@ -159,6 +159,15 @@ class AppContext(
 
     fun showPreTest() = switchTo(PreTestScreen(this))
 
+    /** The pre-test notice of the Range mode round set (menu entry "Range mode"). */
+    fun showRangePreTest() = switchTo(PreTestScreen(this, rangeMode = true))
+
+    /** Range mode from the menu: onboarding first if needed, then its notice; a game without a Range block has no such mode. */
+    fun showRangeMode() = if (isSetUp) showRangePreTest() else showOnboarding(afterFinish = ::showRangePreTest)
+
+    /** Whether the configured game has a Range mode. */
+    fun hasRangeMode(): Boolean = trainerConfig()?.profile?.geometry?.range != null
+
     fun showSettings() {
         languageOverride = null
         if (isSetUp) switchTo(SettingsScreen(this)) else showOnboarding(afterFinish = ::showMenu)
@@ -170,11 +179,11 @@ class AppContext(
     }
 
     /** Starts a new blind test run, merging the stored rounds of this game and DPI; onboarding first if needed. */
-    fun startBlindTest() {
+    fun startBlindTest(rangeMode: Boolean = false) {
         val config = trainerConfig()
         val setup = settings.current
         val pad = setup.padWidthCm
-        if (config == null || pad == null) return showOnboarding(afterFinish = ::showPreTest)
+        if (config == null || pad == null) return showOnboarding(afterFinish = if (rangeMode) ::showRangePreTest else ::showPreTest)
         val range = searchRange(setup.aimStyleOrNull() ?: AimStyle.MIXED, config.cm360, pad)
         val weights = metricWeights()
         val enabled = try {
@@ -183,7 +192,10 @@ class AppContext(
             ScenarioKind.entries.toSet()
         }
         // A game without a Range mode cannot play range rounds, even if the setting still lists them.
-        val playable = if (config.profile.geometry.range == null) enabled - ScenarioKind.RANGE else enabled
+        val hasRange = config.profile.geometry.range != null
+        if (rangeMode && !hasRange) return showMenu()
+        // Range mode plays range and flick in equal shares, whatever the saved toggles say; no flash, no tracking.
+        val playable = if (rangeMode) setOf(ScenarioKind.FLICK, ScenarioKind.RANGE) else if (hasRange) enabled else enabled - ScenarioKind.RANGE
         val past = processor.pastBlindRounds(setup.gameId, config.dpi)
         val seed = nextSeed++
         val test = BlindTest(range, weights, past, seed)

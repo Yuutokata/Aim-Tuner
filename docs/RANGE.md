@@ -1,6 +1,6 @@
 # M15 Range mode
 
-Status: **step 5 done as M15c (see "M15c Range scenario" at the end; not the default yet, that is M15d)**; earlier status: **plan approved; corrected after the first recordings** (see "Corrections after the first recordings"). Sensitivity 0.335. Nothing below is measured yet; every value in this file is a plan or a guess until `tools/range-re/out/range-spec.json` exists.
+Status: **step 5 done as M15c and M15d (default round type, menu entry; see the end)**; earlier status: **plan approved; corrected after the first recordings** (see "Corrections after the first recordings"). Sensitivity 0.335. Nothing below is measured yet; every value in this file is a plan or a guess until `tools/range-re/out/range-spec.json` exists.
 
 ## Goal
 
@@ -133,3 +133,11 @@ The user asked for a close reconstruction, not an exact one. Values marked (m) a
 - deviation from the spec: the head is a real-size sphere at its distance, not a click-target diameter drawn independently of the distance;
 - the settings offer speed (none, Easy, Medium, Hard) and Bots (Strafe, Stand still); armor stays on;
 - the simulated aimer is far slower against strafing bots than the real clips (4-7 kills per 45 s round, about 7 s per kill, against about 1.4 s in the clips), so the gate numbers say little about people.
+
+## M15d Range mode as a standard round (done 2026-10-23)
+
+- Default: for a game with a `trainer.range` block the default scenarios are flick, range and flash (flash by its importance setting). Fresh settings, "Reset to defaults" and onboarding use it; saved settings keep their scenarios, and the settings tile still toggles Range. Games without the block keep flick and flash.
+- Menu entry "Range mode" (hotkey M, shown for games with a Range block): a blind sensitivity test of range and flick in equal shares, independent of the saved toggles, without flash and tracking; the pre-test notice carries a line with the speed and bots settings in use. Rounds are stored and merged like every other blind round.
+- Curve finder: excluded on purpose. Range rounds in the strength search raised the false directions for flat players from 9/16 to 14/16 (M15c gate, unchanged with the slower strafe); `AccelRun` and `RefineEngine` do not list `RANGE`, a test guards it.
+- Gate with the slower strafe: default flat player still 0/30 false offers (ALGORITHMS "Range mode (M15d)").
+- Still assumed or open: armor setting not exposed (armor stays on), the simulated aimer is not calibrated against real play, head hitbox and eye height are unmeasured; all `trainer.range` values stay `verified: false`.

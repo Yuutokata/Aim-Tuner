@@ -322,7 +322,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         weights.clear()
         weights.putAll(AppSettings.DEFAULT_WEIGHTS)
         scenarios.clear()
-        scenarios.addAll(AppSettings.DEFAULT_SCENARIOS)
+        scenarios.addAll(AppSettings.defaultScenarios(draft.profile(ctx.profiles)?.geometry?.range != null))
         draft = draft.copy(flashImportance = FlashImportance.SOMETIMES)
         flashSound = true
         hitSound = true

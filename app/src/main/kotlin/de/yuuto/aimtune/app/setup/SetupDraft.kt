@@ -1,5 +1,6 @@
 package de.yuuto.aimtune.app.setup
 
+import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.FlashImportance
 import de.yuuto.aimtune.core.units.AimStyle
 import de.yuuto.aimtune.games.GameProfile
@@ -124,7 +125,10 @@ data class SetupDraft(
         SetupStep.entries.forEach { step -> issue(step, profiles)?.let { check(false) { "setup incomplete: $it" } } }
         val (padWidth, padHeight) = checkNotNull(padSizeCm())
         val custom = gameId == GAME_CUSTOM
-        return base.withFlashImportance(flashImportance).copy(
+        // A game without a Range mode cannot play range rounds, so the scenario does not stay listed.
+        val hasRange = profile(profiles)?.geometry?.range != null
+        val scenarios = if (hasRange) base.scenarios else base.scenarios.filter { it != ScenarioKind.RANGE.id }.ifEmpty { listOf(ScenarioKind.FLICK.id) }
+        return base.copy(scenarios = scenarios).withFlashImportance(flashImportance).copy(
             dpi = dpi,
             gameId = gameId,
             inGameSensitivity = sensitivity,

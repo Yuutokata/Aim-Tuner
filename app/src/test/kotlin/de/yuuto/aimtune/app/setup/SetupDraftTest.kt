@@ -91,6 +91,15 @@ class SetupDraftTest {
     }
 
     @Test
+    fun `finishing keeps the saved scenarios and drops range for a game without a Range mode`() {
+        val saved = AppSettings(scenarios = listOf("flick", "flash"))
+        assertEquals(listOf("flick", "flash"), complete.copy(gameId = "valorant").toSettings(saved, profiles).scenarios)
+        val withRange = AppSettings()
+        assertEquals(AppSettings.DEFAULT_SCENARIOS_WITH_RANGE, complete.copy(gameId = "valorant").toSettings(withRange, profiles).scenarios)
+        assertEquals(AppSettings.DEFAULT_SCENARIOS, complete.copy(gameId = "cs2").toSettings(withRange, profiles).scenarios)
+    }
+
+    @Test
     fun `an incomplete draft cannot be turned into settings`() {
         assertFailsWith<IllegalStateException> { SetupDraft().toSettings(AppSettings(), profiles) }
     }

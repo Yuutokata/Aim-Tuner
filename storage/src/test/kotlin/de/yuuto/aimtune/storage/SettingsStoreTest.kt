@@ -107,10 +107,10 @@ class SettingsStoreTest {
     }
 
     @Test
-    fun `enabled scenarios default to flick and flash, survive a round trip and reject bad selections`() {
-        assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.FLASH), AppSettings().enabledScenarios())
+    fun `enabled scenarios default to flick, range and flash, survive a round trip and reject bad selections`() {
+        assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.RANGE, ScenarioKind.FLASH), AppSettings().enabledScenarios())
         val file = dir.resolve("old.json")
-        Files.writeString(file, """{"version":1,"dpi":800.0}""")
+        Files.writeString(file, """{"version":1,"dpi":800.0,"scenarios":["flick","flash"]}""")
         assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.FLASH), SettingsStore(file).load().enabledScenarios())
 
         val store = store()
@@ -118,6 +118,12 @@ class SettingsStoreTest {
         assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.TRACKING), store.load().enabledScenarios())
         assertFailsWith<SettingsException> { store().save(AppSettings(scenarios = emptyList())) }
         assertFailsWith<SettingsException> { store().save(AppSettings(scenarios = listOf("flick", "juggling"))) }
+    }
+
+    @Test
+    fun `the default scenarios depend on whether the game has a Range mode`() {
+        assertEquals(listOf("flick", "range", "flash"), AppSettings.defaultScenarios(hasRange = true))
+        assertEquals(listOf("flick", "flash"), AppSettings.defaultScenarios(hasRange = false))
     }
 
     @Test

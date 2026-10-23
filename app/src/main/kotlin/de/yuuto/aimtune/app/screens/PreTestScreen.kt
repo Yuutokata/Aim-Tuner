@@ -28,7 +28,7 @@ private const val FOOTER_BUTTON_HEIGHT = 64f
  * system), Raw Accel (confirmed by hand, it cannot be detected) and the mouse input source. It
  * only informs; the test can always be started.
  */
-class PreTestScreen(ctx: AppContext) : UiScreen(ctx) {
+class PreTestScreen(ctx: AppContext, private val rangeMode: Boolean = false) : UiScreen(ctx) {
     private var acceleration = WindowsPointerSettings.readAcceleration()
 
     override fun build(): Actor {
@@ -37,6 +37,7 @@ class PreTestScreen(ctx: AppContext) : UiScreen(ctx) {
         content.add(
             ui.label(t("pretest.description"), Styles.BODY_MUTED, wrap = true),
         ).left().width(DESCRIPTION_WIDTH).padBottom(48f).row()
+        if (rangeMode) content.add(rangeInfo()).left().width(ROW_WIDTH).padBottom(ROW_GAP).row()
         val profile = ctx.trainerConfig()?.profile
         val rows = PreTestChecks.rows(
             acceleration, ctx.rawAccelConfirmed, ctx.source.name, ctx.source is WindowsRawInputSource,
@@ -48,13 +49,24 @@ class PreTestScreen(ctx: AppContext) : UiScreen(ctx) {
         footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
         footer.addButton(ui.button(t("pretest.recheck"), Styles.SECONDARY) { recheck() }, minWidth = 180f).padRight(16f)
-        footer.addButton(ui.button(t("pretest.start"), Styles.PRIMARY) { ctx.startBlindTest() }, minWidth = 220f)
+        footer.addButton(ui.button(t("pretest.start"), Styles.PRIMARY) { ctx.startBlindTest(rangeMode) }, minWidth = 220f)
         return ui.frame(null, content, footer)
     }
 
     override fun onEscape() = ctx.showMenu()
 
-    override fun onEnter() = ctx.startBlindTest()
+    override fun onEnter() = ctx.startBlindTest(rangeMode)
+
+    /** One line: this is the Range mode, and the speed and bots settings it will use. */
+    private fun rangeInfo(): Table {
+        val options = ctx.settings.current.rangeOptions()
+        val table = Table()
+        table.background(ui.skin.getDrawable(Styles.CARD))
+        table.pad(ROW_PADDING)
+        val bots = t(if (options.botsStrafe) "settings.range_bots.strafe" else "settings.range_bots.reset")
+        table.add(ui.label(t("pretest.range_mode", t("settings.range_speed.${options.speed.id}"), bots), Styles.BODY, wrap = true)).left().growX()
+        return table
+    }
 
     private fun recheck() {
         acceleration = WindowsPointerSettings.readAcceleration()

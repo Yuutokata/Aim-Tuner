@@ -80,6 +80,8 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("results") { sample?.let(ctx::stopBlindTest) },
         Step("history") { ctx.switchTo(HistoryScreen(ctx, CompletableFuture.completedFuture(sampleHistory()))) },
         Step("settings-range") { showRangeSettings() },
+        Step("menu-range") { ctx.showMenu() },
+        Step("range-pretest") { ctx.showRangePreTest() },
         Step("share-data") { ctx.switchTo(ShareDataScreen(ctx, CompletableFuture.completedFuture(StoredCounts(3, 42)))) },
     )
     private val sample by lazy { ctx.trainerConfig()?.let(::sampleBlindRun) }
@@ -98,7 +100,7 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
     /** The settings of a game with Range mode and the Range tile switched on, which shows the extra row of options. */
     private fun showRangeSettings() {
         val current = ctx.settings.current
-        ctx.settings.save(current.copy(gameId = "valorant", scenarios = current.scenarios + ScenarioKind.RANGE.id))
+        ctx.settings.save(current.copy(gameId = "valorant", scenarios = (current.scenarios + ScenarioKind.RANGE.id).distinct()))
         ctx.showSettings()
     }
 
