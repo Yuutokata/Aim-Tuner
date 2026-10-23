@@ -10,6 +10,7 @@ import de.yuuto.aimtune.core.accel.AccelAbPlan
 import de.yuuto.aimtune.core.accel.AccelAnalysis
 import de.yuuto.aimtune.core.accel.AccelFit
 import de.yuuto.aimtune.core.accel.AccelFitResult
+import de.yuuto.aimtune.core.accel.AccelScenarios
 import de.yuuto.aimtune.core.accel.bounded
 import de.yuuto.aimtune.core.accel.evaluateAb
 import de.yuuto.aimtune.core.accel.CurveStrength
@@ -302,11 +303,9 @@ class AccelRun(
         private const val SEARCH_SEED_MIX = 1_300L
 
         /** Scenarios with a first movement per target; micro-adjust is slow, flicks and switching fast. */
-        val CLICK_SCENARIOS = listOf(ScenarioKind.FLICK, ScenarioKind.SWITCHING, ScenarioKind.MICRO)
+        val CLICK_SCENARIOS = AccelScenarios.CLICK
 
         /** The click scenarios with a flash round between each of them: half of the rounds. */
-        val SCENARIOS_WITH_FLASH = listOf(
-            ScenarioKind.FLICK, ScenarioKind.FLASH, ScenarioKind.SWITCHING, ScenarioKind.FLASH, ScenarioKind.MICRO, ScenarioKind.FLASH,
-        )
+        val SCENARIOS_WITH_FLASH = AccelScenarios.WITH_FLASH
     }
 }

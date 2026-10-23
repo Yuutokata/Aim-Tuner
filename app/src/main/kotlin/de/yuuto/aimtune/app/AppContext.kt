@@ -13,6 +13,15 @@ import de.yuuto.aimtune.app.accel.AccelSession
 import de.yuuto.aimtune.app.accel.LastCalibration
 import de.yuuto.aimtune.app.accel.LastSearch
 import de.yuuto.aimtune.app.accel.PriorCalibration
+import de.yuuto.aimtune.app.accel.RefineRun
+import de.yuuto.aimtune.app.accel.RefineSession
+import de.yuuto.aimtune.app.accel.RefineSource
+import de.yuuto.aimtune.app.screens.RefineBetweenScreen
+import de.yuuto.aimtune.app.screens.RefineImportScreen
+import de.yuuto.aimtune.app.screens.RefineResultScreen
+import de.yuuto.aimtune.app.screens.RefineStageScreen
+import de.yuuto.aimtune.core.accel.RawAccelProfile
+import de.yuuto.aimtune.core.accel.RefinePhase
 import de.yuuto.aimtune.app.blind.AxisSummary
 import de.yuuto.aimtune.app.blind.BlindRun
 import de.yuuto.aimtune.app.blind.BlindSession
@@ -82,6 +91,8 @@ class AppContext(
     val exportDir: Path? = null,
     /** Where research exports go; null without a data folder. */
     val researchDir: Path? = null,
+    /** Where the player drops Raw Accel settings.json files to refine; null without a data folder. */
+    val importDir: Path? = null,
 ) {
     private var nextSeed = options.seed ?: System.nanoTime()
     /** A newer release than this build, found by the update check; null when none is known. Set on the render thread. */
@@ -327,6 +338,37 @@ class AppContext(
         val curve = checkNotNull(fit) { "there is no curve to export" }
         val dir = checkNotNull(exportDir) { "no data folder to write to" }
         RawAccelExport.write(dir, curve.curve, dpi, curve.sensitivityFactor)
+    }
+
+    /** The import step of "Refine my Raw Accel curve". */
+    fun showRefine() = switchTo(RefineImportScreen(this))
+
+    /** Starts the refine run for [profile] of [source] at the game sensitivity of the settings. */
+    fun startRefineRun(source: RefineSource, profile: RawAccelProfile) {
+        if (!this.source.hasReportTimestamps || !rawAccelConfirmed) return showRefine()
+        val config = trainerConfig() ?: return showOnboarding(afterFinish = ::showMenu)
+        showRefineStep(
+            RefineRun(config, metricWeights(), runKey = System.currentTimeMillis(), seed = nextSeed++, source = source, profile = profile, flash = settings.current.flashImportance() != FlashImportance.NEVER),
+        )
+    }
+
+    /** The screen that fits the refine run: a round while one is due, the stage result, or the verdict. */
+    fun showRefineStep(run: RefineRun) = switchTo(
+        when (run.phase) {
+            RefinePhase.WARMUP, RefinePhase.SEARCH, RefinePhase.TEST -> RefineBetweenScreen(this, run)
+            RefinePhase.STAGE_RESULT -> RefineStageScreen(this, run)
+            RefinePhase.DONE -> RefineResultScreen(this, run)
+        },
+    )
+
+    fun showRefineRound(run: RefineRun) = switchTo(TrainerScreen(this, run.nextRoundConfig(), RefineSession(this, run)))
+
+    /** Writes a copy of the player's file with the refined profile added into the export folder; the path, or the reason it failed. */
+    fun exportRefine(run: RefineRun): Result<Path> = runCatching {
+        val dir = checkNotNull(exportDir) { "no data folder to write to" }
+        val candidate = run.engine.candidate
+        val root = RawAccelExport.patch(run.source.file.root, run.profile.name, candidate.args, candidate.outputDpi, run.exportName)
+        RawAccelExport.write(dir, root, run.exportName)
     }
 
     /** Number of stored blind rounds for the current setup, for the menu. */

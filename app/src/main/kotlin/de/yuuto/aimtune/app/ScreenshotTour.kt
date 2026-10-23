@@ -12,6 +12,9 @@ import de.yuuto.aimtune.app.accel.PriorCalibration
 import de.yuuto.aimtune.app.accel.sampleAccelRun
 import de.yuuto.aimtune.app.blind.sampleBlindRun
 import de.yuuto.aimtune.app.history.HistoryEntry
+import de.yuuto.aimtune.app.accel.sampleRefineRun
+import de.yuuto.aimtune.app.accel.sampleRefineText
+import de.yuuto.aimtune.app.screens.RefineImportScreen
 import de.yuuto.aimtune.app.screens.HistoryScreen
 import de.yuuto.aimtune.app.screens.ShareDataScreen
 import de.yuuto.aimtune.app.screens.StoredCounts
@@ -64,6 +67,8 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("accel-search-result") { accelSample(AccelPhase.SEARCH_RESULT)?.let(ctx::showAccelStep) },
         Step("accel-test") { accelSample(AccelPhase.TEST)?.let(ctx::showAccelStep) },
         Step("accel-result") { accelSample(AccelPhase.DONE)?.let(ctx::showAccelStep) },
+        Step("refine-import") { ctx.switchTo(RefineImportScreen(ctx, sampleRefineText())) },
+        Step("refine-stage") { ctx.trainerConfig()?.let(::sampleRefineRun)?.let(ctx::showRefineStep) },
         Step("blind-ready") { sample?.let(ctx::showBlindRound) },
         Step("blind-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
         Step("between-rounds") { sample?.let(ctx::showBetweenRounds) },

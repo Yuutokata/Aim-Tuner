@@ -19,6 +19,9 @@ enum class SessionKind(val id: String) {
 
     /** The rounds of the blind strength search (sessions before this kind existed hold them inside [ACCEL_AB]). */
     ACCEL_SEARCH("accel_search"),
+
+    /** The rounds of "Refine my Raw Accel curve": warm-up, stage searches and the test, all played with imported-profile variants. */
+    ACCEL_REFINE("accel_refine"),
     ;
 
     companion object {
