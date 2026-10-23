@@ -268,4 +268,31 @@ class RoundRepositoryTest {
             assertEquals(MetricsRefresh(updated = 0, failed = 1), repo.refreshMetrics())
         }
     }
+
+    @Test
+    fun `range events and metrics survive the database`() {
+        val origin = 7_000_000_000L
+        val recording = recording(origin).copy(
+            scenarioId = "range",
+            targetEvents = listOf(
+                TargetEvent.Spawned(origin, Target(0, Vec3(2.0, -0.1, -9.0), 0.125)),
+                TargetEvent.Waypoint(origin + 300 * ms, 0, Vec3(2.5, -0.1, -9.0)),
+                TargetEvent.BodyHit(origin + 400 * ms, 0),
+                TargetEvent.Hit(origin + 500 * ms, 0),
+                TargetEvent.Spawned(origin + 900 * ms, Target(1, Vec3(-3.0, -0.1, -7.0), 0.125)),
+                TargetEvent.Despawned(origin + 3_000 * ms, 1),
+            ),
+        )
+        Database.open(dir.resolve("r.db")).use { db ->
+            val repo = RoundRepository(db)
+            val session = repo.createSession(1, "valorant", 800.0, SessionKind.SENSITIVITY)
+            val metrics = computeRoundMetrics(recording)
+            val id = repo.saveRound(session, recording, 1, blind = true, metrics = metrics)
+            assertEquals(recording.targetEvents, repo.loadRecording(id)?.targetEvents)
+            val stored = repo.rounds(session).single().metrics
+            assertEquals(1.0, stored["range_kills"])
+            assertEquals(500.0, stored["range_median_ttk_ms"])
+            assertEquals(2.0, stored["range_shots_per_kill"])
+        }
+    }
 }

@@ -1,5 +1,7 @@
 package de.yuuto.aimtune.storage
 
+import de.yuuto.aimtune.core.scenario.RangeOptions
+import de.yuuto.aimtune.core.scenario.RangeSpeed
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.FlashImportance
 import de.yuuto.aimtune.core.score.MetricWeights
@@ -63,6 +65,10 @@ data class AppSettings(
      * "Bounded curves"); LEGACY keeps the fitted family.
      */
     val curveFinder: CurveFinder = CurveFinder.V2,
+    /** Range mode: how long an unshot bot stays ([RangeSpeed.id]: none, easy, medium, hard). */
+    val rangeSpeed: String = RangeSpeed.NONE.id,
+    /** Range mode: bots strafe (true) or stand still (false, the range's "Reset"). */
+    val rangeBotsStrafe: Boolean = true,
 ) {
     /** @throws SettingsException describing the first invalid field. */
     fun validate() {
@@ -79,8 +85,13 @@ data class AppSettings(
         aimStyleOrNull()
         toMetricWeights()
         enabledScenarios()
+        rangeOptions()
         validateCrosshairs()
     }
+
+    /** The Range mode options of these settings. @throws SettingsException for an unknown speed. */
+    fun rangeOptions(): RangeOptions =
+        RangeOptions(speed = RangeSpeed.fromId(rangeSpeed) ?: throw SettingsException("unknown range speed '$rangeSpeed'"), botsStrafe = rangeBotsStrafe)
 
     /** @throws SettingsException for unknown scenario ids or an empty selection. */
     fun enabledScenarios(): Set<ScenarioKind> {

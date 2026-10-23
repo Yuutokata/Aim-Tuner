@@ -171,10 +171,12 @@ class AppContext(
         } catch (e: SettingsException) {
             ScenarioKind.entries.toSet()
         }
+        // A game without a Range mode cannot play range rounds, even if the setting still lists them.
+        val playable = if (config.profile.geometry.range == null) enabled - ScenarioKind.RANGE else enabled
         val past = processor.pastBlindRounds(setup.gameId, config.dpi)
         val seed = nextSeed++
         val test = BlindTest(range, weights, past, seed)
-        val schedule = ScenarioSchedule(enabled, weights)
+        val schedule = ScenarioSchedule(playable.ifEmpty { setOf(ScenarioKind.FLICK) }, weights)
         showBlindRound(BlindRun(test, runKey = System.currentTimeMillis(), baseConfig = config, nextSeed = nextSeed++, schedule = schedule))
     }
 

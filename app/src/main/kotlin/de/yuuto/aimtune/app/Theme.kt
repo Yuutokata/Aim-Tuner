@@ -20,5 +20,10 @@ object Theme {
     val roomGrid: Color = Color.valueOf("4a5270")
     val roomFog: Color = Color.valueOf("161826")
     val roomBody: Color = Color.valueOf("6d63b0")
+    /** Range mode: the bot is sand and ochre so it stands out from the blue-grey room; the lane lines are a lit blue-grey. */
+    val botHead: Color = Color.valueOf("e6d9b8")
+    val botTorso: Color = Color.valueOf("c79a55")
+    val botLimb: Color = Color.valueOf("8f7048")
+    val laneLine: Color = Color.valueOf("8d97c4")
     val caution: Color = Color.valueOf("E69F00")
 }

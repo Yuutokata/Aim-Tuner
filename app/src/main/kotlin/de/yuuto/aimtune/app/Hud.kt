@@ -94,13 +94,18 @@ class Hud(
         ScenarioKind.FLASH -> i18n.t("hud.instruction.flash")
         ScenarioKind.MICRO_STRAFE -> i18n.t("hud.instruction.micro-strafe")
         ScenarioKind.SWITCH_STRAFE -> i18n.t("hud.instruction.switch-strafe")
+        ScenarioKind.RANGE -> i18n.t("hud.instruction.range")
     }
 
     private fun drawRunning(trainer: Trainer, fonts: Fonts) {
         val seconds = (trainer.timeLeftNanos() / 1_000_000_000L).toInt()
         draw(fonts.numberMd, "%d:%02d".format(Locale.ROOT, seconds / 60, seconds % 60), width / 2, height - MARGIN, text, Align.center)
         draw(fonts.label, i18n.scenarioName(config.scenario).uppercase(), MARGIN, height - MARGIN, muted, Align.left)
-        val shots = if (config.scenario.usesClicks) i18n.t("hud.hits_misses", trainer.hits, trainer.misses) else ""
+        val shots = when {
+            config.scenario == ScenarioKind.RANGE -> i18n.t("hud.kills", trainer.hits, trainer.hits + trainer.misses)
+            config.scenario.usesClicks -> i18n.t("hud.hits_misses", trainer.hits, trainer.misses)
+            else -> ""
+        }
         val right = roundLabel ?: shots
         draw(fonts.mono, right, width - MARGIN, height - MARGIN, text, Align.right)
         draw(fonts.body, i18n.t("hud.abort"), MARGIN, MARGIN + fonts.body.lineHeight, muted, Align.left)

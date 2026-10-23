@@ -26,6 +26,9 @@ import java.util.concurrent.CompletableFuture
 private const val FRAMES_BEFORE_CAPTURE = 4
 private const val OPAQUE = 255.toByte()
 private const val BYTES_PER_PIXEL = 4
+private const val RANGE_SEED_TRIES = 500L
+private const val RANGE_TOUR_BEARING = 20.0
+private val RANGE_TOUR_DISTANCE = 7.0..12.0
 
 /**
  * Developer tool (`--screenshots <dir>`): shows every screen with sample data, saves a PNG of
@@ -54,6 +57,8 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("tracking-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
         Step("switching-ready") { showScenario(ScenarioKind.SWITCHING) },
         Step("switching-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
+        Step("range-ready") { showScenario(ScenarioKind.RANGE) },
+        Step("range-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
         Step("accel-intro") { ctx.showAccel() },
         Step("accel-intro-prior") { ctx.showAccel(AccelBaseline(48.7, "0.335", "Valorant", FinderResult(34.4, 61, 40, "0.474", searchRounds = 50), gameSearchRounds = 12)) },
         Step("accel-last") { accelSample(AccelPhase.ANALYSIS)?.let { ctx.showLastAccelAnalysis(LastCalibration(it.dpi, it.baseCm360, PriorCalibration(it.calibrationDone, it.calibrationSamples))) } },
@@ -69,6 +74,7 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("between-rounds") { sample?.let(ctx::showBetweenRounds) },
         Step("results") { sample?.let(ctx::stopBlindTest) },
         Step("history") { ctx.switchTo(HistoryScreen(ctx, CompletableFuture.completedFuture(sampleHistory()))) },
+        Step("settings-range") { showRangeSettings() },
         Step("share-data") { ctx.switchTo(ShareDataScreen(ctx, CompletableFuture.completedFuture(StoredCounts(3, 42)))) },
     )
     private val sample by lazy { ctx.trainerConfig()?.let(::sampleBlindRun) }
@@ -84,10 +90,27 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         } + HistoryEntry(8, start + 8 * day, "valorant", SessionKind.ACCEL_AB, 14, null, null)
     }
 
+    /** The settings of a game with Range mode and the Range tile switched on, which shows the extra row of options. */
+    private fun showRangeSettings() {
+        val current = ctx.settings.current
+        ctx.settings.save(current.copy(gameId = "valorant", scenarios = current.scenarios + ScenarioKind.RANGE.id))
+        ctx.showSettings()
+    }
+
     private fun accelSample(until: AccelPhase) = ctx.trainerConfig()?.let { sampleAccelRun(it, until) }
 
     private fun showScenario(kind: ScenarioKind) {
-        ctx.trainerConfig()?.let { ctx.switchTo(TrainerScreen(ctx, it.copy(scenario = kind))) }
+        ctx.trainerConfig()?.let {
+            val config = if (kind == ScenarioKind.RANGE) it.copy(scenario = kind, seed = rangeTourSeed(it)) else it.copy(scenario = kind)
+            ctx.switchTo(TrainerScreen(ctx, config))
+        }
+    }
+
+    /** A seed whose first bot stands in front of the player, 7-12 m away, so the screenshot shows it. */
+    private fun rangeTourSeed(config: TrainerConfig): Long = (config.seed until config.seed + RANGE_SEED_TRIES).first { seed ->
+        val scenario = ScenarioKind.RANGE.create(1_000_000_000L, seed, config.geometry, config.rangeOptions).also { it.start(0L) }
+        val head = scenario.targets.first().center
+        Math.abs(Math.toDegrees(Math.atan2(head.x, -head.z))) < RANGE_TOUR_BEARING && Math.hypot(head.x, head.z) in RANGE_TOUR_DISTANCE
     }
 
     /** Call after every rendered frame. */
