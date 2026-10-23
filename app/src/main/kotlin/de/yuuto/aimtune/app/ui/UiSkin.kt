@@ -18,6 +18,9 @@ import de.yuuto.aimtune.app.Fonts
 
 /** Names of the widget styles registered in [UiSkin.skin]. */
 object Styles {
+    // Scroll pane of the screen frame
+    const val FRAME_SCROLL = "frame"
+
     // Label
     const val BODY = "body"
     const val BODY_MUTED = "bodyMuted"
@@ -219,6 +222,10 @@ class UiSkin(val tokens: Tokens, framebufferHeight: Int) : Disposable {
                 it.bottomHeight = LIST_ITEM_PADDING
             }
         }
+        // The page scroll of the screen frame: no background, a thin knob that shows there is more below.
+        skin.add(Styles.FRAME_SCROLL, ScrollPane.ScrollPaneStyle().apply {
+            vScrollKnob = shapes.roundedRect(tokens.radiusSm, tokens.neutral(600)).also { it.minWidth = FRAME_SCROLL_KNOB }
+        })
         val scroll = ScrollPane.ScrollPaneStyle().apply {
             background = shapes.roundedRect(tokens.radiusMd, tokens.surface, tokens.neutral(700), TILE_BORDER)
         }
@@ -265,6 +272,7 @@ class UiSkin(val tokens: Tokens, framebufferHeight: Int) : Disposable {
         const val LOGO_DOT = 8f
         const val OUTLINE = 2f
         const val TILE_BORDER = 1.5f
+        const val FRAME_SCROLL_KNOB = 6f
         const val FIELD_PADDING = 24f
         const val CURSOR_WIDTH = 2f
         const val SELECTION_ALPHA = 0.35f

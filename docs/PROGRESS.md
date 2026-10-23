@@ -219,6 +219,8 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 
 ## Last session
 
+- Layout fix (reported: the buttons of the acceleration screen were below the screen): the screen frame (`Widgets.frame`) puts the content into a vertical scroll pane with a thin knob (style `Styles.FRAME_SCROLL`, wheel works on hover, no drag scrolling), so the footer always stays visible on small screens or with UI scaling; the acceleration intro has two columns (text and "Refine my Raw Accel curve" left, starting point and checks right). Settings with the range rows now scrolls. Range rounds are not part of the curve finder (its scenarios are fixed: flick, switching, micro and flash).
+
 - M18 Refine my Raw Accel curve (branch `feature/m18-refine-curve`): new mode behind a button on the acceleration intro, see the M18 checklist and ALGORITHMS "Refine my Raw Accel curve". Import of the player's settings.json, 8 warm-up rounds with their curve, blind stages for level, high-speed gain and transition, blind test against their own curve, patched-copy export with a list of changed fields. The null gate passes (0 / 500 exports); the level gate does not (a 15 % level change is about 1 score point against a round sd of 13), reported as it is and no threshold changed. Not tried on the real mouse yet.
 
 - M15c Range scenario (branch `feature/m15-range-mode`):

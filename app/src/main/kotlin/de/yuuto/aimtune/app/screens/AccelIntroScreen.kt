@@ -18,8 +18,9 @@ import de.yuuto.aimtune.app.ui.onChange
 import de.yuuto.aimtune.input.windows.WindowsPointerSettings
 import java.util.Locale
 
-private const val TEXT_WIDTH = 1000f
-private const val CARD_WIDTH = 760f
+private const val TEXT_WIDTH = 880f
+private const val CARD_WIDTH = 840f
+private const val COLUMN_GAP = 56f
 private const val CARD_PADDING = 32f
 private const val FOOTER_BUTTON_HEIGHT = 64f
 
@@ -32,22 +33,29 @@ class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = c
     private val pointerAcceleration = WindowsPointerSettings.readAcceleration()
 
     override fun build(): Actor {
-        val content = Table()
-        content.add(ui.label(t("accel.title"), Styles.HEADING)).left().padBottom(24f).row()
-        content.add(
+        // Two columns, so the screen fits 1080 lines: what the steps are on the left, the setup they start from on the right.
+        val left = Table()
+        left.add(ui.label(t("accel.title"), Styles.HEADING)).left().padBottom(24f).row()
+        left.add(
             ui.label(t("accel.intro", StrengthSearch.DEFAULT_ROUNDS, AccelRun.DEFAULT_CALIBRATION_ROUNDS), Styles.BODY_MUTED, wrap = true),
         ).left().width(TEXT_WIDTH).padBottom(16f).row()
-        content.add(ui.label(t("accel.experimental"), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padBottom(40f).row()
-        content.add(baselineCard()).left().width(CARD_WIDTH).padBottom(24f).row()
-        content.add(rawAccelCheck()).left().row()
-        if (baseline != null && baseline.canUseFinder) content.add(finderCheck(baseline)).left().padTop(24f).row()
+        left.add(ui.label(t("accel.experimental"), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padBottom(32f).row()
+        left.add(ui.button(t("refine.intro.button"), Styles.SECONDARY) { ctx.showRefine() }).left().height(FOOTER_BUTTON_HEIGHT).row()
+        left.add(ui.label(t("refine.intro.help"), Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).padTop(8f).row()
+
+        val right = Table()
+        right.add(baselineCard()).left().width(CARD_WIDTH).padBottom(24f).row()
+        right.add(rawAccelCheck()).left().row()
+        if (baseline != null && baseline.canUseFinder) right.add(finderCheck(baseline)).left().padTop(24f).row()
         val searchRounds = baseline?.searchRounds(ctx.useFinderResult) ?: 0
-        if (searchRounds > 0) content.add(priorSearchCheck(searchRounds)).left().padTop(24f).row()
-        content.add(ui.button(t("refine.intro.button"), Styles.SECONDARY) { ctx.showRefine() }).left().height(FOOTER_BUTTON_HEIGHT).padTop(24f).row()
-        content.add(ui.label(t("refine.intro.help"), Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).padTop(8f).row()
+        if (searchRounds > 0) right.add(priorSearchCheck(searchRounds)).left().padTop(24f).row()
         if (!ctx.source.hasReportTimestamps) {
-            content.add(ui.label(t("accel.needs_raw_input", ctx.source.name), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padTop(24f)
+            right.add(ui.label(t("accel.needs_raw_input", ctx.source.name), Styles.CAUTION, wrap = true)).left().width(CARD_WIDTH).padTop(24f)
         }
+
+        val content = Table()
+        content.add(left).top().left().width(TEXT_WIDTH)
+        content.add(right).top().left().width(CARD_WIDTH).padLeft(COLUMN_GAP)
 
         val footer = Table()
         footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
@@ -101,7 +109,7 @@ class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = c
         }
         block.add(box).left().row()
         val windows = if (pointerAcceleration?.enabled == true) t("accel.windows_on") else ""
-        if (windows.isNotEmpty()) block.add(ui.label(windows, Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padTop(8f)
+        if (windows.isNotEmpty()) block.add(ui.label(windows, Styles.CAUTION, wrap = true)).left().width(CARD_WIDTH).padTop(8f)
         return block
     }
 
@@ -117,7 +125,7 @@ class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = c
             rebuild()
         }
         block.add(box).left().row()
-        block.add(ui.label(t("accel.use_finder_help", FinderResult.MIN_CONFIDENCE), Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).padTop(8f)
+        block.add(ui.label(t("accel.use_finder_help", FinderResult.MIN_CONFIDENCE), Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH).padTop(8f)
         return block
     }
 
@@ -128,7 +136,7 @@ class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = c
         box.isChecked = ctx.usePriorSearch
         box.onChange { ctx.usePriorSearch = box.isChecked }
         block.add(box).left().row()
-        block.add(ui.label(t("accel.use_prior_help"), Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).padTop(8f)
+        block.add(ui.label(t("accel.use_prior_help"), Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH).padTop(8f)
         return block
     }
 }
