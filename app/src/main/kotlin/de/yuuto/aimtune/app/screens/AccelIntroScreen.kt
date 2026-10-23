@@ -43,6 +43,8 @@ class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = c
         if (baseline != null && baseline.canUseFinder) content.add(finderCheck(baseline)).left().padTop(24f).row()
         val searchRounds = baseline?.searchRounds(ctx.useFinderResult) ?: 0
         if (searchRounds > 0) content.add(priorSearchCheck(searchRounds)).left().padTop(24f).row()
+        content.add(ui.button(t("refine.intro.button"), Styles.SECONDARY) { ctx.showRefine() }).left().height(FOOTER_BUTTON_HEIGHT).padTop(24f).row()
+        content.add(ui.label(t("refine.intro.help"), Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).padTop(8f).row()
         if (!ctx.source.hasReportTimestamps) {
             content.add(ui.label(t("accel.needs_raw_input", ctx.source.name), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padTop(24f)
         }

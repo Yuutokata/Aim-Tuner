@@ -66,7 +66,7 @@ object StoredSearches {
     fun searchRounds(kind: SessionKind, rounds: List<RoundRow>): List<RoundRow> = when (kind) {
         SessionKind.ACCEL_SEARCH -> rounds
         SessionKind.ACCEL_AB -> legacySearchRounds(rounds)
-        SessionKind.SENSITIVITY -> emptyList()
+        SessionKind.SENSITIVITY, SessionKind.ACCEL_REFINE -> emptyList()
     }
 
     private fun legacySearchRounds(rounds: List<RoundRow>): List<RoundRow> {
