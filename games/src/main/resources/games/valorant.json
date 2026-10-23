@@ -110,6 +110,79 @@
       ],
       "notes": "Documented windups (PC): Flashpoint 0.5 s, Arc Rose 0.5 s, Curveball 0.6 s, Blindside 0.6 s (the quick, common flashes; KAY/O FLASH/drive 1.0 s lobbed or 1.6 s thrown and Skye Guiding Light up to 2 s are slower and not modelled); maximum blind 1.5 s (Curveball, Blindside) to 2.25 s. Players who look away are blinded only briefly (secondary sources). The time a flash is visible before it pops also contains part of its flight, which no source gives: popDelaySeconds 0.5-0.65 follows the common windups (the visible flight before the windup is not given by any source); an earlier 0.45-0.9 was found too slow by the player and was chosen so that the simulated hand neither always nor never turns away in time. The exit margin of 10 degrees past the edge of the screen is an assumption for the glare. Measure both in the shooting range and set verified to true."
     },
+    "range": {
+      "spawnDelaySeconds": {
+        "min": 0.2,
+        "max": 0.8
+      },
+      "speedPresets": {
+        "easySeconds": 3.0,
+        "mediumSeconds": 2.0,
+        "hardSeconds": 1.2
+      },
+      "bearingDegrees": {
+        "min": -50.0,
+        "max": 80.0
+      },
+      "distanceMeters": {
+        "min": 5.0,
+        "max": 20.0
+      },
+      "botHeightMeters": 1.8,
+      "headDiameterMeters": 0.25,
+      "strafe": {
+        "speedMetersPerSecond": 2.5,
+        "movingSeconds": {
+          "min": 0.25,
+          "max": 0.5
+        },
+        "stopSeconds": {
+          "min": 0.1,
+          "max": 0.3
+        },
+        "reverseProbability": 0.6,
+        "maxOffsetMeters": 2.0
+      },
+      "killRule": {
+        "headHitKills": true,
+        "bodyHitsArmorOn": 4,
+        "bodyHitsArmorOff": 3
+      },
+      "valueNotes": {
+        "spawnDelaySeconds": {
+          "verified": false,
+          "source": "Measured, rough: clips of 2026-10-22 (60 fps, one played run, n = 19): a new bot about 1.8 s after the previous spawn minus a shot bot's lifetime of 1.4 s gives about 0.4 s; the 0.2-0.8 s spread is an assumption."
+        },
+        "speedPresets": {
+          "verified": false,
+          "source": "Assumption, not measured: the range has Speed Easy / Medium / Hard (valorant.fandom.com/wiki/Range) but none was selected in the clips; a bot lives 3.0 / 2.0 / 1.2 s. Without a preset an unshot bot never leaves (measured: one stayed 44 s)."
+        },
+        "bearingDegrees": {
+          "verified": false,
+          "source": "Measured: clips of 2026-10-22, bearings -51 to +81 degrees from the counter's forward direction in a played run; uniform between them is an assumption."
+        },
+        "distanceMeters": {
+          "verified": false,
+          "source": "Measured, rough: 3-19 m, median 6.8 m, from the angular size of a bot assumed 1.8 m tall (so partly circular); 5-20 m log-uniform is the rounded assumption."
+        },
+        "botHeightMeters": {
+          "verified": false,
+          "source": "Assumption: agents are about 2 m tall in secondary sources (the eye height of 1.6 m of this profile is also an assumption); 1.8 m for the bot."
+        },
+        "headDiameterMeters": {
+          "verified": false,
+          "source": "Assumption: Riot publishes no hitbox. A generous 0.25 m head sphere; the head hitbox was not measurable in the clips."
+        },
+        "strafe": {
+          "verified": false,
+          "source": "Measured: clips of 2026-10-22: move-stop-move, moving segments 0.36 s median (0.25-0.5), stops 0.2 s (0.1-0.3), about 12 degrees per second at an assumed 12 m (2.5 m/s, so partly circular). The reverse probability 0.6 and the +-2 m limit are assumptions."
+        },
+        "killRule": {
+          "verified": false,
+          "source": "Assumption: a head hit kills; Vandal damage against 100 health plus 50 armor needs 4 body hits with bot armor on and 3 with it off (Bot Armor is a setting of the range panel). Not observable in the clips."
+        }
+      }
+    },
     "verified": false
   }
 }

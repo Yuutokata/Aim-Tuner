@@ -17,6 +17,9 @@ enum class ScenarioKind(val id: String, val displayName: String, val usesClicks:
      */
     MICRO_STRAFE("micro-strafe", "Micro-adjust (strafing)", true, strafes = true),
     SWITCH_STRAFE("switch-strafe", "Target switching (strafing)", true, strafes = true),
+
+    /** Range mode: one bot at a time on the floor, strafing, with a head and a body (docs/RANGE.md). Uses the game's `range` block, or its defaults. */
+    RANGE("range", "Range", true, strafes = true),
     ;
 
     /**
@@ -24,7 +27,7 @@ enum class ScenarioKind(val id: String, val displayName: String, val usesClicks:
      * are what the simulation harness was calibrated on); with it the targets follow the game's
      * angular sizes, distances and speeds.
      */
-    fun create(durationNanos: Long, seed: Long, geometry: TrainerGeometry? = null): Scenario = when (this) {
+    fun create(durationNanos: Long, seed: Long, geometry: TrainerGeometry? = null, rangeOptions: RangeOptions = RangeOptions.DEFAULT): Scenario = when (this) {
         FLICK -> FlickScenario(FlickConfig(durationNanos = durationNanos, geometry = geometry), seed)
         MICRO -> MicroScenario(MicroConfig(durationNanos = durationNanos, geometry = geometry), seed)
         MICRO_STRAFE -> MicroScenario(MicroConfig(durationNanos = durationNanos, geometry = geometry, strafe = strafeFor(geometry)), seed)
@@ -32,6 +35,7 @@ enum class ScenarioKind(val id: String, val displayName: String, val usesClicks:
         SWITCHING -> SwitchingScenario(SwitchingConfig(durationNanos = durationNanos, geometry = geometry), seed)
         SWITCH_STRAFE -> SwitchingScenario(SwitchingConfig(durationNanos = durationNanos, geometry = geometry, strafe = strafeFor(geometry)), seed)
         FLASH -> FlashScenario(durationNanos, geometry ?: TrainerGeometry.DEFAULT, seed)
+        RANGE -> RangeScenario(RangeConfig(durationNanos, geometry ?: TrainerGeometry.DEFAULT, options = rangeOptions), seed)
     }
 
     private fun strafeFor(geometry: TrainerGeometry?): StrafeConfig = geometry?.let { StrafeConfig.from(it) } ?: StrafeConfig()

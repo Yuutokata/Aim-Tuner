@@ -16,7 +16,7 @@ class TargetPath(events: List<TargetEvent>) {
             when (event) {
                 is TargetEvent.Spawned -> getOrPut(event.target.id) { mutableListOf() } += Point(event.timeNanos, event.target.center)
                 is TargetEvent.Waypoint -> getOrPut(event.targetId) { mutableListOf() } += Point(event.timeNanos, event.center)
-                is TargetEvent.Hit, is TargetEvent.Miss, is TargetEvent.FlashCue, is TargetEvent.FlashPop -> Unit
+                is TargetEvent.Hit, is TargetEvent.Miss, is TargetEvent.BodyHit, is TargetEvent.Despawned, is TargetEvent.FlashCue, is TargetEvent.FlashPop -> Unit
             }
         }
     }.mapValues { (_, points) -> points.sortedBy { it.timeNanos } }

@@ -96,6 +96,10 @@ data class RoundMetrics(
     val meanAbsLeadErrorDegrees: Double? = null,
     /** Moving targets only: mean absolute endpoint error across the target's motion in degrees. */
     val meanAbsAimErrorDegrees: Double? = null,
+    /** Range rounds only: bots killed, the median time from a bot's spawn to its kill, and clicks per kill. */
+    val rangeKills: Int? = null,
+    val rangeMedianTimeToKillMs: Double? = null,
+    val rangeShotsPerKill: Double? = null,
 ) {
     /** Share of the endpoint error (summed over both axes) that is vertical, null without first movements. */
     val verticalErrorShare: Double?
@@ -122,6 +126,7 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
     }
     val tracking = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.TRACKING) computeTrackingMetrics(recording, track) else null
     val flash = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.FLASH) computeFlashMetrics(recording, track, submovements) else null
+    val range = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.RANGE) computeRangeMetrics(recording) else null
     val errors = movements.mapNotNull { it.firstErrorRatio }
     return RoundMetrics(
         hits = summary.hits,
@@ -146,6 +151,9 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
         meanLeadErrorDegrees = movements.mapNotNull { it.leadErrorDegrees }.averageOrNull(),
         meanAbsLeadErrorDegrees = movements.mapNotNull { it.leadErrorDegrees }.map { abs(it) }.averageOrNull(),
         meanAbsAimErrorDegrees = movements.mapNotNull { it.aimErrorDegrees }.map { abs(it) }.averageOrNull(),
+        rangeKills = range?.kills,
+        rangeMedianTimeToKillMs = range?.medianTimeToKillMs,
+        rangeShotsPerKill = range?.shotsPerKill,
     )
 }
 
@@ -160,10 +168,11 @@ fun allFirstReaches(recording: RoundRecording, params: MetricsParams = MetricsPa
     val track = ViewTrack(recording)
     val path = TargetPath(recording.targetEvents)
     val hits = recording.targetEvents.filterIsInstance<TargetEvent.Hit>().associate { it.targetId to it.timeNanos }
+    val despawns = recording.targetEvents.filterIsInstance<TargetEvent.Despawned>().associate { it.targetId to it.timeNanos }
     val spawns = recording.targetEvents.filterIsInstance<TargetEvent.Spawned>()
     val roundEnd = recording.mouseEvents.lastOrNull()?.timeNanos ?: return emptyList()
     return spawns.mapIndexedNotNull { index, spawn ->
-        val end = hits[spawn.target.id] ?: spawns.getOrNull(index + 1)?.timeNanos ?: roundEnd
+        val end = hits[spawn.target.id] ?: despawns[spawn.target.id] ?: spawns.getOrNull(index + 1)?.timeNanos ?: roundEnd
         if (end <= spawn.timeNanos) null else movementMetric(recording, track, submovements, path, spawn, spawn.timeNanos, end, params)
     }
 }

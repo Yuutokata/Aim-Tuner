@@ -255,6 +255,14 @@ class RoundRepository(private val database: Database) {
                         s.setInt(5, event.targetId)
                     }
                     is TargetEvent.Miss -> s.setString(3, MISS)
+                    is TargetEvent.BodyHit -> {
+                        s.setString(3, BODY_HIT)
+                        s.setInt(5, event.targetId)
+                    }
+                    is TargetEvent.Despawned -> {
+                        s.setString(3, DESPAWNED)
+                        s.setInt(5, event.targetId)
+                    }
                     is TargetEvent.Waypoint -> {
                         s.setString(3, WAYPOINT)
                         s.setInt(5, event.targetId)
@@ -311,6 +319,8 @@ class RoundRepository(private val database: Database) {
                                 SPAWNED -> TargetEvent.Spawned(time, Target(rs.getInt(3), Vec3(rs.getDouble(4), rs.getDouble(5), rs.getDouble(6)), rs.getDouble(7)))
                                 HIT -> TargetEvent.Hit(time, rs.getInt(3))
                                 MISS -> TargetEvent.Miss(time)
+                                BODY_HIT -> TargetEvent.BodyHit(time, rs.getInt(3))
+                                DESPAWNED -> TargetEvent.Despawned(time, rs.getInt(3))
                                 WAYPOINT -> TargetEvent.Waypoint(time, rs.getInt(3), Vec3(rs.getDouble(4), rs.getDouble(5), rs.getDouble(6)))
                                 FLASH_CUE -> TargetEvent.FlashCue(time, rs.getInt(3), rs.getDouble(4), rs.getDouble(5), startNanos + rs.getDouble(6).toLong(), rs.getDouble(7))
                                 FLASH_POP -> TargetEvent.FlashPop(time, rs.getInt(3), rs.getDouble(4) > 0.5, rs.getDouble(5).toLong().let { if (it > 0L) startNanos + it else 0L })
@@ -349,6 +359,8 @@ class RoundRepository(private val database: Database) {
         const val HIT = "hit"
         const val MISS = "miss"
         const val WAYPOINT = "waypoint"
+        const val BODY_HIT = "body_hit"
+        const val DESPAWNED = "despawned"
         const val FLASH_CUE = "flash_cue"
         const val FLASH_POP = "flash_pop"
     }
@@ -377,6 +389,9 @@ fun RoundMetrics.toNamedValues(): Map<String, Double> = buildMap {
     meanLeadErrorDegrees?.let { put("mean_lead_error_deg", it) }
     meanAbsLeadErrorDegrees?.let { put("mean_abs_lead_error_deg", it) }
     meanAbsAimErrorDegrees?.let { put("mean_abs_aim_error_deg", it) }
+    rangeKills?.let { put("range_kills", it.toDouble()) }
+    rangeMedianTimeToKillMs?.let { put("range_median_ttk_ms", it) }
+    rangeShotsPerKill?.let { put("range_shots_per_kill", it) }
 }
 
 /** The stored metrics a round's score is computed from, as [de.yuuto.aimtune.core.metrics.RoundMetrics.scoreInputs] would give them. */

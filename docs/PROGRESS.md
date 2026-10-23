@@ -204,6 +204,7 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 - [~] 3 Measurement scripts (`tools/range-re/`: `unitchain.py` + tests, `turn_calibration.py`, `detect_bots.py`, `analyse_tracks.py`) and a first `out/range-spec.json` from the two clips; preliminary, `verified: false` (the tracker finds only 7 of about 20 bots, see RANGE.md)
 - [x] 4 REA pass (behaviour spec in RANGE.md, decided 2026-10-22)
 - [x] M15a moving-target metrics: `StrafeMotion`, scenarios `micro-strafe` and `switch-strafe` (opt-in tiles in settings), metrics against the target at the end of the reach with lead and aim components, curve-analysis filter, strafing simulated aimer; gate `M15aGateTest` passed (static metrics identical, no false offers from strafing rounds); ALGORITHMS "Moving targets"
+- [~] M15c Range scenario (step 5, in progress): profile `trainer.range`, `RangeScenario`, metrics, range aimer done in core; app rendering, settings and gate follow
 - [ ] 5 Integration: profile, `RangeScenario`, arena, metrics, pipeline and menu, simulator, gate (ALGORITHMS "M15")
 - [ ] 6 Docs, screenshot tour EN/DE
 - [ ] Open (user): record the clips from RECORDING.md

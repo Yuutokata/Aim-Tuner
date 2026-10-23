@@ -64,7 +64,7 @@ class SimulatedAimer(
 
     private class Observation(val timeNanos: Long, val center: Vec3)
 
-    private enum class Mode { NO_TARGET, REACTING, MOVING, SETTLING, CLICKING }
+    private enum class Mode { NO_TARGET, REACTING, MOVING, SETTLING, CLICKING, FOLLOWING }
 
     private val random = Random(seed)
     private val degPerCount = degreesPerCount(dpi, cm360)
@@ -136,7 +136,7 @@ class SimulatedAimer(
         deadlineNanos = target?.let(deadlineOf)
         val seenBefore = target != null && target.id in seenTargets
         targets.forEach { seenTargets += it.id }
-        return clickStep(nowNanos, target, seenBefore)
+        return if (kind == ScenarioKind.RANGE) rangeStep(nowNanos, target, seenBefore) else clickStep(nowNanos, target, seenBefore)
     }
 
     /**
@@ -307,9 +307,71 @@ class SimulatedAimer(
                     wakeNanos = nowNanos + ms(MISS_RECHECK_MS)
                 }
             }
-            Mode.NO_TARGET -> Unit
+            Mode.NO_TARGET, Mode.FOLLOWING -> Unit
         }
         return emitCounts(nowNanos, click)
+    }
+
+    /**
+     * Range bots: a flick to the bot, then following it (a smooth correction every 40 ms toward where it is predicted to be,
+     * or a corrective reach when the crosshair is far off) and a click once the crosshair is on the head as the player
+     * predicts it. This is how people shoot a strafing bot; the closed loop of [clickStep] (look, reach, look again) never
+     * catches up with a target that turns every 0.3 s.
+     */
+    private fun rangeStep(nowNanos: Long, target: Target?, seenBefore: Boolean): AimerStep {
+        if (target == null) {
+            mode = Mode.NO_TARGET
+            observations.clear()
+            return emitCounts(nowNanos, click = false)
+        }
+        if (target.id != targetId) {
+            beginTarget(nowNanos, target, seenBefore)
+            observations.clear()
+        }
+        observations.addLast(Observation(nowNanos, target.center))
+        while (observations.size > 1 && observations.first().timeNanos < nowNanos - ms(TRACK_HISTORY_MS)) observations.removeFirst()
+        var click = false
+        when (mode) {
+            Mode.REACTING -> if (nowNanos >= wakeNanos) planReach(nowNanos, target, primary = true)
+            Mode.MOVING -> if (nowNanos >= lastEnd()) {
+                mode = Mode.FOLLOWING
+                nextControlNanos = nowNanos + ms(player.feedbackDelayMs * fatigue(nowNanos))
+            }
+            Mode.FOLLOWING -> if (nowNanos >= nextControlNanos) {
+                nextControlNanos = nowNanos + ms(TRACK_STEP_MS)
+                follow(nowNanos, target)
+            }
+            Mode.CLICKING -> if (nowNanos >= wakeNanos) {
+                if (holdsForStop(nowNanos, target)) {
+                    wakeNanos = nowNanos + ms(STOP_RECHECK_MS)
+                } else {
+                    click = true
+                    twitch(nowNanos)
+                    mode = Mode.FOLLOWING
+                    nextControlNanos = nowNanos + ms(MISS_RECHECK_MS)
+                }
+            }
+            Mode.SETTLING, Mode.NO_TARGET -> Unit
+        }
+        return emitCounts(nowNanos, click)
+    }
+
+    private fun follow(nowNanos: Long, target: Target) {
+        val error = aimError(nowNanos, target, noisy = false)
+        val off = hypot(error.x, error.y)
+        when {
+            off <= angularRadius(target) -> {
+                mode = Mode.CLICKING
+                // The click is prepared while following: it goes out as soon as the crosshair is where the player predicts the head to be.
+                wakeNanos = nowNanos
+                clickReadyNanos = wakeNanos
+            }
+            off > RANGE_CORRECTION_DEGREES && corrections < player.maxCorrections -> {
+                corrections++
+                planReach(nowNanos, target, primary = false)
+            }
+            else -> controlTracking(nowNanos)
+        }
     }
 
     private fun beginTarget(nowNanos: Long, target: Target, seenBefore: Boolean) {
@@ -374,14 +436,15 @@ class SimulatedAimer(
      * player extends the motion it saw over that lag and the time the reach takes, scaled by how well it anticipates
      * ([SimulatedPlayer.trackingPrediction]) and randomly off ([SimulatedPlayer.strafePredictionNoise]).
      */
-    private fun aimError(nowNanos: Long, target: Target): Offset {
+    private fun aimError(nowNanos: Long, target: Target, noisy: Boolean = true): Offset {
         val plain = errorTo(nowNanos, target)
         if (!strafing) return plain
         val seen = seenOf(nowNanos, target) ?: return plain
         val width = max(2.0 * angularRadius(target), MIN_WIDTH_DEGREES)
         val reachMs = player.fittsInterceptMs + player.fittsSlopeMs * log2(1.0 + hypot(plain.x, plain.y) / width)
         val lagMs = player.trackingLagMs * fatigue(nowNanos)
-        val lead = player.trackingPrediction * max(0.0, 1.0 + player.strafePredictionNoise * gaussian()) * (lagMs + reachMs) / MS_PER_S
+        val noise = if (noisy) player.strafePredictionNoise * gaussian() else 0.0
+        val lead = player.trackingPrediction * max(0.0, 1.0 + noise) * (lagMs + reachMs) / MS_PER_S
         val yaw = seen.yaw + seen.yawSpeed * lead
         val pitch = seen.pitch + seen.pitchSpeed * lead
         return Offset((yaw - trueYaw) * cos(Math.toRadians(pitch)), pitch - truePitch)
@@ -561,6 +624,10 @@ class SimulatedAimer(
         /** A turn away from a flash does not aim at anything; it only has to get far enough, so it is as sloppy as a wide target. */
         const val FLASH_TURN_WIDTH_DEGREES = 25.0
         const val CORRECTION_SPEEDUP = 0.6
+
+        /** A following player far further off than this makes a corrective reach instead of a smooth correction. */
+        const val RANGE_CORRECTION_DEGREES = 3.0
+
         const val MISS_RECHECK_MS = 100.0
 
         /** A strafing target seen moving faster than this is not stopped; the player waits at most [MAX_STOP_WAIT_MS] for it, looking again every [STOP_RECHECK_MS]. */

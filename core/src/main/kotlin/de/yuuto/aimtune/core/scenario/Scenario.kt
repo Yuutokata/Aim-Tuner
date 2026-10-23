@@ -22,6 +22,12 @@ sealed interface TargetEvent {
     data class Hit(override val timeNanos: Long, val targetId: Int) : TargetEvent
     data class Miss(override val timeNanos: Long) : TargetEvent
 
+    /** A shot hit the body of target [targetId] (range bots) but did not kill it; it counts as a shot that missed the head. */
+    data class BodyHit(override val timeNanos: Long, val targetId: Int) : TargetEvent
+
+    /** Target [targetId] disappeared without being hit (range bots with a speed preset). */
+    data class Despawned(override val timeNanos: Long, val targetId: Int) : TargetEvent
+
     /**
      * A moving target is at [center] at [timeNanos]. Between two waypoints of the same target it
      * moves on the path [TargetPath] defines; the [Spawned] event is its first waypoint.

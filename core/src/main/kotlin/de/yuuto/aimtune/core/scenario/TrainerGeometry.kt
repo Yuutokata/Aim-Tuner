@@ -66,6 +66,8 @@ data class TrainerGeometry(
     val elevation: ElevationMix = ElevationMix(),
     /** The minimal map (floor, wall, corners, doorways) and how often a target stands at a corner or doorway. */
     val arena: ArenaLayout = ArenaLayout(),
+    /** Range mode of the game; null when the profile has no `range` block, and the game then has no Range mode. */
+    val range: RangeGeometry? = null,
     val verified: Boolean = false,
 ) {
     init {
