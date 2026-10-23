@@ -11,9 +11,9 @@ import kotlin.random.Random
  * leave the screen.
  */
 data class StrafeConfig(
-    val speedMetersPerSecond: Double = 2.5,
-    val movingSeconds: PositiveRange = PositiveRange(0.25, 0.5),
-    val stopSeconds: PositiveRange = PositiveRange(0.1, 0.3),
+    val speedMetersPerSecond: Double = 2.2,
+    val movingSeconds: PositiveRange = PositiveRange(0.25, 0.45),
+    val stopSeconds: PositiveRange = PositiveRange(0.3, 0.7),
     /** Chance that the target turns around after a stop instead of going on in the same direction. */
     val reverseProbability: Double = 0.6,
     val maxOffsetMeters: Double = 2.0,

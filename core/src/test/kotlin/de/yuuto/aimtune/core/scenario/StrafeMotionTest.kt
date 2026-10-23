@@ -41,7 +41,7 @@ class StrafeMotionTest {
     }
 
     @Test
-    fun `legs alternate between moving for 0_25-0_5 s at the speed and standing for 0_1-0_3 s`() {
+    fun `legs alternate between moving for 0_25-0_45 s at the speed and standing for 0_3-0_7 s`() {
         val waypoints = motion().extendTo(60 * nanosPerSecond)
         val offsets = lateralOffsets(waypoints)
         val times = listOf(0L) + waypoints.map { it.timeNanos }
@@ -52,11 +52,11 @@ class StrafeMotionTest {
             val metersMoved = abs(offsets[i] - offsets[i - 1])
             if (metersMoved < 1e-9) {
                 standing++
-                assertTrue(seconds in 0.1 - 1e-6..0.3 + 1e-6, "stop of $seconds s")
+                assertTrue(seconds in 0.3 - 1e-6..0.7 + 1e-6, "stop of $seconds s")
             } else {
                 moving++
-                assertTrue(seconds in 0.25 - 1e-6..0.5 + 1e-6, "move of $seconds s")
-                assertEquals(2.5, metersMoved / seconds, 1e-6, "speed")
+                assertTrue(seconds in 0.25 - 1e-6..0.45 + 1e-6, "move of $seconds s")
+                assertEquals(2.2, metersMoved / seconds, 1e-6, "speed")
             }
         }
         assertTrue(moving > 50 && standing > 50, "moving $moving, standing $standing")
