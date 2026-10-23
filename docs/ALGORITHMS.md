@@ -332,6 +332,19 @@ For a player without preference the search with flicks, switching and micro alon
 
 **Limits.** Every number above comes from simulated players, the pop delay and the exit margin are assumptions, the simulated hand is not validated against people (it is slow with head-sized targets: plain movements reach only 3-5 in/s), and the flash is a simplified model: its sounds are synthesized (below), not the game's, there is no gradual fade, no blind duration that depends on how far the player turned or on the distance.
 
+## Two-stage strength search, M19 experiment (not adopted)
+
+Question (docs/CURVE-FINDER-AUDIT.md, option O4): does a level stage (a 20-round sensitivity search at 20-140 cm/360) before the strength search keep the detection of a true rising or falling preference and still remove the falling results of hands that only want another overall level? `TwoStageStrengthTest` (`AIMTUNE_REVIEW=1`, `AIMTUNE_SEEDS=100` = 60 seeds per row, `core/build/reports/harness/two-stage-strength.txt`) plays the audit's hands (ADAPTED = 0.75 x the user's curve, ADAPTED_HIGH = 0.53 x, FLAT, RISING / FALLING = gainPlayer +-0.30) through the strength search of `dev` (with the M16 falling rule) and three level variants. Export = offered and the blind A/B says better; the A/B plays at the level the search used.
+
+| Variant | ADAPTED export (falling) | ADAPTED_HIGH | FLAT | RISING right | FALLING right |
+|---|---|---|---|---|---|
+| current (game sensitivity, no level stage) | 8 % (0 %) | 3 % (0 %) | 3 % | 100 % | 87 % |
+| O4 full level, 20 extra rounds | 23 % (0 %) | 58 % (0 %) | 0 % | 53 % | 78 % |
+| level only when its interval excludes the game sensitivity | 23 % (0 %) | 45 % (0 %) | 3 % | 75 % | 83 % |
+| level half-way (geometric mean) | 25 % (0 %) | 37 % (0 %) | 0 % | 82 % | 88 % |
+
+Result: the audit's problem is already solved by M16 (the current row has no falling export for any adapted hand, no harmful export for a flat hand, RISING 100 %). The level stage adds a gain for hands adapted to a lower level (ADAPTED_HIGH 3 % to 37-58 % exported) but costs 20 rounds and no variant meets the gate (RISING >= 80 % and FALLING >= 90 % together; the best, half-way, has 82 % and 88 %, and the full stage 53 % and 78 %), because a rising preference is partly absorbed by the level. Not adopted; the strength search stays as it is. Not simulated: flash rounds in the strength search, a 2-D joint search of level and strength. Differences of 5-8 points between rows are within the noise of 60 seeds.
+
 ## Multi-session merging (M5)
 
 Rounds with the same game and DPI from all sessions enter one fit; each blind-test run is its own session for the offset term. Scores are recomputed over all of them every time. See `SensitivityOptimizerTest` (merged sessions with a 10 point worse second day).
