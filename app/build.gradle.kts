@@ -40,6 +40,23 @@ tasks.register<JavaExec>("screenshotsDe") {
     args("--screenshots", layout.buildDirectory.dir("screenshots-de").get().asFile.path, "--language", "de")
 }
 
+// The same tour in a 1280x720 window, to check that nothing is clipped on a small screen.
+tasks.register<JavaExec>("screenshots720") {
+    group = "verification"
+    description = "Saves a PNG of every UI screen at 1280x720 to build/screenshots-720."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set(application.mainClass)
+    args("--screenshots", layout.buildDirectory.dir("screenshots-720").get().asFile.path, "--window-size", "1280x720")
+}
+
+tasks.register<JavaExec>("screenshots720De") {
+    group = "verification"
+    description = "Saves a PNG of every UI screen in German at 1280x720 to build/screenshots-720-de."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set(application.mainClass)
+    args("--screenshots", layout.buildDirectory.dir("screenshots-720-de").get().asFile.path, "--language", "de", "--window-size", "1280x720")
+}
+
 // The UI tokens live once in docs/design and are bundled into the app from there.
 // The version of this build (-PappVersion from the release tag) for the update check; dev runs show the default.
 val appVersionName = providers.gradleProperty("appVersion").orElse("0.1.0")

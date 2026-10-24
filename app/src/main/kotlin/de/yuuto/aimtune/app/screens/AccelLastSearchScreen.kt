@@ -33,11 +33,11 @@ class AccelLastSearchScreen(ctx: AppContext, private val last: LastSearch?) : Ac
         }
 
         val footer = Table()
-        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showAccel() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
+        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showRawAccelHub() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
         if (last != null && offer != null) addCurveActions(footer, offer, last.dpi, last.cm360)
         return ui.frame(null, content, footer)
     }
 
-    override fun onEscape() = ctx.showAccel()
+    override fun onEscape() = ctx.showRawAccelHub()
 }

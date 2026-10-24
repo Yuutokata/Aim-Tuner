@@ -11,7 +11,6 @@ import de.yuuto.aimtune.app.accel.StrengthSearch
 import de.yuuto.aimtune.app.ui.Styles
 import de.yuuto.aimtune.app.ui.addButton
 import de.yuuto.aimtune.app.ui.button
-import de.yuuto.aimtune.app.ui.caps
 import de.yuuto.aimtune.app.ui.frame
 import de.yuuto.aimtune.app.ui.label
 import de.yuuto.aimtune.app.ui.onChange
@@ -21,7 +20,6 @@ import java.util.Locale
 private const val TEXT_WIDTH = 880f
 private const val CARD_WIDTH = 840f
 private const val COLUMN_GAP = 56f
-private const val CARD_PADDING = 32f
 private const val FOOTER_BUTTON_HEIGHT = 64f
 
 /**
@@ -39,12 +37,10 @@ class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = c
         left.add(
             ui.label(t("accel.intro", StrengthSearch.DEFAULT_ROUNDS, AccelRun.DEFAULT_CALIBRATION_ROUNDS), Styles.BODY_MUTED, wrap = true),
         ).left().width(TEXT_WIDTH).padBottom(16f).row()
-        left.add(ui.label(t("accel.experimental"), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padBottom(32f).row()
-        left.add(ui.button(t("refine.intro.button"), Styles.SECONDARY) { ctx.showRefine() }).left().height(FOOTER_BUTTON_HEIGHT).row()
-        left.add(ui.label(t("refine.intro.help"), Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).padTop(8f).row()
+        left.add(ui.label(t("accel.experimental"), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).row()
 
         val right = Table()
-        right.add(baselineCard()).left().width(CARD_WIDTH).padBottom(24f).row()
+        right.add(ctx.runsUseCard(ctx.runsUse(baseline), CARD_WIDTH) { ctx.showAccel() }).left().width(CARD_WIDTH).padBottom(24f).row()
         right.add(rawAccelCheck()).left().row()
         if (baseline != null && baseline.canUseFinder) right.add(finderCheck(baseline)).left().padTop(24f).row()
         val searchRounds = baseline?.searchRounds(ctx.useFinderResult) ?: 0
@@ -58,9 +54,7 @@ class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = c
         content.add(right).top().left().width(CARD_WIDTH).padLeft(COLUMN_GAP)
 
         val footer = Table()
-        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
-        footer.add(ui.button(t("accel.last"), Styles.SECONDARY) { ctx.showLastAccelAnalysis() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(16f)
-        footer.add(ui.button(t("accel.last_search"), Styles.SECONDARY) { ctx.showLastSearch() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(16f)
+        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showRawAccelHub() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
         val calibrate = ui.button(t("accel.start_calibration"), Styles.SECONDARY) { if (canStart()) ctx.startAccelRun() }
         calibrate.isDisabled = !canStart()
@@ -71,33 +65,13 @@ class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = c
         return ui.frame(null, content, footer)
     }
 
-    override fun onEscape() = ctx.showMenu()
+    override fun onEscape() = ctx.showRawAccelHub()
 
     override fun onEnter() {
         if (canStart()) ctx.startAccelRun(search = true)
     }
 
     private fun canStart() = baseline != null && ctx.rawAccelConfirmed && ctx.source.hasReportTimestamps
-
-    private fun baselineCard(): Table {
-        val card = Table()
-        card.background(ui.skin.getDrawable(if (baseline == null) Styles.CARD_CAUTION else Styles.CARD))
-        card.pad(CARD_PADDING)
-        card.add(ui.caps(t("accel.baseline_title"))).left().row()
-        if (baseline == null) {
-            card.add(ui.label(t("accel.baseline_none"), Styles.TITLE)).left().padTop(8f).row()
-            card.add(ui.label(t("accel.baseline_none_help"), Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(4f)
-        } else {
-            val finder = baseline.finder?.takeIf { ctx.useFinderResult && baseline.canUseFinder }
-            val cm360 = baseline.cm360(ctx.useFinderResult)
-            val sensitivity = finder?.sensitivityText ?: baseline.gameSensitivityText
-            val value = t("accel.baseline_value", "%.1f".format(Locale.ROOT, cm360), baseline.gameName, sensitivity)
-            card.add(ui.label(value, Styles.NUMBER_MD)).left().padTop(8f).row()
-            val source = if (finder != null) t("accel.baseline_finder", finder.rounds, finder.confidencePercent) else t("accel.baseline_game")
-            card.add(ui.label(source, Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(4f)
-        }
-        return card
-    }
 
     private fun rawAccelCheck(): Table {
         val block = Table()

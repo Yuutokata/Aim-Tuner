@@ -64,7 +64,7 @@ class SoundSettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         ctx.settings.save(
             ctx.settings.current.copy(flashVolumePercent = flashVolume, hitVolumePercent = hitVolume, flashBrightnessPercent = brightness),
         )
-        ctx.showSettings()
+        ctx.showSettings(ctx.settingsReturn)
     }
 
     private fun reset() {

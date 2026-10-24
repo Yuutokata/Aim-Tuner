@@ -1,5 +1,7 @@
 package de.yuuto.aimtune.app.i18n
 
+import de.yuuto.aimtune.app.accel.RawAccelSetting
+import de.yuuto.aimtune.app.accel.SettingKind
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import java.io.File
 import java.io.InputStreamReader
@@ -38,7 +40,7 @@ class BundlesTest {
 
     @Test
     fun `every key the code refers to exists`() {
-        val keyLike = Regex(""""((?:accel|refine|between|common|hud|menu|metric|onboarding|pretest|results|round|scenario|settings|setup|history|crosshair|update)\.[a-z_.]+)"""")
+        val keyLike = Regex(""""((?:hub|accel|refine|between|common|hud|menu|metric|onboarding|pretest|results|round|scenario|settings|setup|history|crosshair|update)\.[a-z_.]+)"""")
         val sources = File("src/main/kotlin").walkTopDown().filter { it.extension == "kt" }.toList()
         assertTrue(sources.isNotEmpty(), "source folder not found from ${File(".").absolutePath}")
         val used = sources.flatMap { file -> keyLike.findAll(file.readText()).map { it.groupValues[1] to file.name }.toList() }
@@ -54,6 +56,14 @@ class BundlesTest {
             assertTrue("hud.instruction.${it.id}" in english, "instruction ${it.id}")
         }
         listOf("date", "game", "rounds", "cm", "confidence", "type").forEach { assertTrue("history.col_$it" in english, it) }
+    }
+
+    @Test
+    fun `every Raw Accel setting has its texts`() {
+        RawAccelSetting.entries.forEach { setting ->
+            val keys = listOf("name", "what", "formula", "why") + if (setting.kind == SettingKind.INFO) listOf("recommended", "not_measured") else emptyList()
+            keys.forEach { assertTrue("hub.set.${setting.id}.$it" in english, "hub.set.${setting.id}.$it") }
+        }
     }
 
     @Test

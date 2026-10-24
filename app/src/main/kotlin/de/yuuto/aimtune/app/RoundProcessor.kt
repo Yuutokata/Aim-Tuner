@@ -5,6 +5,7 @@ import de.yuuto.aimtune.app.accel.LastCalibration
 import de.yuuto.aimtune.app.accel.LastSearch
 import de.yuuto.aimtune.app.accel.PriorCalibration
 import de.yuuto.aimtune.app.accel.PriorSearchRound
+import de.yuuto.aimtune.app.accel.SettingsAnalyses
 import de.yuuto.aimtune.app.accel.StoredSearches
 import de.yuuto.aimtune.app.blind.AxisErrors
 import de.yuuto.aimtune.app.blind.PastRound
@@ -26,6 +27,7 @@ import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /** What the HUD shows about the most recent round's analysis. */
 sealed interface RoundReport {
@@ -59,6 +61,11 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
     @Volatile
     var report: RoundReport? = null
         private set
+
+    private val storedCounter = AtomicInteger()
+
+    /** How many rounds this run has stored; the Raw Accel hub uses it to know when its analyses are out of date. */
+    val storedCount: Int get() = storedCounter.get()
 
     init {
         // Rounds stored with an older metric definition are recomputed from their raw events before anything reads them.
@@ -193,6 +200,27 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
         return PriorCalibration(metrics.size, movementSamples(metrics, dpi))
     }
 
+    /**
+     * The passive setting analyses of the newest [MAX_ANALYSED_ROUNDS] plain rounds. The rounds are read on the storage thread
+     * (so the read never overlaps a save), the analyses run on the common pool; nothing blocks the caller. Without a database
+     * or when reading fails the analyses see no rounds and say "not enough data".
+     */
+    fun settingsAnalyses(): CompletableFuture<SettingsAnalyses> {
+        val repo = repository ?: return CompletableFuture.completedFuture(SettingsAnalyses.compute(emptyList()))
+        val recordings = CompletableFuture<List<RoundRecording>>()
+        executor.execute {
+            recordings.complete(
+                try {
+                    repo.rounds().filter { it.accel == null }.takeLast(MAX_ANALYSED_ROUNDS).mapNotNull { repo.loadRecording(it.id) }
+                } catch (e: Exception) {
+                    log.log(System.Logger.Level.ERROR, "reading rounds for the setting analyses failed: ${e.message}", e)
+                    emptyList()
+                },
+            )
+        }
+        return recordings.thenApplyAsync { SettingsAnalyses.compute(it) }
+    }
+
     /** All stored sessions and rounds, read on the storage thread; empty without a database or if reading fails. */
     fun storedHistory(): StoredHistory {
         val repo = repository ?: return StoredHistory(emptyList(), emptyList())
@@ -234,6 +262,7 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
                     sessionKey = key
                 }
             repo.saveRound(session, recording, startedAtMs, blind, metrics)
+            storedCounter.incrementAndGet()
             null
         } catch (e: Exception) {
             log.log(System.Logger.Level.ERROR, "saving round failed", e)
@@ -252,5 +281,8 @@ class RoundProcessor(private val database: Database?, private val exportDir: Pat
 
     private companion object {
         const val SHUTDOWN_WAIT_SECONDS = 10L
+
+        /** The analyses read this many plain rounds at most; the newest ones, so the memory and the time stay bounded. */
+        const val MAX_ANALYSED_ROUNDS = 120
     }
 }

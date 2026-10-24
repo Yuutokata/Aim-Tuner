@@ -154,9 +154,12 @@ object RawAccelExport {
         val file = generateSequence(1) { it + 1 }
             .map { if (it == 1) directory.resolve("$stem.json") else directory.resolve("$stem ($it).json") }
             .first { !Files.exists(it) }
-        Files.writeString(file, patchedJson.encodeToString(JsonElement.serializer(), root) + "\n")
+        Files.writeString(file, patchedText(root))
         return file
     }
+
+    /** [root] as Raw Accel writes its own file: two-space indentation and a closing newline. */
+    fun patchedText(root: JsonObject): String = patchedJson.encodeToString(JsonElement.serializer(), root) + "\n"
 
     /** [block] with the whitelisted shape fields of [old]'s mode that [new] changed; the keys keep their place and every other entry stays as it was. */
     private fun withShape(block: JsonObject, old: RawAccelArgs, new: RawAccelArgs): JsonObject {

@@ -13,7 +13,17 @@ import de.yuuto.aimtune.app.accel.AccelSession
 import de.yuuto.aimtune.app.accel.LastCalibration
 import de.yuuto.aimtune.app.accel.LastSearch
 import de.yuuto.aimtune.app.accel.PriorCalibration
+import de.yuuto.aimtune.app.accel.HubSession
+import de.yuuto.aimtune.app.accel.ImportedProfile
+import de.yuuto.aimtune.app.accel.PatchedCopy
+import de.yuuto.aimtune.app.accel.RawAccelSetting
+import de.yuuto.aimtune.app.accel.RefineOutcome
 import de.yuuto.aimtune.app.accel.RefineRun
+import de.yuuto.aimtune.app.accel.SettingsAnalyses
+import de.yuuto.aimtune.app.accel.RunsUse
+import de.yuuto.aimtune.app.screens.RawAccelExportScreen
+import de.yuuto.aimtune.app.screens.RawAccelHubScreen
+import de.yuuto.aimtune.app.screens.RawAccelSettingScreen
 import de.yuuto.aimtune.app.accel.RefineSession
 import de.yuuto.aimtune.app.accel.RefineSource
 import de.yuuto.aimtune.app.screens.RefineBetweenScreen
@@ -55,6 +65,7 @@ import de.yuuto.aimtune.app.screens.UiScreen
 import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.setup.SetupStep
 import de.yuuto.aimtune.app.ui.UiHolder
+import de.yuuto.aimtune.core.accel.AbStatus
 import de.yuuto.aimtune.core.accel.AccelFit
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.FlashImportance
@@ -103,6 +114,13 @@ class AppContext(
     /** A newer release than this build, found by the update check; null when none is known. Set on the render thread. */
     @Volatile
     var availableUpdate: ReleaseInfo? = null
+
+    /** What the Raw Accel hub keeps: the imported profile, the last refine result, the ticked recommendations and the analyses. */
+    val hub = HubSession(settings, processor::settingsAnalyses, { processor.storedCount })
+
+    /** Where the open settings screen returns to (a screen that linked to it), or null for the menu; the sound screen passes it on. */
+    var settingsReturn: (() -> Unit)? = null
+        private set
 
     private val flashSoundsDelegate = lazy { FlashSounds() }
     private val hitSoundsDelegate = lazy { HitSounds() }
@@ -173,9 +191,11 @@ class AppContext(
     /** Whether the configured game has a Range mode. */
     fun hasRangeMode(): Boolean = trainerConfig()?.profile?.geometry?.range != null
 
-    fun showSettings() {
+    /** The settings; Save, Back and Escape go to [returnTo] when given (the screen that linked here), else to the menu. */
+    fun showSettings(returnTo: (() -> Unit)? = null) {
         languageOverride = null
-        if (isSetUp) switchTo(SettingsScreen(this)) else showOnboarding(afterFinish = ::showMenu)
+        settingsReturn = returnTo
+        if (isSetUp) switchTo(SettingsScreen(this, returnTo)) else showOnboarding(afterFinish = returnTo ?: ::showMenu)
     }
 
     fun showCrosshair() {
@@ -274,6 +294,26 @@ class AppContext(
 
     fun showAccel(baseline: AccelBaseline? = accelBaseline()) = switchTo(AccelIntroScreen(this, baseline))
 
+    /** The sensitivity every Raw Accel run is played at, with where it comes from; null until the setup is complete. */
+    fun runsUse(baseline: AccelBaseline? = accelBaseline()): RunsUse? {
+        val dpi = trainerConfig()?.dpi ?: return null
+        return baseline?.let { RunsUse.of(it, dpi, useFinderResult) }
+    }
+
+    /** The Raw Accel hub; the passive analyses of the stored rounds are computed in the background. */
+    fun showRawAccelHub(analyses: CompletableFuture<SettingsAnalyses> = hub.analyses()) =
+        switchTo(RawAccelHubScreen(this, analyses, hub.restoreImported()))
+
+    /** The page of one Raw Accel setting. */
+    fun showRawAccelSetting(setting: RawAccelSetting, analyses: CompletableFuture<SettingsAnalyses> = hub.analyses()) =
+        switchTo(RawAccelSettingScreen(this, setting, analyses))
+
+    /** The export of the patched copy of the imported file, with the refine result and the ticked recommendations. */
+    fun showPatchedExport(analyses: CompletableFuture<SettingsAnalyses> = hub.analyses()) = switchTo(RawAccelExportScreen(this, analyses))
+
+    /** Remembers the imported profile for the hub (and its file in the settings). */
+    fun importProfile(profile: ImportedProfile) = hub.setImported(profile)
+
     /** The newest blind strength search, analysed again from its stored rounds. */
     fun showLastSearch(last: LastSearch? = processor.lastSearch(metricWeights())) = switchTo(AccelLastSearchScreen(this, last))
 
@@ -366,7 +406,7 @@ class AppContext(
     }.mapCatching { ExportFiles.saveText(path, it).getOrThrow() }
 
     /** The import step of "Refine my Raw Accel curve". */
-    fun showRefine() = switchTo(RefineImportScreen(this))
+    fun showRefine() = switchTo(RefineImportScreen(this, imported = hub.imported))
 
     /** Starts the refine run for [profile] of [source] at the game sensitivity of the settings. */
     fun startRefineRun(source: RefineSource, profile: RawAccelProfile) {
@@ -382,23 +422,28 @@ class AppContext(
         when (run.phase) {
             RefinePhase.WARMUP, RefinePhase.SEARCH, RefinePhase.TEST -> RefineBetweenScreen(this, run)
             RefinePhase.STAGE_RESULT -> RefineStageScreen(this, run)
-            RefinePhase.DONE -> RefineResultScreen(this, run)
+            RefinePhase.DONE -> {
+                if (run.engine.verdict?.status == AbStatus.ACCEL_BETTER) hub.rememberRefine(RefineOutcome(run.source, run.profile, run.engine.candidate))
+                RefineResultScreen(this, run)
+            }
         },
     )
 
     fun showRefineRound(run: RefineRun) = switchTo(TrainerScreen(this, run.nextRoundConfig(), RefineSession(this, run)))
 
-    /** Writes a copy of the player's file with the refined profile added into the export folder; the path, or the reason it failed. */
-    fun exportRefine(run: RefineRun): Result<Path> = runCatching {
+    /** The patched copy of a finished refine run, with the recommendations ticked on the setting pages. */
+    fun patchedCopy(run: RefineRun, analyses: SettingsAnalyses? = null): PatchedCopy =
+        PatchedCopy(run.source, run.profile, run.engine.candidate, hub.passiveChanges(analyses))
+
+    /** Writes the patched copy into the export folder; the path, or the reason it failed. */
+    fun exportPatched(copy: PatchedCopy): Result<Path> = runCatching {
         val dir = checkNotNull(exportDir) { "no data folder to write to" }
-        RawAccelExport.write(dir, refinedRoot(run), run.exportName)
+        RawAccelExport.write(dir, copy.root(), copy.exportName)
     }
 
-    /** Like [exportRefine], to [path] chosen in the save dialog. */
-    fun saveRefineAs(run: RefineRun, path: Path): Result<Path> = runCatching { refinedRoot(run) }
-        .mapCatching { ExportFiles.savePatched(path, it, run.exportName).getOrThrow() }
-
-    private fun refinedRoot(run: RefineRun) = RawAccelExport.patch(run.source.file.root, run.profile.name, run.profile, run.engine.candidate, run.exportName)
+    /** Like [exportPatched], to [path] chosen in the save dialog. */
+    fun savePatchedAs(copy: PatchedCopy, path: Path): Result<Path> = runCatching { copy.root() }
+        .mapCatching { ExportFiles.savePatched(path, it, copy.exportName).getOrThrow() }
 
     /** Number of stored blind rounds for the current setup, for the menu. */
     fun storedRoundCount(): Int {

@@ -6,6 +6,9 @@ import java.nio.file.Paths
 
 enum class SourceKind { AUTO, RAW, GLFW }
 
+/** The size of the screenshot window in pixels. */
+data class WindowSize(val width: Int, val height: Int)
+
 class LaunchOptionsException(message: String) : Exception(message)
 
 /**
@@ -27,6 +30,8 @@ data class LaunchOptions(
     val noUpdateCheck: Boolean = false,
     /** Overrides the curve finder of the settings for this run; null uses the setting. */
     val curveFinder: CurveFinder? = null,
+    /** Size of the hidden window of the screenshot tour; null is 1920x1080. */
+    val windowSize: WindowSize? = null,
 ) {
     companion object {
         const val USAGE = """Usage: aimtune [options]
@@ -37,11 +42,12 @@ data class LaunchOptions(
   --curve-finder <f>   legacy (fitted family) or v2 (bounded lookup table), default from the settings (v2)
   --screenshots <dir>  save a PNG of every screen into <dir> using sample data, then exit
   --language <code>    language of the screenshot tour (en or de), default en
+  --window-size <WxH>  size of the screenshot tour's window in pixels, default 1920x1080 (e.g. 1280x720)
   --record <dir>       also save every finished round into <dir> as a raw event log (regression fixture)"""
     }
 }
 
-private val VALUE_OPTIONS = setOf("--seed", "--source", "--screenshots", "--record", "--language", "--curve-finder")
+private val VALUE_OPTIONS = setOf("--seed", "--source", "--screenshots", "--record", "--language", "--curve-finder", "--window-size")
 
 fun parseLaunchOptions(args: Array<String>): LaunchOptions {
     val values = mutableMapOf<String, String>()
@@ -71,6 +77,11 @@ fun parseLaunchOptions(args: Array<String>): LaunchOptions {
         "v2" -> CurveFinder.V2
         else -> throw LaunchOptionsException("--curve-finder must be legacy or v2, was '$raw'")
     }
+    val windowSize = values["--window-size"]?.let { raw ->
+        val parts = raw.lowercase().split('x').map { it.toIntOrNull() }
+        if (parts.size != 2 || parts.any { it == null || it <= 0 }) throw LaunchOptionsException("--window-size must look like 1280x720, was '$raw'")
+        WindowSize(checkNotNull(parts[0]), checkNotNull(parts[1]))
+    }
     val seed = values["--seed"]?.let { it.toLongOrNull() ?: throw LaunchOptionsException("--seed must be an integer, was '$it'") }
-    return LaunchOptions(seed, source, vsync, values["--screenshots"]?.let { Paths.get(it) }, values["--record"]?.let { Paths.get(it) }, values["--language"], noUpdateCheck, curveFinder)
+    return LaunchOptions(seed, source, vsync, values["--screenshots"]?.let { Paths.get(it) }, values["--record"]?.let { Paths.get(it) }, values["--language"], noUpdateCheck, curveFinder, windowSize)
 }

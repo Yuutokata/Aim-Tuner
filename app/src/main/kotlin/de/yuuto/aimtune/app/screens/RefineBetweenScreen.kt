@@ -34,7 +34,8 @@ class RefineBetweenScreen(ctx: AppContext, private val run: RefineRun) : UiScree
 
     override fun build(): Actor {
         val content = Table()
-        content.add(ui.label(if (done == 0) phaseName() else t("accel.between.round_done", done), Styles.HEADING)).left().padBottom(40f).row()
+        content.add(ui.label(if (done == 0) phaseName() else t("accel.between.round_done", done), Styles.HEADING)).left().padBottom(24f).row()
+        content.add(ctx.runsUseLine(run.runsUse, TEXT_WIDTH, { ctx.showRefineStep(run) })).left().width(TEXT_WIDTH).padBottom(32f).row()
         content.add(ui.caps(phaseName())).left().padBottom(12f).row()
         content.add(ui.progressBar(done.toFloat() / total, BAR_WIDTH)).left().padBottom(12f).row()
         content.add(ui.label(t("refine.between.progress", done, total), Styles.BODY_MUTED)).left().padBottom(40f).row()

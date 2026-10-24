@@ -32,7 +32,8 @@ class RefineStageScreen(ctx: AppContext, private val run: RefineRun) : UiScreen(
     override fun build(): Actor {
         val content = Table()
         val parameter = result?.parameter
-        content.add(ui.label(t("refine.stage.title", parameterName(parameter)), Styles.HEADING)).left().padBottom(24f).row()
+        content.add(ui.label(t("refine.stage.title", parameterName(parameter)), Styles.HEADING)).left().padBottom(16f).row()
+        content.add(ctx.runsUseLine(run.runsUse, TEXT_WIDTH, { ctx.showRefineStep(run) })).left().width(TEXT_WIDTH).padBottom(24f).row()
         content.add(ui.label(t("refine.stage.explain"), Styles.BODY_MUTED, wrap = true)).left().width(TEXT_WIDTH).padBottom(24f).row()
         result?.let { content.add(card(it)).left().width(CARD_WIDTH).row() }
 

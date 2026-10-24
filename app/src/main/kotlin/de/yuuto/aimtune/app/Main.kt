@@ -22,7 +22,8 @@ fun main(args: Array<String>) {
     val screenshots = options.screenshotDir != null
     val config = Lwjgl3ApplicationConfiguration().apply {
         setTitle("AimTune")
-        setWindowedMode(if (screenshots) SCREENSHOT_WIDTH else WINDOW_WIDTH, if (screenshots) SCREENSHOT_HEIGHT else WINDOW_HEIGHT)
+        val tour = options.windowSize ?: WindowSize(SCREENSHOT_WIDTH, SCREENSHOT_HEIGHT)
+        setWindowedMode(if (screenshots) tour.width else WINDOW_WIDTH, if (screenshots) tour.height else WINDOW_HEIGHT)
         // The screenshot tour renders in a hidden window and does not wait for vertical sync.
         useVsync(options.vsync && !screenshots)
         setInitialVisible(!screenshots)

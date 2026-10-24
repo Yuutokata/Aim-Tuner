@@ -104,6 +104,9 @@ class AccelRun(
 
     val dpi: Double get() = baseConfig.dpi
 
+    /** The sensitivity this run was started with, for the "Runs use" line. */
+    val runsUse: RunsUse get() = RunsUse.running(baseConfig)
+
     /** Where the curve under test came from. */
     enum class Source { ANALYSIS, TRIAL, SEARCH }
 

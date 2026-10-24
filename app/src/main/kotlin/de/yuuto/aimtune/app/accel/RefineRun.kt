@@ -34,6 +34,9 @@ class RefineRun(
 
     val dpi: Double get() = baseConfig.dpi
 
+    /** The sensitivity this run was started with, for the "Runs use" line. */
+    val runsUse: RunsUse get() = RunsUse.running(baseConfig)
+
     val exportName: String get() = "${profile.name} (AimTune)"
 
     val label: UiText
