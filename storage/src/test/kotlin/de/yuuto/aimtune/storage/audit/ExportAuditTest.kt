@@ -28,6 +28,7 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -78,9 +79,9 @@ class ExportAuditTest {
     // ---- 2. speed axis ----
 
     @Test
-    fun speedAxisAndDpiTruncation() {
+    fun speedAxisAndDpiRounding() {
         for (dpi in listOf(800.0, 800.5)) {
-            val raDeviceDpi = dpi.toInt().toDouble()
+            val raDeviceDpi = dpi.roundToInt().toDouble()
             val app = AccelProcessor.speedInPerSecond(3.0, dpi)
             val ra = 3.0 * (1000.0 / raDeviceDpi)
             note("2 dpi=$dpi: 3 counts/ms is %.4f in/s in the app, %.4f in/s in Raw Accel (device DPI $raDeviceDpi), ratio %.6f".format(Locale.ROOT, app, ra, ra / app))
@@ -98,15 +99,15 @@ class ExportAuditTest {
         for ((name, c) in curves) {
             for (f in listOf(1.0, 1.08)) {
                 val ref = RawAccelRef(RawAccelExport.settingsJson(c, dpi, f))
-                // the hand moves at x in/s as the app (800.5 dpi) sees it; Raw Accel divides by 800 instead
-                val worst = speeds.maxOf { x -> abs(ref.total(x * dpi / 800.0) / (c.multiplier(x) * f) - 1.0) }
+                // the hand moves at x in/s as the app (800.5 dpi) sees it; Raw Accel divides by the rounded 801 instead
+                val worst = speeds.maxOf { x -> abs(ref.total(x * dpi / 801.0) / (c.multiplier(x) * f) - 1.0) }
                 note("2 dpi=800.5 f=$f %-24s max total-gain deviation (speed axis + Output DPI ratio) = %.3f %%".format(Locale.ROOT, name, worst * 100))
             }
         }
         val ref = RawAccelRef(RawAccelExport.settingsJson(NaturalCurve(0.1, 1.5), dpi, 1.0))
-        note("2 FINDING: dpi 800.5 -> device DPI ${ref.deviceDpi.toInt()}, Output DPI ${ref.outputDpi}: constant gain error %.4f %% (Output/device) and speed-axis shift %.4f %% (dpi.toInt(), RawAccelExport.kt:53); negligible for integer DPI".format(Locale.ROOT, (ref.outputDpi / ref.deviceDpi - 1) * 100, (dpi / 800.0 - 1) * 100))
-        assertEquals(800.0, ref.deviceDpi)
-        assertEquals(800.5, ref.outputDpi)
+        note("2 FINDING: dpi 800.5 -> device DPI ${ref.deviceDpi.toInt()}, Output DPI ${ref.outputDpi}: constant gain error %.4f %% (Output/device) and speed-axis shift %.4f %% (dpi.roundToInt(), RawAccelExport.kt:69); negligible for integer DPI".format(Locale.ROOT, (ref.outputDpi / ref.deviceDpi - 1) * 100, (dpi / 800.0 - 1) * 100))
+        assertEquals(801.0, ref.deviceDpi)
+        assertEquals(801.0, ref.outputDpi)
     }
 
     // ---- 3. LUT ends ----
