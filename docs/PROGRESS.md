@@ -267,6 +267,18 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
   - aim style wrist with some arm (onboarding is right).
   Waiting for the clips.
 
+- Curve finder audit (branch `audit/curve-finder`, merged into `dev` as a record; its milestones M16-M19 are done or decided, see above): `docs/CURVE-FINDER-AUDIT.md` with evidence in `docs/audit/` (real-data forensics on a DB copy, simulation `CurveAuditTest`, export check `ExportAuditTest`, Raw Accel 1.7.1 formulas, Valorant range sources). Result:
+  - The falling export (natural 0.70) came from "Last search", not "Last analysis" (which finds no curve on the real data).
+  - Causes:
+    - the curve rounds ran at the optimizer's 0.474-0.494 (17 % confidence), not at 0.335 (`AppContext.startAccelRun`);
+    - the strength search has no level factor, so a level and adaptation mismatch shows up as a falling shape;
+    - "Last search" exports even though the interval includes 1 and the only A/B of that curve was NO_DIFFERENCE (-5.8).
+  - The simulation reproduces it: a hand adapted like the user's ends falling in 50-58 % of runs, and about half of the "Last search" offers are harmful.
+  - The app cannot represent Gain mode or in_out/input caps, and `parse` silently misreads the user's file.
+  - Proposed milestones M16 (safety), M17 (Raw Accel complete + import), M18 (refine my curve), M19 (two-stage strength search), and M15 split (moving-target metrics first).
+  - No production code changed.
+- Raw Accel import (M18) tested by the user with their own profile: works.
+
 - M15 step 3 (first pass): wrote the measurement scripts and ran them on the user's two clips; results are preliminary. M15 steps 1 and 2: plan approved (sensitivity 0.335, Medium, armor off); wrote the recording kit `tools/range-re/RECORDING.md` and git-ignored raw clips and frames. No code changed. Waiting for the user's clips.
 
 - Sound and brightness settings (requested: the flash sounds were too loud and the white-out of a flash hurt the eyes): `AppSettings.flashVolumePercent` (default 60), `hitVolumePercent` (100) and `flashBrightnessPercent` (default 50, 10 to 100), edited on a new screen `SoundSettingsScreen` ("Volume and brightness", button in the footer of the settings; sliders, a Play button per sound and a swatch of the white-out level; the values are kept when the screen is left). `FlashSounds.play(event, gain)`, `HitSounds.onShot(result, gain)` and `TrainerScene.whiteOutLevel` (the white-out is now a grey of that level, 100 % is the old plain white) use them; `AppSettings.fraction` turns a percent into a safe 0..1 factor. Older settings files get the new defaults, so the flash is quieter and dimmer without any action. Tests: `SettingsStoreTest`; screenshot step `sound-settings` (EN/DE). Open (user): judge in play whether 60 % and 50 % feel right; the orb that is visible before the pop is still white.
@@ -339,6 +351,8 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 - M2: core units/FOV/flick scenario, input module, LibGDX trainer, debug overlay.
 
 ## Next steps
+
+- User reads `docs/CURVE-FINDER-AUDIT.md` (branch `audit/curve-finder`), answers its open questions and decides which milestones (M16-M19, M15 split) to build. Until then do not load the exported natural 0.70 curve.
 
 0. User tests M9 with `gradlew.bat :app:run`: the targets are now head-sized and much smaller (expect low accuracy at first), the pre-test notice says "Estimate", the between-rounds screen may warn about drift. Then R1b: measure a head in Valorant's range and set `verified`.
 

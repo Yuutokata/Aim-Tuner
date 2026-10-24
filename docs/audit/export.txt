@@ -1,0 +1,55 @@
+1 [f=1.0] classic cap>1                                  max rel err played-vs-exported = 0.00e+00
+1 [f=1.0] classic cap<1 (falling)                        max rel err played-vs-exported = 0.00e+00
+1 [f=1.0] classic uncapped (cap.y=0 assumed no cap)      max rel err played-vs-exported = 0.00e+00
+1 [f=1.0] natural rising                                 max rel err played-vs-exported = 2.22e-16
+1 [f=1.0] natural rising offset                          max rel err played-vs-exported = 0.00e+00
+1 [f=1.0] natural falling                                max rel err played-vs-exported = 2.22e-16
+1 [f=1.0] power (formula == app, JSON roundtrip only)    max rel err played-vs-exported = 0.00e+00
+1 [f=1.0] lut from boundedTo(rising natural, 4..60)      max rel err played-vs-exported = 3.90e-08
+1 [f=1.0] lut from boundedTo(falling natural, 4..60)     max rel err played-vs-exported = 2.49e-08
+1 [f=1.0] strengthAccel(0.70)                            max rel err played-vs-exported = 2.22e-16
+1 [f=1.08] classic cap>1                                  max rel err played-vs-exported = 1.11e-16
+1 [f=1.08] classic cap<1 (falling)                        max rel err played-vs-exported = 1.11e-16
+1 [f=1.08] classic uncapped (cap.y=0 assumed no cap)      max rel err played-vs-exported = 1.11e-16
+1 [f=1.08] natural rising                                 max rel err played-vs-exported = 2.22e-16
+1 [f=1.08] natural rising offset                          max rel err played-vs-exported = 2.22e-16
+1 [f=1.08] natural falling                                max rel err played-vs-exported = 1.11e-16
+1 [f=1.08] power (formula == app, JSON roundtrip only)    max rel err played-vs-exported = 2.22e-16
+1 [f=1.08] lut from boundedTo(rising natural, 4..60)      max rel err played-vs-exported = 3.90e-08
+1 [f=1.08] lut from boundedTo(falling natural, 4..60)     max rel err played-vs-exported = 2.49e-08
+1 [f=1.08] strengthAccel(0.70)                            max rel err played-vs-exported = 1.11e-16
+1 strengthAccel(0.70) = natural decay 0.05, limit 0.70, factor 1.0: Output DPI == device DPI
+2 dpi=800.0: 3 counts/ms is 3.7500 in/s in the app, 3.7500 in/s in Raw Accel (device DPI 800.0), ratio 1.000000
+2 dpi=800.5: 3 counts/ms is 3.7477 in/s in the app, 3.7500 in/s in Raw Accel (device DPI 800.0), ratio 1.000625
+2 AccelProcessor speed = counts*1000/dpi/ms equals Raw Accel counts*(1000/dpi)/ms for integer DPI
+2 dpi=800.5 f=1.0 natural 0.7 (strength)   max total-gain deviation (speed axis + Output DPI ratio) = 0.062 %
+2 dpi=800.5 f=1.08 natural 0.7 (strength)   max total-gain deviation (speed axis + Output DPI ratio) = 0.062 %
+2 dpi=800.5 f=1.0 natural rising 1.5       max total-gain deviation (speed axis + Output DPI ratio) = 0.071 %
+2 dpi=800.5 f=1.08 natural rising 1.5       max total-gain deviation (speed axis + Output DPI ratio) = 0.071 %
+2 dpi=800.5 f=1.0 classic 0.0831 cap 1.8   max total-gain deviation (speed axis + Output DPI ratio) = 0.100 %
+2 dpi=800.5 f=1.08 classic 0.0831 cap 1.8   max total-gain deviation (speed axis + Output DPI ratio) = 0.100 %
+2 FINDING: dpi 800.5 -> device DPI 800, Output DPI 800.5: constant gain error 0.0625 % (Output/device) and speed-axis shift 0.0625 % (dpi.toInt(), RawAccelExport.kt:53); negligible for integer DPI
+4 user curve (classic, Gain true, exp 2, off 10, in_out 62.5/1.6) multiplier: 1.0:1.0000 10.0:1.0000 20.0:1.0286 30.0:1.0762 40.0:1.1286 50.0:1.1829 62.5:1.2520 100.0:1.3825
+4 times Output/Device DPI (0.75): 1.0:0.7500 10.0:0.7500 20.0:0.7714 30.0:0.8071 40.0:0.8464 50.0:0.8871 62.5:0.9390 100.0:1.0369
+4 FINDING: RawAccelExport.parse does NOT reject the user's file; it returns ClassicCurve(acceleration=0.005, exponent=2.0, inputOffset=10.0, cap=1.6) and factor 0.7500
+4   it ignores Gain/Velocity=true, Cap mode in_out and Cap x=62.5; cap.y 1.6 is read as the Velocity output cap and acceleration stays 0.005 (true in_out accel is 0.005714)
+4   parsed curve / user's true curve: 1.0:1.0000/1.0000 10.0:1.0000/1.0000 20.0:1.0250/1.0286 30.0:1.0667/1.0762 40.0:1.1125/1.1286 50.0:1.1600/1.1829 62.5:1.2205/1.2520 100.0:1.4050/1.3825
+4   max rel error of the silently parsed curve = 2.52 %
+4 user curve as Velocity LUT, 32 points over 0.5..200.0 in/s: max rel err 0.229 % (kinks at 10 and 62.5 in/s)
+4 user curve as Velocity LUT, 32 points over 5.0..100.0 in/s: max rel err 0.060 % (kinks at 10 and 62.5 in/s)
+4 user curve as Velocity LUT, 257 points over 0.5..200.0 in/s: max rel err 0.004 % (kinks at 10 and 62.5 in/s)
+4 user curve as Velocity LUT, 257 points over 5.0..100.0 in/s: max rel err 0.001 % (kinks at 10 and 62.5 in/s)
+4 fields that differ after parse -> settingsJson (vertical block omitted):
+4   ### Accel modes ###: user="classic | jump | natural | synchronous | power | lut | noaccel" export=null
+4   ### Cap modes ###: user="in_out | input | output" export=null
+4   defaultDeviceConfig/Use constant time interval based on polling rate: user=false export=null
+4   profiles[0]/Whole or horizontal accel parameters/Cap / Jump/x: user=62.5 export=0.0
+4   profiles[0]/Whole or horizontal accel parameters/Cap mode: user="in_out" export="output"
+4   profiles[0]/Whole or horizontal accel parameters/Gain / Velocity: user=true export=false
+4   profiles[0]/name: user="default" export="AimTune"
+4 NOT representable by the data model: Gain form; cap modes in_out and input (Cap x written as 0); Output DPI as independent base (only the ratio, as sensitivityFactor 0.75, is kept); vertical params separate from horizontal (copied from horizontal); domain/range stretches (always 1); lpNorm (2); by-component mode (whole); smoothing half-lives (0); rotation, snapping, speed cap (0); Y/X, L/R, U/D DPI ratios (1); jump and synchronous modes (not parsed); devices list (empty); profile name (AimTune); device options 'constant time interval' and polling rate. Kept: classic/natural/power/lut parameters incl. inputOffset, output cap.y.
+3 LUT 4..60 in/s: app vs Raw Accel lut incl. below first, above last, exact ends: max rel err = 3.90e-08
+3 below first -> 1.27534 (app) / 1.27534 (ref); above last -> 1.50000 / 1.50000; flat outside in both
+3 32-point LUT vs its fitted family inside 4..60 in/s: max rel deviation 1.80e-04 (interpolation only)
+3 NOTE: outside the table the LUT is flat, the family is not: uncapped classic at 150 in/s family 3.9205 vs table 2.1213 (boundedTo by design); natural already saturated
+5 FINDING: write() replaces an existing settings.json wholesale (no merge, no backup): old content kept = false; one profile AimTune, devices [], everything else at defaults
