@@ -131,7 +131,7 @@
       "botHeightMeters": 1.8,
       "headDiameterMeters": 0.25,
       "strafe": {
-        "speedMetersPerSecond": 2.2,
+        "speedMetersPerSecond": 2.0,
         "movingSeconds": {
           "min": 0.25,
           "max": 0.45

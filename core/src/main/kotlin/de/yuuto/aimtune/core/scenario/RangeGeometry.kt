@@ -48,7 +48,7 @@ data class RangeGeometry(
     /** Width of the head sphere that is hit; its angular size follows from the distance. */
     val headDiameterMeters: Double = 0.25,
     /** Strafe of a bot; the yaw limit is the game's screen, so a bot may leave the screen like the range's bots. */
-    val strafeSpeedMetersPerSecond: Double = 2.2,
+    val strafeSpeedMetersPerSecond: Double = 2.0,
     val strafeMovingSeconds: PositiveRange = PositiveRange(0.25, 0.45),
     val strafeStopSeconds: PositiveRange = PositiveRange(0.3, 0.7),
     val strafeReverseProbability: Double = 0.6,
