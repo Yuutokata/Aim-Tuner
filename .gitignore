@@ -49,3 +49,7 @@ bin/
 /tools/range-re/out/frames/
 /tools/range-re/out/crops/
 /tools/range-re/__pycache__/
+
+### IDE ###
+.idea/
+user-rawaccel-settings.json
