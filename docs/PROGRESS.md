@@ -208,7 +208,7 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 
 ### M22 Raw Accel hub (branch `feature/m22-raw-accel-hub`; plan in docs/RAWACCEL-HUB.md)
 - [x] Plan: settings audit of Raw Accel 1.7.1 with a decision per setting, driver order, hub design, milestones; approved 2026-10-24 (open questions answered with the plan's proposals until the user says otherwise)
-- [ ] M22a Exact 2-D driver model (rotation, snap, speed cap, stretches, Lp, smoothing, power/jump/synchronous, ratios, carry, time)
+- [x] M22a Exact 2-D driver model: `RawAccelModifier` (time and poll lock, DPI normalization, rotation, snap, speed cap, domain/range weights, whole/by-component with Lp/max norm, the three smoothers, output DPI, Y/X, L/R, U/D, integer carry), modes power/jump/synchronous (`RawPower`, `RawJump`, `RawSynchronous` with the float table), full `RawAccelProfile` with validation from `rawaccel-validate.hpp`, `AccelSpec` form `rawaccel2`. Tests: an independent literal port (`RawAccelReference`) and `RawAccelModifierTest` (22: every mode and cap mode, every step of the driver order, 1e-9, float table 1e-6, integer output exact), `RawAccelProfileTest` (validation, `rawaccel2` round trip). `rawaccel1` still only takes classic/natural/lut/noaccel. Not ported: device `disable`/`extra_info` (no effect on the output), `speed_min` (always 0). Not yet wired into the trainer (M22b)
 - [ ] M22b Pipeline and import (`MouseModifier`, `AccelModel`, import plays every setting)
 - [ ] M22c Refine without LEVEL (base invariant test, stage mappings for lut/jump/synchronous, gate re-run)
 - [ ] M22d Native file dialogs (tinyfd open and save as)

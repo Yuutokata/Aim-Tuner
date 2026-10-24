@@ -62,12 +62,12 @@ fun RawAccelProfile.supports(parameter: RefineParameter): Boolean = when (parame
     RefineParameter.HIGH_GAIN -> when (args.mode) {
         RawAccelMode.CLASSIC -> hasHighOutput()
         RawAccelMode.NATURAL -> args.limit != 1.0
-        RawAccelMode.LUT, RawAccelMode.NOACCEL -> false
+        RawAccelMode.LUT, RawAccelMode.NOACCEL, RawAccelMode.JUMP, RawAccelMode.SYNCHRONOUS, RawAccelMode.POWER -> false
     }
     RefineParameter.TRANSITION -> when (args.mode) {
         RawAccelMode.CLASSIC -> args.inputOffset > 0.0 && hasHighOutput()
         RawAccelMode.NATURAL -> args.limit != 1.0
-        RawAccelMode.LUT, RawAccelMode.NOACCEL -> false
+        RawAccelMode.LUT, RawAccelMode.NOACCEL, RawAccelMode.JUMP, RawAccelMode.SYNCHRONOUS, RawAccelMode.POWER -> false
     }
 }
 

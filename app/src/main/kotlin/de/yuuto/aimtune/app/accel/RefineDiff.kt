@@ -37,7 +37,7 @@ object RefineDiff {
             }
             RawAccelMode.NATURAL -> lines += "inputOffset ${number(a.inputOffset)}  decayRate ${number(a.decayRate)}  limit ${number(a.limit)}"
             RawAccelMode.LUT -> lines += "${a.lut.size / 2} points"
-            RawAccelMode.NOACCEL -> Unit
+            RawAccelMode.NOACCEL, RawAccelMode.JUMP, RawAccelMode.SYNCHRONOUS, RawAccelMode.POWER -> Unit
         }
         lines += "Output DPI ${number(profile.outputDpi)}  device DPI ${number(profile.deviceDpi)}"
         return lines.joinToString("\n")
