@@ -43,13 +43,19 @@ tasks.register<JavaExec>("screenshotsDe") {
 val appVersionName = providers.gradleProperty("appVersion").orElse("0.1.0")
 
 tasks.processResources {
-    inputs.property("appVersion", appVersionName)
-    filesMatching("version.properties") { expand("appVersion" to appVersionName.get()) }
+    // A local val, so the lambda below captures the provider and not the build script (configuration cache).
+    val version = appVersionName
+    inputs.property("appVersion", version)
+    filesMatching("version.properties") { expand("appVersion" to version.get()) }
     from(rootProject.file("docs/design/tokens.json")) { into("assets/ui") }
 }
 
 // Windows app image or installer with its own trimmed Java runtime, built with the JDK's jpackage (see ADR 0005).
 // `./gradlew :app:jpackage` makes build/jpackage/AimTune/AimTune.exe; `-PinstallerType=exe` or `msi` needs the WiX toolset.
+interface Injected {
+    @get:javax.inject.Inject val fileSystem: FileSystemOperations
+}
+
 val jpackageRuntimeModules = "java.base,java.desktop,java.logging,java.management,java.naming,java.sql,java.net.http,jdk.unsupported"
 
 tasks.register<Exec>("jpackage") {
@@ -62,7 +68,9 @@ tasks.register<Exec>("jpackage") {
     val type = providers.gradleProperty("installerType").orElse("app-image")
     // The release workflow passes the tag (v1.2.3 -> 1.2.3); jpackage needs a numeric version.
     val appVersion = appVersionName.get()
-    doFirst { delete(outDir) }
+    // Gradle's own delete also removes the read-only files jpackage leaves; the service is injected for the configuration cache.
+    val fileSystem = objects.newInstance<Injected>().fileSystem
+    doFirst { fileSystem.delete { delete(outDir) } }
     executable(launcher.map { it.metadata.installationPath.file("bin/jpackage.exe").asFile.path }.get())
     args(
         "--type", type.get(),
