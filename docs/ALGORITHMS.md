@@ -626,9 +626,9 @@ The app's strength search plays flash turn-away rounds in half of its rounds whe
 | FALLING | 93 % (right 93 %) | 20 % | 5 % |
 
 Result:
-- **No harmful or falling export for adapted or flat hands**: the adapted hands and FLAT export at most 3 % in any variant, and no adapted hand exports a falling curve. Flash rounds make the search more cautious, not less.
+- **Few exports for adapted and flat hands, none falling**: ADAPTED, ADAPTED_HIGH and FLAT export at most 3 % in any variant and no adapted hand exports a falling curve; with flash they export 0-2 %. Flash rounds make the search more cautious, not less.
 - **Falling curves are almost never exported when flash matters** (FALLING 93 % click only, 20 % and 5 % with flash): a fast turn-away pays for more gain at speed, so a falling curve loses in the flash rounds. This fits the player's goal (low gain for micro-adjustments, high gain for flash turns) and is why the click-only gate (FALLING >= 90 %) does not carry over.
 - **Rising detection drops with a low flash weight** (93 % click only, 37 % "sometimes", 78 % "often"): the best strength then sits at the range edge or is diluted by the dodge metric. Many "sometimes" runs are not offered at all (75 % offered for RISING).
 - The median paired benefit of the offered curves of the FLAT hand is negative with flash (-22 and -17 points) but they are not exported (0 %); the offered-but-not-confirmed share is 10-13 %.
 
-Not adopted, no app change: the search with flash is safe for the hands tested and consistent with the goal; the lower rising detection at flash "sometimes" is a possible point for a later tuning (more rounds or a lower flash share in the search). 60 seeds give about +-12 points of sampling error. The 2-D joint search of level and strength stays untested.
+Not adopted, no app change: the search with flash exports little for hands without a real preference and is consistent with the goal; the lower rising detection at flash "sometimes" is a possible point for a later tuning (more rounds or a lower flash share in the search). 60 seeds give about +-12 points of sampling error. The 2-D joint search of level and strength stays untested.
