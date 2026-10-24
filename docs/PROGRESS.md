@@ -4,7 +4,7 @@ Single source of truth for project status. Update at the end of every task and b
 
 ## Current
 
-- **Latest:** M18 Refine my Raw Accel curve is implemented (null gate met, level gate missed, see below). Before that: M14 Optimizer review fixes is implemented: curve finder v2 (bounded lookup table) is the new default. Speed rounds, the closed loop, grouped A/B and the time model missed their gates and stay off. Waiting for the user's test of the LUT export in Raw Accel.
+- **Latest:** M22 Raw Accel hub planned and approved (branch `feature/m22-raw-accel-hub`, plan in docs/RAWACCEL-HUB.md); M22a and M22d next. Before that: M18 Refine my Raw Accel curve is implemented (null gate met, level gate missed, see below). Before that: M14 Optimizer review fixes is implemented: curve finder v2 (bounded lookup table) is the new default. Speed rounds, the closed loop, grouped A/B and the time model missed their gates and stay off. Waiting for the user's test of the LUT export in Raw Accel.
 - **Milestone:** M11 Realistic target heights and M12 Valorant crosshair (in progress, M11 first); M10 Flash turn-away (implemented, waiting for the user's hands-on test); M9 Review fixes (implemented, waiting for the user's hands-on test); M8 Results, i18n, packaging is implemented and waiting for the user's hands-on test
 - **Task:** fixes are in (see M9 below and docs/history/REVIEW.md status table). The target sizes are assumptions until R1b. M7's second hands-on part (analysis, blind test, Raw Accel import) is still open, and per the review the acceleration results should not be trusted before R2.
 
@@ -205,6 +205,16 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 - [x] Gate `RefineGateTest` (500 runs): REFINE_NULL exports 0 / 500 (target <= 5 % met); LEVEL +-15 targets missed (right side 64 % / 55 % instead of >= 70 %, exported 0 % / 1 % instead of >= 50 %), 0 harmful exports at 12-round stages (2 of 9 at 24 rounds); cause: the simulated score changes by about 1 point over a 15 % level change against a round sd of 13 (ALGORITHMS "Refine my Raw Accel curve")
 - [ ] Open (user): complete the level part and the test on the real profile; judge whether real hands show a clearer level optimum than the simulated one; load an exported file into Raw Accel
 - [ ] Open: IMPORT is the import screen, not a phase of the run object; the intro's "Refine" button needs the Raw Accel check ticked on the import screen itself; power mode, rotation and Y/X ratio are still refused
+
+### M22 Raw Accel hub (branch `feature/m22-raw-accel-hub`; plan in docs/RAWACCEL-HUB.md)
+- [x] Plan: settings audit of Raw Accel 1.7.1 with a decision per setting, driver order, hub design, milestones; approved 2026-10-24 (open questions answered with the plan's proposals until the user says otherwise)
+- [ ] M22a Exact 2-D driver model (rotation, snap, speed cap, stretches, Lp, smoothing, power/jump/synchronous, ratios, carry, time)
+- [ ] M22b Pipeline and import (`MouseModifier`, `AccelModel`, import plays every setting)
+- [ ] M22c Refine without LEVEL (base invariant test, stage mappings for lut/jump/synchronous, gate re-run)
+- [ ] M22d Native file dialogs (tinyfd open and save as)
+- [ ] M22e Passive analyses and harness gates (rotation, Y/X, L/R, U/D, snap replay)
+- [ ] M22f Hub UI, export merge, i18n, screenshot tour
+- [ ] M22g Docs consistency pass
 
 ### M15 Range mode (branch `feature/m15-range-mode`; plan in docs/RANGE.md)
 - [x] 1 Plan: `docs/RANGE.md` approved; corrected after the first clips: mode Eliminate 100, armor on, sensitivity 0.335
