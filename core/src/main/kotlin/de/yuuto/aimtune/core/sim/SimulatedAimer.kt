@@ -16,6 +16,7 @@ import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -55,6 +56,8 @@ class SimulatedAimer(
         val dYaw: Double,
         val dPitch: Double,
         val handScale: Double = 1.0,
+        /** Vertical hand drift per horizontal hand movement ([HandGeometry.driftSlopeSd]); the player does not know about it. */
+        val handTilt: Double = 0.0,
     ) {
         val endNanos: Long get() = startNanos + durationNanos
     }
@@ -81,6 +84,10 @@ class SimulatedAimer(
     private var truePitch = 0.0
     private var emittedX = 0L
     private var emittedY = 0L
+
+    /** The part of a count that the hand's deviation ([HandGeometry]) has not yet turned into a whole count. */
+    private var handResidualX = 0.0
+    private var handResidualY = 0.0
     private var mode = Mode.NO_TARGET
     private var targetId = -1
 
@@ -112,6 +119,8 @@ class SimulatedAimer(
         modifier?.reset()
         emittedX = 0
         emittedY = 0
+        handResidualX = 0.0
+        handResidualY = 0.0
         mode = Mode.NO_TARGET
         targetId = -1
         roundStartNanos = nowNanos
@@ -491,8 +500,19 @@ class SimulatedAimer(
             sqrt(sq(player.signalNoise * amplitude * speedup) + sq(player.handNoiseCm * FULL_TURN / effectiveCm360))
         val pressure = 1.0 - player.pressureUndershoot * (speedup - 1.0)
         val gain = if (primary) (1.0 - player.undershootBias) * rangeFactor(amplitude) * max(pressure, MIN_PRESSURE_GAIN) else 1.0
-        val moveX = error.x * gain + sigma * gaussian()
-        val moveY = error.y * gain + sigma * gaussian()
+        var noiseX = sigma * gaussian()
+        var noiseY = sigma * gaussian()
+        if ((player.extentNoiseScale != 1.0 || player.directionNoiseScale != 1.0) && amplitude > 0.0) {
+            // Split the noise along and across the reach and scale the parts separately (to match the spread of real rounds).
+            val ux = error.x / amplitude
+            val uy = error.y / amplitude
+            val along = (noiseX * ux + noiseY * uy) * player.extentNoiseScale
+            val across = (-noiseX * uy + noiseY * ux) * player.directionNoiseScale
+            noiseX = along * ux - across * uy
+            noiseY = along * uy + across * ux
+        }
+        val moveX = error.x * gain + noiseX
+        val moveY = error.y * gain + noiseY
         if (player.noiseModel == NoiseModel.DECOUPLED && amplitude > 0.0) {
             // Same peak speed as planned: the time stretches with the distance the noise produced along the reach.
             val along = (moveX * error.x + moveY * error.y) / amplitude
@@ -500,7 +520,8 @@ class SimulatedAimer(
         }
         // Screen-plane x is yaw scaled by cos(pitch); convert back to a yaw change.
         val pitchMid = truePitch + moveY / 2.0
-        reaches += Reach(nowNanos, ms(durationMs), moveX / cos(Math.toRadians(pitchMid)), moveY, 1.0 / expected)
+        val tilt = if (primary && player.hand.driftSlopeSd > 0.0) player.hand.driftSlopeSd * gaussian() else 0.0
+        reaches += Reach(nowNanos, ms(durationMs), moveX / cos(Math.toRadians(pitchMid)), moveY, 1.0 / expected, tilt)
         mode = Mode.MOVING
     }
 
@@ -541,6 +562,7 @@ class SimulatedAimer(
             val s = minimumJerk((nowNanos - r.startNanos).toDouble() / r.durationNanos)
             yaw += r.dYaw * r.handScale * s
             pitch += r.dPitch * r.handScale * s
+            if (r.handTilt != 0.0) pitch += r.dYaw * r.handScale * r.handTilt * s
         }
         return yaw to pitch
     }
@@ -552,6 +574,7 @@ class SimulatedAimer(
             basePitch += r.dPitch
             baseHandYaw += r.dYaw * r.handScale
             baseHandPitch += r.dPitch * r.handScale
+            if (r.handTilt != 0.0) baseHandPitch += r.dYaw * r.handScale * r.handTilt
         }
         reaches.removeAll(done.toSet())
     }
@@ -562,10 +585,19 @@ class SimulatedAimer(
         val (yaw, pitch) = handPosition(nowNanos)
         val x = (yaw / degPerCount).roundToLong()
         val y = (pitch / degPerCount).roundToLong()
-        val dx = (x - emittedX).toInt()
-        val dy = -(y - emittedY).toInt() // mouse down (positive dy) looks down
+        var dx = (x - emittedX).toInt()
+        var dy = -(y - emittedY).toInt() // mouse down (positive dy) looks down
         emittedX = x
         emittedY = y
+        if (player.hand.distortsCounts && (dx != 0 || dy != 0)) {
+            val (hx, hy) = player.hand.distort(dx.toDouble(), dy.toDouble())
+            val carriedX = hx + handResidualX
+            val carriedY = hy + handResidualY
+            dx = carriedX.roundToInt()
+            dy = carriedY.roundToInt()
+            handResidualX = carriedX - dx
+            handResidualY = carriedY - dy
+        }
         if (dx != 0 || dy != 0) {
             val move = modifier?.modify(MouseEvent(nowNanos, dx, dy))
             trueYaw += (move?.dx ?: dx.toDouble()) * degPerCount
