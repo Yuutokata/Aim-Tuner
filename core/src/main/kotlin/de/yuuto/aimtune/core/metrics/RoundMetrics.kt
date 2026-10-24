@@ -31,6 +31,11 @@ data class MetricsParams(
     val minReactionPeakNanos: Long = 120_000_000L,
     /** The first reach covers at least this share of the distance to the target; smaller movements are tremor, not a reach. */
     val minFirstReachFraction: Double = 0.25,
+    /**
+     * Range rounds: half of the horizontal field of view (Valorant's 103 degrees at 16:9). A bot that spawns outside it counts
+     * as appearing when it enters the view; the search turn before that is not part of its time to hit and its first reach.
+     */
+    val rangeHalfFovDegrees: Double = 51.5,
 )
 
 /** One reach from a target's spawn to the hit on it. */
@@ -100,6 +105,9 @@ data class RoundMetrics(
     val rangeKills: Int? = null,
     val rangeMedianTimeToKillMs: Double? = null,
     val rangeShotsPerKill: Double? = null,
+    /** Range rounds only: bots that spawned outside the field of view, and the median time until a bot was in view (over those). */
+    val rangeOffScreenSpawns: Int? = null,
+    val rangeMedianSearchMs: Double? = null,
 ) {
     /** Share of the endpoint error (summed over both axes) that is vertical, null without first movements. */
     val verticalErrorShare: Double?
@@ -112,21 +120,24 @@ data class RoundMetrics(
 
 /** Computes the metrics of a round from its recording, as defined in docs/ALGORITHMS.md. */
 fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = MetricsParams()): RoundMetrics {
-    val summary = summarize(recording.targetEvents)
     val submovements = segmentSubmovements(recording.mouseEvents, recording.dpi, params.segmentation)
     val track = ViewTrack(recording)
     val spawns = recording.targetEvents.filterIsInstance<TargetEvent.Spawned>().associateBy { it.target.id }
     val path = TargetPath(recording.targetEvents)
+    val isRange = ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.RANGE
+    val appearedAt = if (isRange) botAppearances(recording, track, path, params) else emptyMap()
+    val summary = summarize(recording.targetEvents, appearedAt)
     val hitEvents = recording.targetEvents.filterIsInstance<TargetEvent.Hit>()
     val movements = hitEvents.mapIndexedNotNull { index, hit ->
         val spawn = spawns[hit.targetId] ?: return@mapIndexedNotNull null
         // The reach starts at the later of the target's spawn and the previous hit (several targets can wait at once).
-        val from = maxOf(spawn.timeNanos, hitEvents.getOrNull(index - 1)?.timeNanos ?: spawn.timeNanos)
-        movementMetric(recording, track, submovements, path, spawn, from, hit.timeNanos, params)
+        val appeared = appearedAt[spawn.target.id] ?: spawn.timeNanos
+        val from = maxOf(appeared, hitEvents.getOrNull(index - 1)?.timeNanos ?: spawn.timeNanos)
+        movementMetric(recording, track, submovements, path, spawn, from, hit.timeNanos, params, appeared)
     }
     val tracking = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.TRACKING) computeTrackingMetrics(recording, track) else null
     val flash = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.FLASH) computeFlashMetrics(recording, track, submovements) else null
-    val range = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.RANGE) computeRangeMetrics(recording) else null
+    val range = if (isRange) computeRangeMetrics(recording, appearedAt) else null
     val errors = movements.mapNotNull { it.firstErrorRatio }
     return RoundMetrics(
         hits = summary.hits,
@@ -154,6 +165,8 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
         rangeKills = range?.kills,
         rangeMedianTimeToKillMs = range?.medianTimeToKillMs,
         rangeShotsPerKill = range?.shotsPerKill,
+        rangeOffScreenSpawns = range?.offScreenSpawns,
+        rangeMedianSearchMs = range?.medianSearchMs,
     )
 }
 
@@ -198,6 +211,8 @@ private fun movementMetric(
     fromNanos: Long,
     untilNanos: Long,
     params: MetricsParams,
+    /** When the target came into view; later than the spawn for a Range bot that spawned outside the field of view. */
+    appearedNanos: Long = spawn.timeNanos,
 ): MovementMetric? {
     val t0 = fromNanos
     val t1 = untilNanos
@@ -209,8 +224,14 @@ private fun movementMetric(
     val distance = toTarget.length
     if (distance < params.minTargetDistanceDegrees) return null
 
+    // A reach right after a hit starts on the way (no reaction limit); one toward a target that only now came into view has it.
+    val newTargetAt = when {
+        appearedNanos > spawn.timeNanos && fromNanos <= appearedNanos -> appearedNanos
+        fromNanos > spawn.timeNanos -> null
+        else -> t0
+    }
     val inWindow = submovements.filter { it.peakNanos in t0..t1 }
-    val firstIndex = inWindow.indexOfFirst { isFirstReach(it, track, if (fromNanos > spawn.timeNanos) null else t0, toTarget, distance, targetPitch, params) }
+    val firstIndex = inWindow.indexOfFirst { isFirstReach(it, track, newTargetAt, toTarget, distance, targetPitch, params) }
     val first = inWindow.getOrNull(firstIndex)
     val firstMoved = first?.let {
         val end = track.viewAt(it.endNanos - 1)
@@ -297,4 +318,16 @@ private fun List<Double>.sampleStdDevOrNull(): Double? {
     if (size < 2) return null
     val mean = average()
     return sqrt(sumOf { (it - mean) * (it - mean) } / (size - 1))
+}
+
+/** When each bot of a Range round came into view, by target id: at its spawn, or later when it spawned outside the field of view. */
+private fun botAppearances(recording: RoundRecording, track: ViewTrack, path: TargetPath, params: MetricsParams): Map<Int, Long> {
+    val events = recording.targetEvents
+    val ends = events.filterIsInstance<TargetEvent.Hit>().associate { it.targetId to it.timeNanos } +
+        events.filterIsInstance<TargetEvent.Despawned>().associate { it.targetId to it.timeNanos }
+    val roundEnd = recording.mouseEvents.lastOrNull()?.timeNanos ?: 0L
+    return events.filterIsInstance<TargetEvent.Spawned>().mapNotNull { spawn ->
+        val end = maxOf(ends[spawn.target.id] ?: roundEnd, spawn.timeNanos)
+        firstVisibleNanos(track, path, spawn, end, params.rangeHalfFovDegrees)?.let { spawn.target.id to it }
+    }.toMap()
 }
