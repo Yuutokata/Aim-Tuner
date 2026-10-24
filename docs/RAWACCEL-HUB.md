@@ -18,6 +18,34 @@ Import und Export bekommen native Dateidialoge (LWJGL tinyfd 3.3.3, passend zur 
 
 Sieben Meilensteine M22a–M22g. a und d können parallel laufen.
 
+## Outcome (M22a-g)
+
+Status after M22g: everything below the plan text was built as planned on branch `feature/m22-raw-accel-hub`, with the deviations listed here. The plan text below is kept unchanged as the record of what was decided before the work; where it differs (for example the analysis code lives in `core/accel/settings`, not in `core/rawaccel/analysis`), this section and `docs/PROGRESS.md` are the truth. Details and gate tables: `docs/ALGORITHMS.md` ("Raw Accel driver model (M22)", "Passive setting analyses (M22e)", "Refine my Raw Accel curve").
+
+**Per setting** (gate = `PassiveSettingsGateTest`, 200 runs per row; "real-SD noise" = the setting with the hand noise scaled to the spread of the stored rounds):
+
+| Setting | Final decision | Key evidence |
+|---|---|---|
+| Rotation | Analysis, recommends; tickable into the patched copy | null 0 %; ±3, ±6, ±10 degrees: 100 % right sign and within 2 degrees, in all four settings |
+| Y/X | Analysis, recommends; tickable | null 0 % (5 % at real-SD noise); g_y 0.8 / 1.25 found in 100 % / 100 % (75 % / 100 % at real-SD noise) |
+| L/R | Analysis, recommends; tickable | null 0 %; 0.85 / 1.15 found in 100 % / 100 % in all settings |
+| U/D | Info page, shows its measured number only | null 8 % at real-SD noise (target <= 5 %), so no recommendation; 0 %, 0 %, 2 % in the other settings |
+| Angle snapping | Info page, recommends 0 degrees, shows the replay | recommends 0 in 100 % of runs in every setting; on the five real flick rounds snap 10 degrees gives +46 % vertical error, 2 to 5 degrees no effect |
+| Input speed cap | Info, recommend off, shows your speed percentiles | speed profile over 213,282 reports: p50 2.5, p99 23.9 in/s |
+| Smoothing, stretches, whole/by component, Lp norm, polling | Info pages, recommend 0, 1/1, whole with 2, automatic | below the measurability floor (a 15 % multiplier change moves the score about 1 point against a round SD of 13) |
+| Output DPI, device DPI | Base: shown, never changed by refine | `RefineBaseInvariantTest`: 2502 random cases over 409 profiles, 158 engine runs |
+
+**Refine.** LEVEL is gone; refine changes only curve-shape fields and the base stays identical in every round and in the export. The gate holds (REFINE_NULL exports 0 of 500, harmful exports 0 in every model), but no preference is found: with the user's profile only 3.7 % (no flash) or 9.5 % (flash) of the simulated hand's gain evaluations lie above the offset, the imported and the preferred curve differ there by at most 0.0026 in the mean multiplier, the wanted side is hit in 47.5 to 56.0 % of the runs (chance) and nothing is exported, even for preferences of x0.5 and x2. **User decision: Refine stays in the hub, with an honest note** that it changes a curve only after a clear blind win, which did not happen in simulation. Untested: a profile whose rise lies at 15-25 in/s, a hand with faster flicks, real hands.
+
+**Answers to the open questions.**
+
+1. Passive findings in the export: opt-in ticks for rotation, Y/X and L/R only, labelled "not blind-tested", off by default.
+2. A failed gate becomes an info page: applied to U/D (number only). No new finder.
+3. Power mode: played and blind-tested, no refine stages.
+4. The last imported file path is persisted (path only, never the content).
+5. Data: only the 10 stored rounds (5 flick, 5 range) were available; the real-data check uses the five flick rounds (112 usable reaches), Y/X and U/D say "not enough data" on them.
+6. Gate targets were kept (null <= 5 %, detection >= 70-80 %); no threshold was changed to pass.
+
 ## Evidence used (all reproducible)
 
 - **Source:** `a1xd/rawaccel` tag v1.7.1, files `common/rawaccel.hpp`, `rawaccel-base.hpp`, `rawaccel-validate.hpp`, `accel-*.hpp`, `math-vec2.hpp`, `driver/driver.cpp`, `wrapper/wrapper.cpp`. Line numbers below refer to v1.7.1.

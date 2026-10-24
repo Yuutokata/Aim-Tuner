@@ -50,10 +50,10 @@ Keyboard: menu hotkeys as shown, Enter to confirm, Esc to pause/back, Tab naviga
 
 New screens, all in the existing style (cards, mono for parameters, the shared chart):
 
-- **Import** (`refine-import`): left column with the intro, "Paste from clipboard", up to four file buttons from the import folder and its path, profile buttons, and the Raw Accel check box; right card "What was read" with the parameters in mono, the total factor and the multiplier chart (curve times output DPI / device DPI against hand speed, line at 1). A refused profile gets a caution card with the reasons; "Start refining" stays disabled until a profile is playable and the check is ticked.
+- **Import** (`refine-import`): left column with the intro, the primary button "Open settings.json..." (native file dialog, M22d), "Paste from clipboard", up to four file buttons from the import folder and its path, profile buttons, and the Raw Accel check box; right card "What was read" with the parameters in mono, the total factor and the multiplier chart (curve times output DPI / device DPI against hand speed, line at 1). A profile Raw Accel itself would refuse (or a DPI that differs from the settings) gets a caution card with the reasons, and a profile with nothing to refine says so; "Start refining" stays disabled until a profile can be refined and the check is ticked.
 - **Between rounds**: the usual progress bar, with "Skip warm-up" and "End this part now" as secondary buttons; never a value or an arm.
-- **Stage result** (`refine-stage`): heading "Level: result", one card with the best change as a signed percent, its range, confidence and rounds, and one sentence saying whether it is carried on; footer "Skip the rest, go to the test" and "Next: ...".
-- **Result**: verdict, and for "better" a card listing the changed fields as `field: old -> new` with the export button; after saving the card says where the file is.
+- **Stage result** (`refine-stage`): heading "<stage>: result" (High-speed gain or Transition), one card with the best change as a signed percent, its range, confidence and rounds, and one sentence saying whether it is carried on; footer "Skip the rest, go to the test" and "Next: ...".
+- **Result**: verdict, and for "better" a card listing the changed fields as `field: old -> new` with the export buttons (Copy, "Save as..." with a native save dialog, export folder); after saving the card says where the file is.
 
 ### Raw Accel hub (M22f)
 
@@ -114,7 +114,7 @@ Original geometry, no assets of any game. The bot is a head sphere in sand (`#e6
 | In-test HUD (1h) with progress bar below the timer and "Esc · pause" | Timer, scenario name, "Round n / N", "Esc aborts the round"; no bar, no pause | Aborting discards the round, a pause would taint it |
 | Settings (1n) has metric weights only | A "Scenarios" block under the weights: four toggles for what a blind test plays; the weights decide how often | M6 scenarios need a way to be switched off |
 | Between rounds (1i): hits, accuracy, time to hit | A caption with the scenario name; tracking shows "Time on target" instead of hits | Tracking has no hits |
-| Acceleration is only a tab on the results view (1j) | Its own menu item "Acceleration" with an intro, calibration and test round screens, an analysis screen with a chart of the wanted gain per hand speed (dots, 95 % band) and the fitted curve, and a verdict screen with export and copy | The acceleration steps need rounds of their own and a decision before an export, so a tab on the results view would have nothing to show most of the time |
+| Acceleration is only a tab on the results view (1j) | Its own menu item (since M22f "Raw Accel", which opens the hub) with the finder intro (now "Find a curve"), calibration and test round screens, an analysis screen with a chart of the wanted gain per hand speed (dots, 95 % band) and the fitted curve, and a verdict screen with export and copy | The acceleration steps need rounds of their own and a decision before an export, so a tab on the results view would have nothing to show most of the time |
 | Onboarding 3/4 (1e) has only the aim style cards; Settings (1n) has no flash row | The aim style step also asks "Turning away from flashes" (never / sometimes / often) below the cards, and the settings have a "Flash turn-away" row with the same three buttons (the flash scenario is switched by it, not by a tile) | The flash scenario (M10) needs the importance as a user setting without a fifth onboarding step |
 | Language selector in Settings (1n) | A select box under Round length; the language applies at once as a preview and is stored on Save | English and German as in the mockup |
 | Trainer: dark room, soft horizon, no decoration (frame 1h) | A minimal map: a darker floor at eye height, a ring wall, pillars at corners, door frames at doorways and a column under each head-sized target (accent ramp). Results (1j) has one more sentence under the confidence card: which axis the misses come from | M11: targets stand on the floor at head height and at corners, so crosshair placement can be trained; the sentence tells vertical from horizontal errors |
@@ -126,4 +126,4 @@ Original geometry, no assets of any game. The bot is a head sphere in sand (`#e6
 
 ## Open design questions
 
-See `docs/PROGRESS.md` ("Open questions"): pre-test system checks, "consistency" metric definition, session length vs "stop anytime", export file dialog.
+See `docs/PROGRESS.md` ("Open questions"): pre-test system checks, "consistency" metric definition, session length vs "stop anytime". The export file dialog is decided: native open and save dialogs (LWJGL tinyfd, M22d) with the clipboard and the fixed folders as fallbacks.
