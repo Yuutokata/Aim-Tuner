@@ -108,6 +108,8 @@ private const val SPAWNED = "spawned"
 private const val HIT = "hit"
 private const val MISS = "miss"
 private const val WAYPOINT = "waypoint"
+private const val BODY_HIT = "body_hit"
+private const val DESPAWNED = "despawned"
 private const val FLASH_CUE = "flash_cue"
 private const val FLASH_POP = "flash_pop"
 
@@ -115,6 +117,8 @@ private fun TargetEvent.toDto(origin: Long): TargetEventDto = when (this) {
     is TargetEvent.Spawned -> TargetEventDto(SPAWNED, timeNanos - origin, target.id, target.center.x, target.center.y, target.center.z, target.radius)
     is TargetEvent.Hit -> TargetEventDto(HIT, timeNanos - origin, targetId)
     is TargetEvent.Miss -> TargetEventDto(MISS, timeNanos - origin)
+    is TargetEvent.BodyHit -> TargetEventDto(BODY_HIT, timeNanos - origin, targetId)
+    is TargetEvent.Despawned -> TargetEventDto(DESPAWNED, timeNanos - origin, targetId)
     is TargetEvent.Waypoint -> TargetEventDto(WAYPOINT, timeNanos - origin, targetId, center.x, center.y, center.z)
     // A flash reuses the numeric fields: id = flash id, x/y = yaw/pitch, z = pop time, radius = safe angle.
     is TargetEvent.FlashCue -> TargetEventDto(FLASH_CUE, timeNanos - origin, flashId, yawDegrees, pitchDegrees, (popNanos - origin).toDouble(), safeAngleDegrees)
@@ -126,6 +130,8 @@ private fun TargetEventDto.toEvent(): TargetEvent = when (type) {
     SPAWNED -> TargetEvent.Spawned(t, Target(requireField(id, "id"), Vec3(requireField(x, "x"), requireField(y, "y"), requireField(z, "z")), requireField(radius, "radius")))
     HIT -> TargetEvent.Hit(t, requireField(id, "id"))
     MISS -> TargetEvent.Miss(t)
+    BODY_HIT -> TargetEvent.BodyHit(t, requireField(id, "id"))
+    DESPAWNED -> TargetEvent.Despawned(t, requireField(id, "id"))
     WAYPOINT -> TargetEvent.Waypoint(t, requireField(id, "id"), Vec3(requireField(x, "x"), requireField(y, "y"), requireField(z, "z")))
     FLASH_CUE -> TargetEvent.FlashCue(t, requireField(id, "id"), requireField(x, "x"), requireField(y, "y"), requireField(z, "z").toLong(), requireField(radius, "radius"))
     FLASH_POP -> TargetEvent.FlashPop(t, requireField(id, "id"), requireField(x, "x") > 0.5, requireField(y, "y").toLong())

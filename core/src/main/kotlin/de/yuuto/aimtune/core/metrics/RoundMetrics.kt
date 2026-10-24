@@ -4,10 +4,11 @@ import de.yuuto.aimtune.core.analysis.SegmentationParams
 import de.yuuto.aimtune.core.analysis.Submovement
 import de.yuuto.aimtune.core.analysis.segmentSubmovements
 import de.yuuto.aimtune.core.recording.RoundRecording
+import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.recording.ViewTrack
 import de.yuuto.aimtune.core.scenario.ScenarioKind
-import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.scenario.TargetEvent
+import de.yuuto.aimtune.core.scenario.TargetPath
 import de.yuuto.aimtune.core.scenario.summarize
 import kotlin.math.abs
 import kotlin.math.asin
@@ -23,7 +24,7 @@ data class MetricsParams(
     /**
      * The speed peak of the first reach comes at least this long after a target appeared. A reach
      * whose peak comes earlier is the hand still moving from the previous click, not a reaction
-     * (docs/REVIEW.md C2). The peak, not the start, because the start of a smooth reach is found
+     * (docs/history/REVIEW.md C2). The peak, not the start, because the start of a smooth reach is found
      * early (the slow ramp-up is above the low end threshold). Not applied to targets that were
      * already visible, where the player may be on the way before the previous hit.
      */
@@ -49,6 +50,16 @@ data class MovementMetric(
     val firstErrorHDegrees: Double? = null,
     /** Same for the vertical axis: > 0 is above the target (the crosshair ended too high). */
     val firstErrorVDegrees: Double? = null,
+    /**
+     * The target moved between the start of the reach and the end of its first submovement. The errors of such a reach are
+     * measured against the target's position at the end of that submovement, and the speed-error analysis leaves it out
+     * (the hand aimed at a moving target, not at a place; docs/ALGORITHMS.md "Moving targets").
+     */
+    val targetMoved: Boolean = false,
+    /** Only for a moving target: the endpoint error along the target's motion in degrees, > 0 is ahead of the target (a lead that was too long). */
+    val leadErrorDegrees: Double? = null,
+    /** Only for a moving target: the endpoint error across its motion in degrees, > 0 is to the left of the direction it moves in on the screen. */
+    val aimErrorDegrees: Double? = null,
 )
 
 data class RoundMetrics(
@@ -80,6 +91,15 @@ data class RoundMetrics(
     val meanAbsFirstErrorVDegrees: Double? = null,
     /** Mean signed vertical endpoint error in degrees: > 0 means the first movement tends to end above the target. */
     val meanFirstErrorVDegrees: Double? = null,
+    /** Moving targets only: mean signed (> 0 ahead of the target), and mean absolute, endpoint error along the target's motion in degrees. */
+    val meanLeadErrorDegrees: Double? = null,
+    val meanAbsLeadErrorDegrees: Double? = null,
+    /** Moving targets only: mean absolute endpoint error across the target's motion in degrees. */
+    val meanAbsAimErrorDegrees: Double? = null,
+    /** Range rounds only: bots killed, the median time from a bot's spawn to its kill, and clicks per kill. */
+    val rangeKills: Int? = null,
+    val rangeMedianTimeToKillMs: Double? = null,
+    val rangeShotsPerKill: Double? = null,
 ) {
     /** Share of the endpoint error (summed over both axes) that is vertical, null without first movements. */
     val verticalErrorShare: Double?
@@ -96,15 +116,17 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
     val submovements = segmentSubmovements(recording.mouseEvents, recording.dpi, params.segmentation)
     val track = ViewTrack(recording)
     val spawns = recording.targetEvents.filterIsInstance<TargetEvent.Spawned>().associateBy { it.target.id }
+    val path = TargetPath(recording.targetEvents)
     val hitEvents = recording.targetEvents.filterIsInstance<TargetEvent.Hit>()
     val movements = hitEvents.mapIndexedNotNull { index, hit ->
         val spawn = spawns[hit.targetId] ?: return@mapIndexedNotNull null
         // The reach starts at the later of the target's spawn and the previous hit (several targets can wait at once).
         val from = maxOf(spawn.timeNanos, hitEvents.getOrNull(index - 1)?.timeNanos ?: spawn.timeNanos)
-        movementMetric(recording, track, submovements, spawn, from, hit.timeNanos, params)
+        movementMetric(recording, track, submovements, path, spawn, from, hit.timeNanos, params)
     }
     val tracking = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.TRACKING) computeTrackingMetrics(recording, track) else null
     val flash = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.FLASH) computeFlashMetrics(recording, track, submovements) else null
+    val range = if (ScenarioKind.fromId(recording.scenarioId) == ScenarioKind.RANGE) computeRangeMetrics(recording) else null
     val errors = movements.mapNotNull { it.firstErrorRatio }
     return RoundMetrics(
         hits = summary.hits,
@@ -126,6 +148,12 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
         meanAbsFirstErrorHDegrees = movements.mapNotNull { it.firstErrorHDegrees }.map { abs(it) }.averageOrNull(),
         meanAbsFirstErrorVDegrees = movements.mapNotNull { it.firstErrorVDegrees }.map { abs(it) }.averageOrNull(),
         meanFirstErrorVDegrees = movements.mapNotNull { it.firstErrorVDegrees }.averageOrNull(),
+        meanLeadErrorDegrees = movements.mapNotNull { it.leadErrorDegrees }.averageOrNull(),
+        meanAbsLeadErrorDegrees = movements.mapNotNull { it.leadErrorDegrees }.map { abs(it) }.averageOrNull(),
+        meanAbsAimErrorDegrees = movements.mapNotNull { it.aimErrorDegrees }.map { abs(it) }.averageOrNull(),
+        rangeKills = range?.kills,
+        rangeMedianTimeToKillMs = range?.medianTimeToKillMs,
+        rangeShotsPerKill = range?.shotsPerKill,
     )
 }
 
@@ -138,12 +166,14 @@ fun computeRoundMetrics(recording: RoundRecording, params: MetricsParams = Metri
 fun allFirstReaches(recording: RoundRecording, params: MetricsParams = MetricsParams()): List<MovementMetric> {
     val submovements = segmentSubmovements(recording.mouseEvents, recording.dpi, params.segmentation)
     val track = ViewTrack(recording)
+    val path = TargetPath(recording.targetEvents)
     val hits = recording.targetEvents.filterIsInstance<TargetEvent.Hit>().associate { it.targetId to it.timeNanos }
+    val despawns = recording.targetEvents.filterIsInstance<TargetEvent.Despawned>().associate { it.targetId to it.timeNanos }
     val spawns = recording.targetEvents.filterIsInstance<TargetEvent.Spawned>()
     val roundEnd = recording.mouseEvents.lastOrNull()?.timeNanos ?: return emptyList()
     return spawns.mapIndexedNotNull { index, spawn ->
-        val end = hits[spawn.target.id] ?: spawns.getOrNull(index + 1)?.timeNanos ?: roundEnd
-        if (end <= spawn.timeNanos) null else movementMetric(recording, track, submovements, spawn, spawn.timeNanos, end, params)
+        val end = hits[spawn.target.id] ?: despawns[spawn.target.id] ?: spawns.getOrNull(index + 1)?.timeNanos ?: roundEnd
+        if (end <= spawn.timeNanos) null else movementMetric(recording, track, submovements, path, spawn, spawn.timeNanos, end, params)
     }
 }
 
@@ -163,6 +193,7 @@ private fun movementMetric(
     recording: RoundRecording,
     track: ViewTrack,
     submovements: List<Submovement>,
+    path: TargetPath,
     spawn: TargetEvent.Spawned,
     fromNanos: Long,
     untilNanos: Long,
@@ -171,7 +202,9 @@ private fun movementMetric(
     val t0 = fromNanos
     val t1 = untilNanos
     val start = track.viewAt(t0)
-    val (targetYaw, targetPitch) = directionAngles(spawn.target)
+    // A static target stays where it spawned; a moving one is followed from its waypoints.
+    val startCenter = path.positionAt(spawn.target.id, t0) ?: spawn.target.center
+    val (targetYaw, targetPitch) = directionAngles(startCenter)
     val toTarget = offset(start.yawDegrees, start.pitchDegrees, targetYaw, targetPitch, targetPitch)
     val distance = toTarget.length
     if (distance < params.minTargetDistanceDegrees) return null
@@ -183,9 +216,31 @@ private fun movementMetric(
         val end = track.viewAt(it.endNanos - 1)
         offset(start.yawDegrees, start.pitchDegrees, end.yawDegrees, end.pitchDegrees, targetPitch)
     }
+    // The error of a reach is measured against the target where it was when the reach ended, not where it was when the reach began.
+    val firstEndNanos = first?.let { it.endNanos - 1 }
+    val targetMoved = path.movesDuring(spawn.target.id, t0, firstEndNanos ?: t1)
+    val toEnd = if (targetMoved) {
+        val (endYaw, endPitch) = directionAngles(path.positionAt(spawn.target.id, firstEndNanos ?: t1) ?: startCenter)
+        offset(start.yawDegrees, start.pitchDegrees, endYaw, endPitch, targetPitch)
+    } else {
+        toTarget
+    }
+    val reach = toEnd.length
     val firstError = firstMoved?.let { moved ->
-        val along = (moved.x * toTarget.x + moved.y * toTarget.y) / distance
-        (along - distance) / distance
+        // A target that came to rest on the crosshair leaves no distance to relate the error to.
+        if (targetMoved && reach < params.minTargetDistanceDegrees) return@let null
+        val along = (moved.x * toEnd.x + moved.y * toEnd.y) / reach
+        (along - reach) / reach
+    }
+    val errorH = firstMoved?.let { it.x - toEnd.x }
+    val errorV = firstMoved?.let { it.y - toEnd.y }
+    val motion = Offset(toEnd.x - toTarget.x, toEnd.y - toTarget.y)
+    val components = if (targetMoved && errorH != null && errorV != null && motion.length >= MIN_MOTION_DEGREES) {
+        val ux = motion.x / motion.length
+        val uy = motion.y / motion.length
+        (errorH * ux + errorV * uy) to (-errorH * uy + errorV * ux)
+    } else {
+        null
     }
     val path = angularPath(recording, track, t0, t1, targetPitch)
     return MovementMetric(
@@ -197,8 +252,11 @@ private fun movementMetric(
         firstPeakSpeedCountsPerMs = first?.peakSpeedCountsPerMs,
         correctiveSubmovements = if (first == null) maxOf(0, inWindow.size - 1) else inWindow.size - 1 - firstIndex,
         pathEfficiency = if (path > 0.0) minOf(1.0, distance / path) else null,
-        firstErrorHDegrees = firstMoved?.let { it.x - toTarget.x },
-        firstErrorVDegrees = firstMoved?.let { it.y - toTarget.y },
+        firstErrorHDegrees = errorH,
+        firstErrorVDegrees = errorV,
+        targetMoved = targetMoved,
+        leadErrorDegrees = components?.first,
+        aimErrorDegrees = components?.second,
     )
 }
 
@@ -224,8 +282,10 @@ private fun angularPath(recording: RoundRecording, track: ViewTrack, t0: Long, t
         }
 }
 
-private fun directionAngles(target: Target): Pair<Double, Double> {
-    val c = target.center
+/** A target that moved less than this on the screen plane has no direction of motion to split the error along. */
+private const val MIN_MOTION_DEGREES = 0.1
+
+private fun directionAngles(c: Vec3): Pair<Double, Double> {
     val yaw = Math.toDegrees(atan2(c.x, -c.z))
     val pitch = Math.toDegrees(asin(c.y / c.length))
     return yaw to pitch

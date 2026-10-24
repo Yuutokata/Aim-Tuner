@@ -3,6 +3,7 @@ package de.yuuto.aimtune.app
 import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.setup.SetupStep
 import de.yuuto.aimtune.core.accel.AccelCurve
+import de.yuuto.aimtune.core.scenario.RangeOptions
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.TrainerGeometry
 import de.yuuto.aimtune.games.GameProfile
@@ -21,6 +22,8 @@ data class TrainerConfig(
     val accel: AccelCurve? = null,
     /** Target sizes and distances of the rounds; the game's own by default, null only for the fixed legacy values (old recordings). */
     val geometry: TrainerGeometry? = profile.geometry,
+    /** Speed and bot movement of Range mode rounds; the other scenarios ignore it. */
+    val rangeOptions: RangeOptions = RangeOptions.DEFAULT,
 )
 
 /** The trainer config for saved [settings], or null while onboarding is incomplete. */
@@ -33,5 +36,6 @@ fun trainerConfigFor(settings: AppSettings, profiles: GameProfiles, seed: Long):
         profile = checkNotNull(draft.profile(profiles)),
         roundSeconds = settings.roundSeconds,
         seed = seed,
+        rangeOptions = runCatching { settings.rangeOptions() }.getOrDefault(RangeOptions.DEFAULT),
     )
 }

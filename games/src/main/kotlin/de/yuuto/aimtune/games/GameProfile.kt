@@ -32,7 +32,7 @@ data class GameProfile(
     /**
      * Width / height of the picture the trainer draws, whatever the window's shape: the scene is letterboxed
      * to it, so the horizontal FOV is exactly what the game shows at this aspect ratio. How a game scales
-     * its FOV for other shapes is not documented for Valorant (docs/REVIEW.md M7), so the trainer does not guess.
+     * its FOV for other shapes is not documented for Valorant (docs/history/REVIEW.md M7), so the trainer does not guess.
      */
     val trainerAspectRatio: Double = WIDESCREEN_ASPECT,
     /** Angular target sizes, engagement angles and movement speeds the trainer uses; defaults are unverified assumptions. */

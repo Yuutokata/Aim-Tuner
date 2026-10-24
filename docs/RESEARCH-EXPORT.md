@@ -3,7 +3,7 @@
 History, then "Share data for research" writes all stored rounds into one file,
 `aimtune-research-<yyyyMMdd-HHmmss>.json.gz`, in `%APPDATA%\AimTune\exports\research\`. AimTune never
 uploads it; the person sends it themselves. It exists because the method has never been run on other
-people's recordings (docs/ASSESSMENT.md D4): the files let someone check the first-reach definition, the
+people's recordings (docs/history/ASSESSMENT.md D4): the files let someone check the first-reach definition, the
 low-speed pattern of the acceleration analysis, and whether the score curve has an interior optimum for people.
 
 Size: about 70 KB compressed per 45-second round at a 1 kHz mouse (28 rounds: 2 MB).

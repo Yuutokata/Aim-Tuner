@@ -72,6 +72,19 @@ Rounds are analysed and saved by `RoundProcessor` on a background thread. If the
 - `app/accel`: `AccelRun` is the state machine without UI (calibration, analysis, test, done; nothing in it reveals the condition of a test round), `AccelSession` plugs it into the trainer screen through `RoundSession` (shared with `BlindSession`), `SampleAccelRun` feeds the screenshot tour. Screens: `AccelIntroScreen` (starting sensitivity from the stored blind rounds, Raw Accel check), `AccelBetweenScreen`, `AccelAnalysisScreen`, `AccelResultScreen`. Acceleration rounds are stored as sessions of kind `accel_ab`, so the optimizer never sees them. A new run starts with `PriorCalibration` (movements of earlier plain rounds of those sessions at about the same DPI and cm/360, read by `RoundProcessor.priorCalibration`), which the calibration adds to its own rounds.
 - Tests: `AccelCurveTest` (formulas, processor, spec), `AccelFitTest`, `core/.../harness/AccelPipelineTest` (analysis -> fit -> A/B against the simulated players, false-positive calibration, power), `RawAccelExportTest`, `AccelRunTest`, `RoundRepositoryTest` (stored curve, migration from version 1).
 
+## Raw Accel model and import (M17)
+
+- `core/accel/RawAccelCurve.kt`: `RawAccelArgs` (typed `accel_args` with Raw Accel's validation), `RawAccelCurve` (an `AccelCurve` with the driver's classic/natural/lut/noaccel formulas in Velocity and Gain form), `RawAccelProfile` (name, args, output DPI, device DPI; `totalMultiplier`). `AccelSpec` stores a `RawAccelCurve` as `rawaccel1;...`.
+- `storage/RawAccelImport`: `parse` keeps the JSON tree (`RawAccelFile`), `profile` returns `Imported(profile, warnings)` or `Refused(reasons, warnings)`; `RawAccelImportException` for malformed input. `RawAccelExport.patch` adds a changed copy of a profile to that tree and `write` stores it under `settings-<name>.json`.
+- Tests: `RawAccelCurveTest` (core), `RawAccelImportTest`, `RawAccelPatchTest`, fixture `storage/src/test/resources/rawaccel/user-classic-gain.json`.
+
+## Refine my Raw Accel curve (M18)
+
+- `core/accel/RefineParameter.kt`: `RefineParameter` (LEVEL, HIGH_GAIN, TRANSITION with their factor ranges), `RawAccelProfile.adjusted(parameter, factor)` / `supports`, `RawAccelProfile.played(gameCm360)` (curve plus the cm/360 its output DPI gives).
+- `core/accel/RefineSearch.kt`: one stage as a blind search over a pseudo cm/360 of `100 * factor` with the sensitivity optimizer (like `CurveStrength`), `RefineResult`. `core/accel/RefineEngine.kt`: the phases WARMUP, SEARCH(stage), STAGE_RESULT, TEST, DONE without UI; the test is `AccelAbPlan` + `evaluateAb` with the control arm (`AbCondition.PLAIN`) playing the imported profile. The headless gate (`RefineGateTest`) drives this same class.
+- `app/accel`: `RefineImport` (parse, choose profile, DPI check, list `imports/`), `RefineRun` (engine plus `TrainerConfig`), `RefineSession` (`SessionKind.ACCEL_REFINE`; stored searches, calibration and "Last search" ignore it), `RefineDiff` (changed fields). Screens `RefineImportScreen`, `RefineBetweenScreen`, `RefineStageScreen`, `RefineResultScreen`; `AppContext.startRefineRun`, `showRefineStep`, `exportRefine` (`RawAccelExport.patch` + `write`).
+- Tests: `RefineParameterTest`, `RefineEngineTest` (core), `RefineRunTest` (app); gate `core/.../harness/review/RefineGateTest` (`AIMTUNE_REVIEW`, report `core/build/reports/harness/gate-m18.txt`).
+
 ## Optimizer review fixes (M14)
 
 - `core/accel`: `LookupCurve` (Raw Accel "lut", velocity form, flat outside its points; `AccelSpec` `lut;points=s:m,...`, `RawAccelExport` mode `lut` with the flat `data` array), `AccelFit.boundedTo` / `boundedRecommendation` / `AccelFitResult.bounded` (curve finder v2), `AccelAnalysis.speedQuantile`. `SpeedRoundAnalysis.kt` (speed-round estimator) and `FlickConfig.targetLifetimeNanos` / `Scenario.deadlineNanos` / `allFirstReaches` are an experiment the app does not use (ALGORITHMS.md "M14").

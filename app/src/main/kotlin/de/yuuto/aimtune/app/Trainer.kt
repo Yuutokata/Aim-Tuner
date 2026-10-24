@@ -74,7 +74,7 @@ class Trainer(
         summary = null
         recordedMouse.clear()
         accelProcessor = config.accel?.let { AccelProcessor(it, config.dpi) }
-        scenario = config.scenario.create(roundNanos, roundSeed, config.geometry)
+        scenario = config.scenario.create(roundNanos, roundSeed, config.geometry, config.rangeOptions)
         roundStartNanos = nowNanos()
         scenario?.start(roundStartNanos)
         phase = Phase.RUNNING

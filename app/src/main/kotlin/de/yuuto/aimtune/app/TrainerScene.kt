@@ -20,6 +20,8 @@ import com.badlogic.gdx.utils.Disposable
 import de.yuuto.aimtune.core.math.ViewAngles
 import de.yuuto.aimtune.core.scenario.ArenaFeatureKind
 import de.yuuto.aimtune.core.scenario.ArenaLayout
+import de.yuuto.aimtune.core.scenario.BotShape
+import de.yuuto.aimtune.core.scenario.RangeGeometry
 import de.yuuto.aimtune.core.scenario.FlashState
 import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.scenario.TrainerGeometry
@@ -39,6 +41,8 @@ class TrainerScene(
     private val modelRadius: Double = DEFAULT_MODEL_RADIUS,
     /** With the geometry of a game the scene has a floor at eye height, a wall, corners and doorways; without it only the plain room. */
     geometry: TrainerGeometry? = null,
+    /** Range mode: the targets are drawn as bots of this shape, and the room has a counter and lane lines instead of corners and doorways. */
+    private val bot: BotShape? = null,
 ) : Disposable {
     private var windowWidth = 16
     private var windowHeight = 9
@@ -97,9 +101,25 @@ class TrainerScene(
     }
     private val gridInstance: ModelInstance? = gridModel?.let { ModelInstance(it) }
 
+    /** Parts of the range bot (procedural boxes and a sphere) and the lit lane lines. */
+    private val botModels: List<Model> = listOf(Theme.botTorso, Theme.botLimb).map { color ->
+        ModelBuilder().createBox(1f, 1f, 1f, Material(ColorAttribute.createDiffuse(color)), (Usage.Position or Usage.Normal).toLong())
+    }
+    private val botTorsoInstance = ModelInstance(botModels[0])
+    private val botLimbInstance = ModelInstance(botModels[1])
+    private val laneModel: Model = ModelBuilder().createBox(
+        1f, 1f, 1f, Material(ColorAttribute.createDiffuse(Theme.laneLine), ColorAttribute.createEmissive(Theme.laneLine.cpy().mul(LANE_GLOW))),
+        (Usage.Position or Usage.Normal).toLong(),
+    )
+    private val botHeadModel: Model = ModelBuilder().createSphere(
+        2f, 2f, 2f, SPHERE_DIVISIONS, SPHERE_DIVISIONS, Material(ColorAttribute.createDiffuse(Theme.botHead)), (Usage.Position or Usage.Normal).toLong(),
+    )
+    private val botHeadInstance = ModelInstance(botHeadModel)
+
     /** Floor, wall ring, corner pillars and door frames; empty without a geometry. */
     private val arena: List<ModelInstance> = if (geometry == null || floorY == null) emptyList() else buildArena(geometry, floorY)
     private val bodyInstance = ModelInstance(bodyBox)
+
 
     private val targetModel: Model = ModelBuilder().createSphere(
         modelRadius.toFloat() * 2, modelRadius.toFloat() * 2, modelRadius.toFloat() * 2, SPHERE_DIVISIONS, SPHERE_DIVISIONS,
@@ -157,6 +177,10 @@ class TrainerScene(
             batch.render(flashInstance, environment)
         }
         for (target in targets) {
+            if (bot != null) {
+                drawBot(target, bot)
+                continue
+            }
             val scale = (target.radius / modelRadius).toFloat()
             targetInstance.transform.setToTranslation(target.center.x.toFloat(), target.center.y.toFloat(), target.center.z.toFloat()).scale(scale, scale, scale)
             batch.render(targetInstance, environment)
@@ -164,6 +188,35 @@ class TrainerScene(
         }
         batch.end()
         HdpiUtils.glViewport(0, 0, windowWidth, windowHeight)
+    }
+
+    /**
+     * The range bot: a head sphere (the hit sphere), a torso, a pelvis, two arms and two legs, turned to face the player. The
+     * proportions are those of [BotShape], so what is drawn is what is hit; the look is original, not the game's bot.
+     */
+    private fun drawBot(target: Target, shape: BotShape) {
+        val cx = target.center.x.toFloat()
+        val cy = target.center.y.toFloat()
+        val cz = target.center.z.toFloat()
+        val yaw = Math.toDegrees(atan2(target.center.x, -target.center.z))
+        val r = target.radius.toFloat()
+        botHeadInstance.transform.setToTranslation(cx, cy, cz).scale(r, r, r)
+        batch.render(botHeadInstance, environment)
+        val torsoTop = cy - r - NECK
+        val torsoBottom = torsoTop - TORSO_HEIGHT
+        val pelvisBottom = torsoBottom - PELVIS_HEIGHT
+        val feet = cy - shape.headCenterAboveFeet.toFloat()
+        fun box(instance: ModelInstance, side: Float, top: Float, bottom: Float, width: Float, depth: Float) {
+            instance.transform.setToTranslation(cx, (top + bottom) / 2, cz).rotateRad(Vector3.Y, -Math.toRadians(yaw).toFloat())
+                .translate(side, 0f, 0f).scale(width, top - bottom, depth)
+            batch.render(instance, environment)
+        }
+        box(botTorsoInstance, 0f, torsoTop, torsoBottom, TORSO_WIDTH, TORSO_DEPTH)
+        box(botTorsoInstance, 0f, torsoBottom, pelvisBottom, PELVIS_WIDTH, TORSO_DEPTH)
+        for (side in floatArrayOf(-1f, 1f)) {
+            box(botLimbInstance, side * ARM_OFFSET, torsoTop - 0.02f, torsoTop - ARM_LENGTH, ARM_WIDTH, ARM_DEPTH)
+            box(botLimbInstance, side * LEG_OFFSET, pelvisBottom, feet, LEG_WIDTH, LEG_DEPTH)
+        }
     }
 
     /** A column from the floor to the bottom of a head-sized target, so the head stands on something. */
@@ -199,7 +252,8 @@ class TrainerScene(
             val c = ViewAngles.directionOf(yaw, 0.0) * distance
             parts += part(crateBox, c.x.toFloat(), floor + size / 2, c.z.toFloat(), size, size, size, yaw + 20.0)
         }
-        layout.features.forEachIndexed { index, feature ->
+        if (bot != null) parts += rangeCourse(floor, geometry.range)
+        (if (bot != null) emptyList() else layout.features).forEachIndexed { index, feature ->
             val yaw = feature.yawDegrees
             val at = ViewAngles.directionOf(yaw, 0.0) * feature.distanceMeters
             // Sideways on the ground, to the right of the line of sight.
@@ -225,6 +279,37 @@ class TrainerScene(
         return parts
     }
 
+    /** The counter in front of the player and the lit lines on the floor: lanes every 10 degrees of bearing and arcs at the near, middle and far distance. */
+    private fun rangeCourse(floor: Float, range: RangeGeometry?): List<ModelInstance> {
+        val parts = mutableListOf<ModelInstance>()
+        parts += part(structureBox, 0f, floor + COUNTER_HEIGHT / 2, -COUNTER_DISTANCE, COUNTER_WIDTH, COUNTER_HEIGHT, COUNTER_DEPTH, 0.0)
+        parts += part(panelBox, 0f, floor + COUNTER_HEIGHT + 0.03f, -COUNTER_DISTANCE, COUNTER_WIDTH + 0.1f, 0.06f, COUNTER_DEPTH + 0.1f, 0.0)
+        val low = range?.bearingMinDegrees ?: -50.0
+        val high = range?.bearingMaxDegrees ?: 80.0
+        val near = range?.distanceMeters?.min ?: 5.0
+        val far = range?.distanceMeters?.max ?: 20.0
+        val y = floor + LANE_LIFT
+        var bearing = Math.ceil(low / LANE_STEP_DEGREES) * LANE_STEP_DEGREES
+        while (bearing <= high) {
+            val mid = ViewAngles.directionOf(bearing, 0.0) * ((far + LANE_START) / 2)
+            parts += laneBox(mid.x.toFloat(), y, mid.z.toFloat(), LANE_WIDTH, (far - LANE_START).toFloat(), bearing)
+            bearing += LANE_STEP_DEGREES
+        }
+        for (arc in listOf(near, (near + far) / 2, far)) {
+            var b = low
+            while (b < high) {
+                val c = ViewAngles.directionOf(b + ARC_STEP_DEGREES / 2, 0.0) * arc
+                parts += laneBox(c.x.toFloat(), y, c.z.toFloat(), (2 * arc * sin(Math.toRadians(ARC_STEP_DEGREES / 2))).toFloat() + 0.02f, LANE_WIDTH, b + ARC_STEP_DEGREES / 2)
+                b += ARC_STEP_DEGREES
+            }
+        }
+        return parts
+    }
+
+    /** A flat strip centred at ([x], [y], [z]), [width] across and [length] along the bearing [yawDegrees]. */
+    private fun laneBox(x: Float, y: Float, z: Float, width: Float, length: Float, yawDegrees: Double): ModelInstance =
+        ModelInstance(laneModel).apply { transform.setToTranslation(x, y, z).rotateRad(Vector3.Y, -Math.toRadians(yawDegrees).toFloat()).scale(width, LANE_THICKNESS, length) }
+
     /** How bright the white-out is, 0..1 of full white (the player's setting); full white hurt the eyes. */
     var whiteOutLevel: Float = 1f
 
@@ -244,6 +329,9 @@ class TrainerScene(
         roomModel.dispose()
         targetModel.dispose()
         unitBoxes.forEach { it.dispose() }
+        botModels.forEach { it.dispose() }
+        laneModel.dispose()
+        botHeadModel.dispose()
         gridModel?.dispose()
     }
 
@@ -273,6 +361,30 @@ class TrainerScene(
         const val BODY_DEPTH = 0.3f
         const val MIN_BODY_HEIGHT = 0.2f
         const val MAX_HEAD_RADIUS = 0.3
+        const val NECK = 0.05f
+        const val TORSO_HEIGHT = 0.55f
+        const val PELVIS_HEIGHT = 0.2f
+        const val TORSO_WIDTH = 0.42f
+        const val PELVIS_WIDTH = 0.34f
+        const val TORSO_DEPTH = 0.24f
+        const val ARM_OFFSET = 0.29f
+        const val ARM_WIDTH = 0.1f
+        const val ARM_DEPTH = 0.12f
+        const val ARM_LENGTH = 0.55f
+        const val LEG_OFFSET = 0.09f
+        const val LEG_WIDTH = 0.15f
+        const val LEG_DEPTH = 0.17f
+        const val COUNTER_DISTANCE = 1.7f
+        const val COUNTER_WIDTH = 1.6f
+        const val COUNTER_HEIGHT = 0.8f
+        const val COUNTER_DEPTH = 0.4f
+        const val LANE_LIFT = 0.02f
+        const val LANE_GLOW = 0.45f
+        const val LANE_THICKNESS = 0.01f
+        const val LANE_WIDTH = 0.03f
+        const val LANE_STEP_DEGREES = 10.0
+        const val ARC_STEP_DEGREES = 4.0
+        const val LANE_START = 3.0
         const val GRID_SPACING = 2f
         const val GRID_EXTENT = 60f
         const val GRID_LIFT = 0.01f

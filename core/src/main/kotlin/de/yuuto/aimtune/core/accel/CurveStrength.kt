@@ -11,7 +11,7 @@ import kotlin.math.abs
  * The strength is searched blind with the same optimizer that finds the sensitivity, over a pseudo
  * cm/360 of `100 * strength` (so the search is on a log scale and symmetric in rising and falling), instead
  * of being inferred from how first movements miss: that inference sees only a narrow band of hand speeds
- * (docs/ASSESSMENT.md, "Follow-up on a more precise curve").
+ * (docs/history/ASSESSMENT.md, "Follow-up on a more precise curve").
  */
 object CurveStrength {
     const val MIN = 0.7
@@ -33,6 +33,13 @@ object CurveStrength {
 
     /** The decay rate of the natural curves the search plays; stored rounds are recognised by it. */
     const val DECAY = 0.05
+
+    /**
+     * A falling strength counts as clear only when the upper end of its credible range is below this. Falling curves are
+     * the ones the search found on noise most often (docs/history/CURVE-FINDER-AUDIT.md, option O2), so they need more evidence
+     * than rising ones, whose range only has to stay above 1.
+     */
+    const val FALLING_MAX_HIGH = 0.90
     private const val PSEUDO_SCALE = 100.0
 
     /** The range the optimizer searches without flash rounds, as pseudo cm/360. */
@@ -53,6 +60,15 @@ object CurveStrength {
 
     /** True when [strength] would be played as a real curve. */
     fun isCurve(strength: Double): Boolean = abs(strength - NEUTRAL) >= PLAIN_BAND
+
+    /**
+     * True when the credible range [low]..[high] of the best [strength] clearly excludes "no curve": a real curve whose
+     * range is above 1 (rising), or entirely below [FALLING_MAX_HIGH] (falling).
+     */
+    fun excludesPlain(strength: Double, low: Double, high: Double): Boolean {
+        if (!isCurve(strength)) return false
+        return low > NEUTRAL || high < FALLING_MAX_HIGH
+    }
 }
 
 /** The curve of [strength] as a candidate for the blind A/B test; the sensitivity factor stays 1 (the search included it). */

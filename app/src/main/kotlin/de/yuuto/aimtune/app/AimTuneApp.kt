@@ -71,6 +71,7 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
             startupProblems = problems,
             exportDir = paths?.dataDir?.resolve("exports")?.resolve("rawaccel"),
             researchDir = paths?.dataDir?.resolve("exports")?.resolve("research"),
+            importDir = paths?.dataDir?.resolve("imports")?.also { runCatching { java.nio.file.Files.createDirectories(it) } },
         )
         context = ctx
         val screenshotDir = options.screenshotDir

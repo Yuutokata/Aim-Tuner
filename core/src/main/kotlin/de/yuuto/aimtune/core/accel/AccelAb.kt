@@ -8,7 +8,11 @@ import de.yuuto.aimtune.core.score.normalCdf
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-/** The two conditions of the blind A/B test: plain sensitivity, or the fitted curve with its sensitivity factor. */
+/**
+ * The two conditions of the blind A/B test: plain sensitivity, or the fitted curve with its sensitivity factor. [PLAIN] is
+ * the control arm: in "Refine my Raw Accel curve" it plays the player's imported profile instead of plain sensitivity
+ * ([RefineEngine]), and [ACCEL] the refined one; plan and statistics are the same.
+ */
 enum class AbCondition { PLAIN, ACCEL }
 
 /** One round of the A/B test; both rounds of a pair play the same scenario with the same [seed], so the targets are identical. */
@@ -112,7 +116,7 @@ const val DEFAULT_MIN_PAIRS = 6
 
 /**
  * One-sided level of every look. 300 simulated tests with no difference gave a 'winner' in 12 % of the
- * runs at 0.02 per look and six looks (docs/REVIEW.md M3); 0.01 and a minimum number of pairs and effect
+ * runs at 0.02 per look and six looks (docs/history/REVIEW.md M3); 0.01 and a minimum number of pairs and effect
  * bring that down (see `ReviewAccelTest`).
  */
 const val DEFAULT_ALPHA_PER_LOOK = 0.01

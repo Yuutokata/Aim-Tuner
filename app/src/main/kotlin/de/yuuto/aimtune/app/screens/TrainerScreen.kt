@@ -16,6 +16,7 @@ import de.yuuto.aimtune.app.Trainer
 import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.app.TrainerScene
 import de.yuuto.aimtune.app.audio.FlashCueTracker
+import de.yuuto.aimtune.core.scenario.RangeGeometry
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 
 private const val MILLIS_PER_SECOND = 1000L
@@ -39,7 +40,9 @@ class TrainerScreen(private val ctx: AppContext, private val config: TrainerConf
             sessionRoundDone = true
         }
     }
-    private val scene = TrainerScene(config.profile.verticalFovDegrees.toFloat(), config.profile.trainerAspectRatio, geometry = config.profile.geometry)
+    private val scene = TrainerScene(config.profile.verticalFovDegrees.toFloat(), config.profile.trainerAspectRatio, geometry = config.profile.geometry, bot = botShape())
+    private fun botShape() = if (config.scenario == ScenarioKind.RANGE) (config.profile.geometry.range ?: RangeGeometry()).shape else null
+
     private val cueTracker = FlashCueTracker()
     private val hud = Hud(config, ctx.ui.tokens, ctx.i18n, roundLabel = session?.label?.let { ctx.i18n.t(it) }, crosshair = ctx.settings.current.activeCrosshair())
 

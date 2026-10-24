@@ -79,3 +79,19 @@ private fun normalizedCurve(fit: AccelFit, points: List<GainPoint>, xs: DoubleAr
     val mean = exp(points.sumOf { ln(fit.totalGain(it.speed)) * it.count } / total)
     return DoubleArray(xs.size) { fit.totalGain(xs[it]) / mean }
 }
+
+private const val PROFILE_CHART_MAX_SPEED = 120.0
+private const val PROFILE_CHART_POINTS = 120
+
+/** The total multiplier of a Raw Accel profile (curve times output DPI / device DPI) against hand speed in in/s, with the line at 1. */
+fun profileChart(tokens: Tokens, profile: de.yuuto.aimtune.core.accel.RawAccelProfile): ChartSpec {
+    val xs = DoubleArray(PROFILE_CHART_POINTS) { PROFILE_CHART_MAX_SPEED * (it + 1) / PROFILE_CHART_POINTS }
+    val ys = DoubleArray(xs.size) { profile.totalMultiplier(xs[it]) }
+    val low = minOf(ys.min(), 1.0)
+    val high = maxOf(ys.max(), 1.0)
+    val margin = maxOf((high - low) * 0.15, 0.05)
+    return ChartSpec(
+        xMin = 0.0, xMax = PROFILE_CHART_MAX_SPEED, yMin = low - margin, yMax = high + margin,
+        lines = listOf(ChartLine(xs, ys, tokens.chartCandidate)), referenceYs = listOf(1.0),
+    )
+}

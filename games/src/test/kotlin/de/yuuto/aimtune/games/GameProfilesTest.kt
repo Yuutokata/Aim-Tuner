@@ -144,4 +144,55 @@ class GameProfilesTest {
         assertEquals(50.0, custom.geometry.flash.halfFovDegrees, 0.1)
         assertEquals(45.0, de.yuuto.aimtune.games.GameProfile.custom(0.07, 90.0).geometry.flash.halfFovDegrees, 0.1)
     }
+
+    private val rangeBlock = """
+        "range":{"spawnDelaySeconds":{"min":0.1,"max":0.5},"speedPresets":{"easySeconds":4.0,"mediumSeconds":3.0,"hardSeconds":2.0},
+         "bearingDegrees":{"min":-30.0,"max":60.0},"distanceMeters":{"min":4.0,"max":10.0},"botHeightMeters":1.7,"headDiameterMeters":0.2,
+         "strafe":{"speedMetersPerSecond":3.0,"movingSeconds":{"min":0.2,"max":0.4},"stopSeconds":{"min":0.1,"max":0.2},"reverseProbability":0.5,"maxOffsetMeters":1.5},
+         "killRule":{"headHitKills":true,"bodyHitsArmorOn":5,"bodyHitsArmorOff":3},
+         "valueNotes":{NOTES}}
+    """.trimIndent()
+
+    private fun withRange(notes: List<String>, verified: Boolean = false): String {
+        val entries = notes.joinToString(",") { "\"$it\":{\"verified\":$verified,\"source\":\"test\"}" }
+        return valid.replace("\"sensitivity\"", "\"trainer\":{${rangeBlock.replace("{NOTES}", "{$entries}")}},\"sensitivity\"")
+    }
+
+    private val allNotes = listOf("spawnDelaySeconds", "speedPresets", "bearingDegrees", "distanceMeters", "botHeightMeters", "headDiameterMeters", "strafe", "killRule")
+
+    @Test
+    fun `the range block of valorant is complete and every value is marked as not verified with a source`() {
+        val range = assertNotNull(assertNotNull(bundled.find("valorant")).geometry.range)
+        assertEquals(0.2, range.spawnDelaySeconds.min)
+        assertEquals(0.8, range.spawnDelaySeconds.max)
+        assertEquals(3.0, range.lifetimeSeconds(de.yuuto.aimtune.core.scenario.RangeSpeed.EASY))
+        assertEquals(1.2, range.lifetimeSeconds(de.yuuto.aimtune.core.scenario.RangeSpeed.HARD))
+        assertNull(range.lifetimeSeconds(de.yuuto.aimtune.core.scenario.RangeSpeed.NONE))
+        assertEquals(-50.0, range.bearingMinDegrees)
+        assertEquals(80.0, range.bearingMaxDegrees)
+        assertEquals(1.8, range.botHeightMeters)
+        assertEquals(4, range.bodyHitsToKill(armor = true))
+        assertEquals(3, range.bodyHitsToKill(armor = false))
+        assertEquals(false, range.verified)
+    }
+
+    @Test
+    fun `a profile without a range block has no Range mode, one with a block reads every value`() {
+        assertNull(parseGameProfile(valid).geometry.range)
+        val range = assertNotNull(parseGameProfile(withRange(allNotes)).geometry.range)
+        assertEquals(4.0, range.easyLifetimeSeconds)
+        assertEquals(0.2, range.headDiameterMeters)
+        assertEquals(5, range.bodyHitsToKillArmorOn)
+        assertEquals(1.5, range.strafeMaxOffsetMeters)
+        assertEquals(false, range.verified)
+        assertEquals(true, assertNotNull(parseGameProfile(withRange(allNotes, verified = true)).geometry.range).verified)
+    }
+
+    @Test
+    fun `a range block without a source note for every value is rejected`() {
+        val error = assertFailsWith<GameProfileException> { parseGameProfile(withRange(allNotes - "killRule")) }
+        assertTrue("killRule" in error.message.orEmpty())
+        assertFailsWith<GameProfileException> { parseGameProfile(valid.replace("\"sensitivity\"", "\"trainer\":{\"range\":{\"botHeightMeters\":1.8}},\"sensitivity\"")) }
+        assertFailsWith<GameProfileException> { parseGameProfile(withRange(allNotes).replace("\"botHeightMeters\":1.7", "\"botHeightMeters\":0.4")) }
+    }
 }

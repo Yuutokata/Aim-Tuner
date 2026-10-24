@@ -33,7 +33,7 @@ data class AngleBucket(val maxDegrees: Double, val weight: Double) {
  * distance, so a change of distance cannot change the difficulty. All values of a profile that were
  * not checked against the game have [verified] false and say so in the profile's notes.
  *
- * The defaults are the Valorant assumptions of docs/REVIEW.md ("Realism"): a head of about 0.2 m seen
+ * The defaults are the Valorant assumptions of docs/history/REVIEW.md ("Realism"): a head of about 0.2 m seen
  * from 6-30 m, mostly small corrections near the crosshair with occasional large flicks.
  */
 data class TrainerGeometry(
@@ -66,6 +66,8 @@ data class TrainerGeometry(
     val elevation: ElevationMix = ElevationMix(),
     /** The minimal map (floor, wall, corners, doorways) and how often a target stands at a corner or doorway. */
     val arena: ArenaLayout = ArenaLayout(),
+    /** Range mode of the game; null when the profile has no `range` block, and the game then has no Range mode. */
+    val range: RangeGeometry? = null,
     val verified: Boolean = false,
 ) {
     init {

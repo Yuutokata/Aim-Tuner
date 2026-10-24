@@ -1,9 +1,12 @@
 package de.yuuto.aimtune.app.ui
 
 import com.badlogic.gdx.scenes.scene2d.Actor
+import com.badlogic.gdx.scenes.scene2d.InputEvent
+import com.badlogic.gdx.scenes.scene2d.InputListener
 import com.badlogic.gdx.scenes.scene2d.ui.Container
 import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.badlogic.gdx.scenes.scene2d.ui.Label
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
 import com.badlogic.gdx.scenes.scene2d.ui.Stack
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton
@@ -70,7 +73,19 @@ fun UiSkin.frame(headerRight: Actor?, content: Actor, footer: Actor?): Table {
     root.add(header).growX().height(tokens.headerHeight).row()
 
     if (content is Table) content.align(Align.topLeft)
-    root.add(content).grow().top().left().padTop(CONTENT_TOP_PADDING).row()
+    // Content taller than the window (small screens, UI scale) scrolls instead of pushing the footer out of view.
+    val scroll = ScrollPane(content, skin, Styles.FRAME_SCROLL)
+    scroll.setScrollingDisabled(true, false)
+    scroll.setOverscroll(false, false)
+    scroll.setFlickScroll(false)
+    scroll.setFadeScrollBars(false)
+    // ScrollPane takes the wheel only after a click on it (ScrollPane.addCaptureListener), so hovering is enough here.
+    scroll.addListener(object : InputListener() {
+        override fun enter(event: InputEvent, x: Float, y: Float, pointer: Int, fromActor: Actor?) {
+            scroll.stage?.scrollFocus = scroll
+        }
+    })
+    root.add(scroll).grow().top().left().padTop(CONTENT_TOP_PADDING).row()
     if (footer != null) root.add(footer).growX().height(tokens.footerHeight)
     return root
 }

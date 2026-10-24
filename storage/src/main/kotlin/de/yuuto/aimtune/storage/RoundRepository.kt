@@ -19,6 +19,9 @@ enum class SessionKind(val id: String) {
 
     /** The rounds of the blind strength search (sessions before this kind existed hold them inside [ACCEL_AB]). */
     ACCEL_SEARCH("accel_search"),
+
+    /** The rounds of "Refine my Raw Accel curve": warm-up, stage searches and the test, all played with imported-profile variants. */
+    ACCEL_REFINE("accel_refine"),
     ;
 
     companion object {
@@ -45,8 +48,8 @@ data class RoundRow(
 /**
  * Version of the metric definitions written with each round; raise it when ALGORITHMS.md changes them.
  * Rounds with an older version are recomputed from their stored raw events ([RoundRepository.refreshMetrics]).
- * 2: the first reach of a movement must come after a reaction time and cover a share of the distance (REVIEW.md C2);
- *    the accuracy the score uses is the first-shot accuracy (REVIEW.md M6).
+ * 2: the first reach of a movement must come after a reaction time and cover a share of the distance (docs/history/REVIEW.md C2);
+ *    the accuracy the score uses is the first-shot accuracy (docs/history/REVIEW.md M6).
  * 3: horizontal and vertical endpoint error of the first movement (mean_abs_first_error_h_deg / _v_deg, mean_first_error_v_deg);
  *    older rounds get them from their stored events. Flash turn-away rounds (the dodge rate) came in with this version too.
  */
@@ -255,6 +258,14 @@ class RoundRepository(private val database: Database) {
                         s.setInt(5, event.targetId)
                     }
                     is TargetEvent.Miss -> s.setString(3, MISS)
+                    is TargetEvent.BodyHit -> {
+                        s.setString(3, BODY_HIT)
+                        s.setInt(5, event.targetId)
+                    }
+                    is TargetEvent.Despawned -> {
+                        s.setString(3, DESPAWNED)
+                        s.setInt(5, event.targetId)
+                    }
                     is TargetEvent.Waypoint -> {
                         s.setString(3, WAYPOINT)
                         s.setInt(5, event.targetId)
@@ -311,6 +322,8 @@ class RoundRepository(private val database: Database) {
                                 SPAWNED -> TargetEvent.Spawned(time, Target(rs.getInt(3), Vec3(rs.getDouble(4), rs.getDouble(5), rs.getDouble(6)), rs.getDouble(7)))
                                 HIT -> TargetEvent.Hit(time, rs.getInt(3))
                                 MISS -> TargetEvent.Miss(time)
+                                BODY_HIT -> TargetEvent.BodyHit(time, rs.getInt(3))
+                                DESPAWNED -> TargetEvent.Despawned(time, rs.getInt(3))
                                 WAYPOINT -> TargetEvent.Waypoint(time, rs.getInt(3), Vec3(rs.getDouble(4), rs.getDouble(5), rs.getDouble(6)))
                                 FLASH_CUE -> TargetEvent.FlashCue(time, rs.getInt(3), rs.getDouble(4), rs.getDouble(5), startNanos + rs.getDouble(6).toLong(), rs.getDouble(7))
                                 FLASH_POP -> TargetEvent.FlashPop(time, rs.getInt(3), rs.getDouble(4) > 0.5, rs.getDouble(5).toLong().let { if (it > 0L) startNanos + it else 0L })
@@ -349,6 +362,8 @@ class RoundRepository(private val database: Database) {
         const val HIT = "hit"
         const val MISS = "miss"
         const val WAYPOINT = "waypoint"
+        const val BODY_HIT = "body_hit"
+        const val DESPAWNED = "despawned"
         const val FLASH_CUE = "flash_cue"
         const val FLASH_POP = "flash_pop"
     }
@@ -374,6 +389,12 @@ fun RoundMetrics.toNamedValues(): Map<String, Double> = buildMap {
     meanAbsFirstErrorHDegrees?.let { put("mean_abs_first_error_h_deg", it) }
     meanAbsFirstErrorVDegrees?.let { put("mean_abs_first_error_v_deg", it) }
     meanFirstErrorVDegrees?.let { put("mean_first_error_v_deg", it) }
+    meanLeadErrorDegrees?.let { put("mean_lead_error_deg", it) }
+    meanAbsLeadErrorDegrees?.let { put("mean_abs_lead_error_deg", it) }
+    meanAbsAimErrorDegrees?.let { put("mean_abs_aim_error_deg", it) }
+    rangeKills?.let { put("range_kills", it.toDouble()) }
+    rangeMedianTimeToKillMs?.let { put("range_median_ttk_ms", it) }
+    rangeShotsPerKill?.let { put("range_shots_per_kill", it) }
 }
 
 /** The stored metrics a round's score is computed from, as [de.yuuto.aimtune.core.metrics.RoundMetrics.scoreInputs] would give them. */

@@ -20,6 +20,7 @@ import de.yuuto.aimtune.app.ui.caps
 import de.yuuto.aimtune.app.ui.frame
 import de.yuuto.aimtune.app.ui.label
 import de.yuuto.aimtune.app.ui.onChange
+import de.yuuto.aimtune.core.scenario.RangeSpeed
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.score.FlashImportance
 import de.yuuto.aimtune.core.score.ScoreMetric
@@ -42,7 +43,9 @@ private val ROUND_LENGTHS = listOf(30, 45, 60, 90)
 private const val FLASH_SEGMENT_WIDTH = 150f
 private const val FLASH_HELP_WIDTH = 760f
 private const val SOUND_TILE_WIDTH = 200f
-private const val UPDATE_TILE_WIDTH = 400f
+private const val UPDATE_TILE_WIDTH = 340f
+private const val RANGE_SELECT_WIDTH = 170f
+private const val RANGE_SEGMENT_HEIGHT = 44f
 
 private val METRIC_KEYS = mapOf(
     ScoreMetric.ACCURACY to "metric.accuracy",
@@ -59,6 +62,8 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
     private val weights = ctx.settings.current.metricWeights.filterKeys { name -> ScoreMetric.entries.firstOrNull { it.name == name }?.scoresRounds == true }.toMutableMap()
     private val scenarios = ctx.settings.current.scenarios.toMutableSet()
     private var flashSound = ctx.settings.current.flashSound
+    private var rangeSpeed = RangeSpeed.fromId(ctx.settings.current.rangeSpeed) ?: RangeSpeed.NONE
+    private var rangeStrafe = ctx.settings.current.rangeBotsStrafe
     private var hitSound = ctx.settings.current.hitSound
     private var checkForUpdates = ctx.settings.current.checkForUpdates
     private var message: Pair<String, Boolean>? = null
@@ -84,7 +89,6 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         val right = Table()
         right.add(weightsBlock()).left().row()
         right.add(scenariosBlock()).left().padTop(SCENARIOS_GAP).row()
-        right.add(updateToggle()).left().padTop(SCENARIOS_GAP)
         val content = Table()
         content.add(left).top().left()
         content.add(right).top().left().padLeft(COLUMN_GAP).padTop(ui.tokens.footerHeight)
@@ -98,6 +102,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         // Next to the sound switches it would widen the left column; the footer has room.
         footer.add(ui.button(t("settings.sound_levels"), Styles.SECONDARY) { ctx.showSoundSettings() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(16f)
+        footer.add(updateToggle()).left().height(FOOTER_BUTTON_HEIGHT).padLeft(16f)
         footer.add().expandX()
         message?.let { (text, ok) -> footer.add(ui.label(text, if (ok) Styles.OK else Styles.CAUTION)).right().padRight(32f) }
         footer.add(ui.button(t("settings.reset"), Styles.TEXT) { reset() }).height(FOOTER_BUTTON_HEIGHT).padRight(16f)
@@ -210,7 +215,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         return row
     }
 
-    /** One toggle tile in the right column, where there is room (the left one is as tall as the window). */
+    /** The switch for the daily update check, in the footer: both columns are as tall as the window. */
     private fun updateToggle(): Table {
         val button: TextButton = ui.button(t("settings.update_check"), Styles.TILE) { checkForUpdates = !checkForUpdates; message = null; rebuild() }
         button.setProgrammaticChangeEvents(false)
@@ -224,15 +229,39 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         block.add(ui.label(t("settings.scenarios_help"), Styles.CAPTION_MUTED)).left().padBottom(24f).row()
         val grid = Table()
         // The flash scenario is switched by the importance control below, not by a tile.
-        ScenarioKind.entries.filter { it != ScenarioKind.FLASH }.forEachIndexed { index, kind ->
+        val hasRange = draft.profile(ctx.profiles)?.geometry?.range != null
+        ScenarioKind.entries.filter { it != ScenarioKind.FLASH && (it != ScenarioKind.RANGE || hasRange) }.forEachIndexed { index, kind ->
             val button: TextButton = ui.button(ctx.i18n.scenarioName(kind), Styles.TILE) { toggleScenario(kind) }
             button.setProgrammaticChangeEvents(false)
             button.isChecked = kind.id in scenarios
             grid.add(button).width(SCENARIO_WIDTH).height(CONTROL_HEIGHT).padRight(SEGMENT_GAP).padBottom(SEGMENT_GAP)
             if (index % 2 == 1) grid.row()
         }
-        block.add(grid).left()
+        block.add(grid).left().row()
+        if (ScenarioKind.RANGE.id in scenarios && hasRange) {
+            block.add(rangeOptions()).left().padTop(SEGMENT_GAP)
+        }
         return block
+    }
+
+    /** Range mode: how long an unshot bot stays, and whether bots strafe; one row of two selects under the scenario tiles. */
+    private fun rangeOptions(): Table {
+        val table = Table()
+        val speeds = RangeSpeed.entries.map { t("settings.range_speed.${it.id}") }
+        val speedSelect = SelectBox<String>(ui.skin)
+        speedSelect.setItems(*speeds.toTypedArray())
+        speedSelect.selected = speeds[rangeSpeed.ordinal]
+        speedSelect.onChange { rangeSpeed = RangeSpeed.entries[speeds.indexOf(speedSelect.selected)]; message = null }
+        val bots = listOf(t("settings.range_bots.strafe"), t("settings.range_bots.reset"))
+        val botsSelect = SelectBox<String>(ui.skin)
+        botsSelect.setItems(*bots.toTypedArray())
+        botsSelect.selected = bots[if (rangeStrafe) 0 else 1]
+        botsSelect.onChange { rangeStrafe = bots.indexOf(botsSelect.selected) == 0; message = null }
+        table.add(ui.label(t("settings.range_speed"), Styles.CAPTION_MUTED)).left().padRight(SEGMENT_GAP)
+        table.add(speedSelect).width(RANGE_SELECT_WIDTH).height(RANGE_SEGMENT_HEIGHT).padRight(SCENARIOS_GAP / 2)
+        table.add(ui.label(t("settings.range_bots"), Styles.CAPTION_MUTED)).left().padRight(SEGMENT_GAP)
+        table.add(botsSelect).width(RANGE_SELECT_WIDTH).height(RANGE_SEGMENT_HEIGHT)
+        return table
     }
 
     private fun toggleScenario(kind: ScenarioKind) {
@@ -278,7 +307,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
             return
         }
         val enabled = ScenarioKind.entries.map { it.id }.filter { it in scenarios }
-        val base: AppSettings = ctx.settings.current.copy(roundSeconds = roundSeconds, metricWeights = weights.toMap(), scenarios = enabled, language = language.code, flashSound = flashSound, hitSound = hitSound, checkForUpdates = checkForUpdates)
+        val base: AppSettings = ctx.settings.current.copy(roundSeconds = roundSeconds, metricWeights = weights.toMap(), scenarios = enabled, language = language.code, flashSound = flashSound, hitSound = hitSound, checkForUpdates = checkForUpdates, rangeSpeed = rangeSpeed.id, rangeBotsStrafe = rangeStrafe)
         val error = ctx.settings.save(draft.toSettings(base, ctx.profiles))
         if (error == null) {
             ctx.showMenu()
@@ -293,10 +322,12 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         weights.clear()
         weights.putAll(AppSettings.DEFAULT_WEIGHTS)
         scenarios.clear()
-        scenarios.addAll(AppSettings.DEFAULT_SCENARIOS)
+        scenarios.addAll(AppSettings.defaultScenarios(draft.profile(ctx.profiles)?.geometry?.range != null))
         draft = draft.copy(flashImportance = FlashImportance.SOMETIMES)
         flashSound = true
         hitSound = true
+        rangeSpeed = RangeSpeed.NONE
+        rangeStrafe = true
         checkForUpdates = true
         message = t("settings.reset_done") to true
         rebuild()

@@ -17,7 +17,7 @@ data class ResearchExportResult(val file: Path, val sessions: Int, val rounds: I
 
 /**
  * Writes all stored sessions as one gzip-compressed JSON file that a person can send to a researcher
- * (docs/ASSESSMENT.md D4: the method has never been run on other people's recordings). It holds, per
+ * (docs/history/ASSESSMENT.md D4: the method has never been run on other people's recordings). It holds, per
  * round, the raw mouse counts with their times, the target spawns, hits and misses, the sensitivity
  * and DPI, the game id and the metrics. It holds no name, no machine or user name, no clock times
  * (sessions only get a day index relative to the first one, rounds an offset within their session)
@@ -121,6 +121,8 @@ object ResearchExport {
             is TargetEvent.Spawned -> out.append("{\"type\":\"spawn\",\"tNanos\":$t,\"id\":${event.target.id},\"x\":${number(event.target.center.x)},\"y\":${number(event.target.center.y)},\"z\":${number(event.target.center.z)},\"radius\":${number(event.target.radius)}}")
             is TargetEvent.Hit -> out.append("{\"type\":\"hit\",\"tNanos\":$t,\"id\":${event.targetId}}")
             is TargetEvent.Miss -> out.append("{\"type\":\"miss\",\"tNanos\":$t}")
+            is TargetEvent.BodyHit -> out.append("{\"type\":\"bodyHit\",\"tNanos\":$t,\"id\":${event.targetId}}")
+            is TargetEvent.Despawned -> out.append("{\"type\":\"despawn\",\"tNanos\":$t,\"id\":${event.targetId}}")
             is TargetEvent.FlashCue -> out.append("{\"type\":\"flashCue\",\"tNanos\":$t,\"id\":${event.flashId},\"yaw\":${number(event.yawDegrees)},\"pitch\":${number(event.pitchDegrees)},\"popTNanos\":${event.popNanos - origin},\"safeAngle\":${number(event.safeAngleDegrees)}}")
             is TargetEvent.FlashPop -> out.append("{\"type\":\"flashPop\",\"tNanos\":$t,\"id\":${event.flashId},\"dodged\":${event.dodged},\"blindUntilTNanos\":${if (event.blindUntilNanos > 0L) event.blindUntilNanos - origin else 0L}}")
             is TargetEvent.Waypoint -> out.append("{\"type\":\"waypoint\",\"tNanos\":$t,\"id\":${event.targetId},\"x\":${number(event.center.x)},\"y\":${number(event.center.y)},\"z\":${number(event.center.z)}}")

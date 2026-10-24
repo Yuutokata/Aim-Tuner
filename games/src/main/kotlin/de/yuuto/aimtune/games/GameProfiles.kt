@@ -7,6 +7,7 @@ import de.yuuto.aimtune.core.scenario.ArenaLayout
 import de.yuuto.aimtune.core.scenario.ElevationMix
 import de.yuuto.aimtune.core.scenario.FlashGeometry
 import de.yuuto.aimtune.core.scenario.PositiveRange
+import de.yuuto.aimtune.core.scenario.RangeGeometry
 import de.yuuto.aimtune.core.scenario.TrainerGeometry
 import de.yuuto.aimtune.core.units.Fov
 import de.yuuto.aimtune.core.units.FovType
@@ -128,6 +129,78 @@ private data class FlashDto(
     }
 }
 
+@Serializable
+private data class SpeedPresetsDto(val easySeconds: Double, val mediumSeconds: Double, val hardSeconds: Double)
+
+@Serializable
+private data class RangeStrafeDto(
+    val speedMetersPerSecond: Double,
+    val movingSeconds: RangeDto,
+    val stopSeconds: RangeDto,
+    val reverseProbability: Double,
+    val maxOffsetMeters: Double,
+)
+
+@Serializable
+private data class KillRuleDto(val headHitKills: Boolean, val bodyHitsArmorOn: Int, val bodyHitsArmorOff: Int)
+
+/** Where one value of the `range` block comes from; a value that was not checked in the game says `verified: false`. */
+@Serializable
+private data class RangeValueNoteDto(val verified: Boolean = false, val source: String = "")
+
+/** A closed interval that may include negative numbers (a bearing). */
+@Serializable
+private data class BoundsDto(val min: Double, val max: Double)
+
+/**
+ * The `range` block of the `trainer` block (Range mode, docs/RANGE.md). Every field is required: a game either has a complete
+ * Range mode or none. [valueNotes] names the source of each value and is checked by the loader, so no value goes unexplained.
+ */
+@Serializable
+private data class RangeBlockDto(
+    val spawnDelaySeconds: RangeDto,
+    val speedPresets: SpeedPresetsDto,
+    val bearingDegrees: BoundsDto,
+    val distanceMeters: RangeDto,
+    val botHeightMeters: Double,
+    val headDiameterMeters: Double,
+    val strafe: RangeStrafeDto,
+    val killRule: KillRuleDto,
+    val valueNotes: Map<String, RangeValueNoteDto>,
+) {
+    fun toGeometry(): RangeGeometry {
+        val missing = REQUIRED_NOTES - valueNotes.keys
+        require(missing.isEmpty()) { "range.valueNotes is missing a source for ${missing.joinToString()}" }
+        require(valueNotes.values.all { it.source.isNotBlank() }) { "every range.valueNotes entry needs a source" }
+        fun RangeDto.range() = PositiveRange(min, max)
+        return RangeGeometry(
+            spawnDelaySeconds = spawnDelaySeconds.range(),
+            easyLifetimeSeconds = speedPresets.easySeconds,
+            mediumLifetimeSeconds = speedPresets.mediumSeconds,
+            hardLifetimeSeconds = speedPresets.hardSeconds,
+            bearingMinDegrees = bearingDegrees.min,
+            bearingMaxDegrees = bearingDegrees.max,
+            distanceMeters = distanceMeters.range(),
+            botHeightMeters = botHeightMeters,
+            headDiameterMeters = headDiameterMeters,
+            strafeSpeedMetersPerSecond = strafe.speedMetersPerSecond,
+            strafeMovingSeconds = strafe.movingSeconds.range(),
+            strafeStopSeconds = strafe.stopSeconds.range(),
+            strafeReverseProbability = strafe.reverseProbability,
+            strafeMaxOffsetMeters = strafe.maxOffsetMeters,
+            headHitKills = killRule.headHitKills,
+            bodyHitsToKillArmorOn = killRule.bodyHitsArmorOn,
+            bodyHitsToKillArmorOff = killRule.bodyHitsArmorOff,
+            verified = valueNotes.values.all { it.verified },
+        )
+    }
+
+    companion object {
+        /** The values that need a source note; the keys of `valueNotes`. */
+        val REQUIRED_NOTES = setOf("spawnDelaySeconds", "speedPresets", "bearingDegrees", "distanceMeters", "botHeightMeters", "headDiameterMeters", "strafe", "killRule")
+    }
+}
+
 /** The `trainer` block of a profile; every field is optional and falls back to [TrainerGeometry.DEFAULT]. */
 @Serializable
 private data class TrainerDto(
@@ -147,6 +220,7 @@ private data class TrainerDto(
     val headHeightMeters: Double? = null,
     val elevation: ElevationDto? = null,
     val arena: ArenaDto? = null,
+    val range: RangeBlockDto? = null,
     val verified: Boolean = false,
 ) {
     fun toGeometry(horizontalFovDegrees: Double): TrainerGeometry {
@@ -169,6 +243,7 @@ private data class TrainerDto(
             headHeightMeters = headHeightMeters ?: d.headHeightMeters,
             elevation = elevation?.toMix() ?: d.elevation,
             arena = arena?.toLayout() ?: d.arena,
+            range = range?.toGeometry(),
             verified = verified,
         )
     }

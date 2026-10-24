@@ -18,8 +18,8 @@ import de.yuuto.aimtune.app.ui.onChange
 import java.util.Locale
 
 private const val MENU_WIDTH = 760f
-private const val MENU_ITEM_HEIGHT = 84f
-private const val MENU_GAP = 12f
+private const val MENU_ITEM_HEIGHT = 72f
+private const val MENU_GAP = 8f
 private const val ITEM_PADDING = 28f
 private const val HEADING_GAP = 56f
 private const val COLUMN_GAP = 120f
@@ -41,6 +41,10 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
         left.add(ui.label(t("menu.title_1") + "\n" + t("menu.title_2"), Styles.HEADING)).left().padBottom(HEADING_GAP).row()
         left.add(menuItem(t("menu.start"), startSubtitle(), "Enter") { ctx.showStart() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
+        if (ctx.hasRangeMode()) {
+            left.add(menuItem(t("menu.range"), t("menu.range_sub"), "M") { ctx.showRangeMode() })
+                .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
+        }
         left.add(menuItem(t("menu.results"), resultsSubtitle(), "R") { ctx.showStoredResults() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
         left.add(menuItem(t("menu.acceleration"), t("menu.acceleration_sub"), "A") { ctx.showAccel() })
@@ -75,6 +79,7 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
         Input.Keys.A -> true.also { ctx.showAccel() }
         Input.Keys.H -> true.also { ctx.showHistory() }
         Input.Keys.C -> true.also { ctx.showCrosshair() }
+        Input.Keys.M -> ctx.hasRangeMode().also { if (it) ctx.showRangeMode() }
         Input.Keys.U -> (pendingUpdate() != null).also { if (it) openUpdate() }
         else -> false
     }

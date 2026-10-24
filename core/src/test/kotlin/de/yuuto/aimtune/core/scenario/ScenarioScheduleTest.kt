@@ -8,16 +8,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ScenarioScheduleTest {
+    private val classic = setOf(ScenarioKind.FLICK, ScenarioKind.MICRO, ScenarioKind.TRACKING, ScenarioKind.SWITCHING)
+
     private fun counts(schedule: ScenarioSchedule, rounds: Int) = (0 until rounds).groupingBy { schedule.kindFor(it) }.eachCount()
 
     @Test
     fun `default weights give tracking two ninths of the rounds and split the rest`() {
-        val schedule = ScenarioSchedule(ScenarioKind.entries.toSet() - ScenarioKind.FLASH, MetricWeights.DEFAULT)
+        val schedule = ScenarioSchedule(classic, MetricWeights.DEFAULT)
         assertEquals(2.0 / 9, schedule.shares.getValue(ScenarioKind.TRACKING), 1e-12)
         assertEquals(7.0 / 27, schedule.shares.getValue(ScenarioKind.FLICK), 1e-12)
         val played = counts(schedule, 135)
         assertEquals(30, played.getValue(ScenarioKind.TRACKING))
-        assertTrue((ScenarioKind.entries - ScenarioKind.FLASH).all { (played[it] ?: 0) > 0 })
+        assertTrue(classic.all { (played[it] ?: 0) > 0 })
         assertEquals(135, played.values.sum())
     }
 
@@ -58,9 +60,9 @@ class ScenarioScheduleTest {
 
     @Test
     fun `the plan is spread evenly and never changes`() {
-        val schedule = ScenarioSchedule(ScenarioKind.entries.toSet() - ScenarioKind.FLASH, MetricWeights.DEFAULT)
+        val schedule = ScenarioSchedule(classic, MetricWeights.DEFAULT)
         val first = (0 until 30).map { schedule.kindFor(it) }
-        assertEquals(first, (0 until 30).map { ScenarioSchedule(ScenarioKind.entries.toSet() - ScenarioKind.FLASH, MetricWeights.DEFAULT).kindFor(it) })
+        assertEquals(first, (0 until 30).map { ScenarioSchedule(classic, MetricWeights.DEFAULT).kindFor(it) })
         // Every window of 10 rounds contains tracking, and nothing is played twice in a row.
         for (from in 0..20) assertTrue(first.subList(from, from + 10).contains(ScenarioKind.TRACKING), "window $from")
         assertTrue(first.zipWithNext().none { (a, b) -> a == b }, "no scenario twice in a row: $first")

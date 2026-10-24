@@ -43,3 +43,13 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+### Range reverse engineering (raw clips and frames never go into git)
+/tools/range-re/clips/
+/tools/range-re/cache/
+/tools/range-re/out/frames/
+/tools/range-re/out/crops/
+/tools/range-re/__pycache__/
+
+### IDE ###
+.idea/
+user-rawaccel-settings.json

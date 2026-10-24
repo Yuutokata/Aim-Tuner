@@ -13,6 +13,15 @@ import de.yuuto.aimtune.app.accel.AccelSession
 import de.yuuto.aimtune.app.accel.LastCalibration
 import de.yuuto.aimtune.app.accel.LastSearch
 import de.yuuto.aimtune.app.accel.PriorCalibration
+import de.yuuto.aimtune.app.accel.RefineRun
+import de.yuuto.aimtune.app.accel.RefineSession
+import de.yuuto.aimtune.app.accel.RefineSource
+import de.yuuto.aimtune.app.screens.RefineBetweenScreen
+import de.yuuto.aimtune.app.screens.RefineImportScreen
+import de.yuuto.aimtune.app.screens.RefineResultScreen
+import de.yuuto.aimtune.app.screens.RefineStageScreen
+import de.yuuto.aimtune.core.accel.RawAccelProfile
+import de.yuuto.aimtune.core.accel.RefinePhase
 import de.yuuto.aimtune.app.blind.AxisSummary
 import de.yuuto.aimtune.app.blind.BlindRun
 import de.yuuto.aimtune.app.blind.BlindSession
@@ -82,6 +91,8 @@ class AppContext(
     val exportDir: Path? = null,
     /** Where research exports go; null without a data folder. */
     val researchDir: Path? = null,
+    /** Where the player drops Raw Accel settings.json files to refine; null without a data folder. */
+    val importDir: Path? = null,
 ) {
     private var nextSeed = options.seed ?: System.nanoTime()
     /** A newer release than this build, found by the update check; null when none is known. Set on the render thread. */
@@ -121,6 +132,9 @@ class AppContext(
      */
     var usePriorSearch = true
 
+    /** Whether the curve runs are played at the finder's result instead of the game sensitivity; only honoured when that result is confident. */
+    var useFinderResult = false
+
     val isSetUp: Boolean
         get() = SetupDraft.fromSettings(settings.current).let { draft -> SetupStep.entries.all { draft.issue(it, profiles) == null } }
 
@@ -145,6 +159,15 @@ class AppContext(
 
     fun showPreTest() = switchTo(PreTestScreen(this))
 
+    /** The pre-test notice of the Range mode round set (menu entry "Range mode"). */
+    fun showRangePreTest() = switchTo(PreTestScreen(this, rangeMode = true))
+
+    /** Range mode from the menu: onboarding first if needed, then its notice; a game without a Range block has no such mode. */
+    fun showRangeMode() = if (isSetUp) showRangePreTest() else showOnboarding(afterFinish = ::showRangePreTest)
+
+    /** Whether the configured game has a Range mode. */
+    fun hasRangeMode(): Boolean = trainerConfig()?.profile?.geometry?.range != null
+
     fun showSettings() {
         languageOverride = null
         if (isSetUp) switchTo(SettingsScreen(this)) else showOnboarding(afterFinish = ::showMenu)
@@ -156,11 +179,11 @@ class AppContext(
     }
 
     /** Starts a new blind test run, merging the stored rounds of this game and DPI; onboarding first if needed. */
-    fun startBlindTest() {
+    fun startBlindTest(rangeMode: Boolean = false) {
         val config = trainerConfig()
         val setup = settings.current
         val pad = setup.padWidthCm
-        if (config == null || pad == null) return showOnboarding(afterFinish = ::showPreTest)
+        if (config == null || pad == null) return showOnboarding(afterFinish = if (rangeMode) ::showRangePreTest else ::showPreTest)
         val range = searchRange(setup.aimStyleOrNull() ?: AimStyle.MIXED, config.cm360, pad)
         val weights = metricWeights()
         val enabled = try {
@@ -168,10 +191,15 @@ class AppContext(
         } catch (e: SettingsException) {
             ScenarioKind.entries.toSet()
         }
+        // A game without a Range mode cannot play range rounds, even if the setting still lists them.
+        val hasRange = config.profile.geometry.range != null
+        if (rangeMode && !hasRange) return showMenu()
+        // Range mode plays range and flick in equal shares, whatever the saved toggles say; no flash, no tracking.
+        val playable = if (rangeMode) setOf(ScenarioKind.FLICK, ScenarioKind.RANGE) else if (hasRange) enabled else enabled - ScenarioKind.RANGE
         val past = processor.pastBlindRounds(setup.gameId, config.dpi)
         val seed = nextSeed++
         val test = BlindTest(range, weights, past, seed)
-        val schedule = ScenarioSchedule(enabled, weights)
+        val schedule = ScenarioSchedule(playable.ifEmpty { setOf(ScenarioKind.FLICK) }, weights)
         showBlindRound(BlindRun(test, runKey = System.currentTimeMillis(), baseConfig = config, nextSeed = nextSeed++, schedule = schedule))
     }
 
@@ -219,11 +247,21 @@ class AppContext(
 
     private class StoredAnalysis(val config: TrainerConfig, val weights: MetricWeights, val rounds: List<PastRound>, val result: OptimizationResult?)
 
-    /** The sensitivity the acceleration steps start from: the optimizer's result over the stored blind rounds, if there is one. */
+    /**
+     * The sensitivity the acceleration steps are played at: the configured game sensitivity, plus the finder's result for
+     * the player to choose; null until the setup is complete.
+     */
     fun accelBaseline(): AccelBaseline? {
-        val stored = storedAnalysis() ?: return null
-        val result = stored.result ?: return null
-        return AccelBaseline(result.optimumCm360, result.confidencePercent, stored.rounds.size, processor.priorSearch(stored.config.dpi, result.optimumCm360).size)
+        val config = trainerConfig() ?: return null
+        val setup = settings.current
+        val sensitivity = setup.inGameSensitivity ?: return null
+        val finder = storedAnalysis()?.let { stored ->
+            stored.result?.let {
+                val sensitivity = config.profile.formatSensitivity(config.profile.sensitivityFor(config.dpi, it.optimumCm360))
+                FinderResult(it.optimumCm360, it.confidencePercent, stored.rounds.size, sensitivity, processor.priorSearch(config.dpi, it.optimumCm360).size)
+            }
+        }
+        return AccelBaseline(config.cm360, config.profile.formatSensitivity(sensitivity), config.profile.name, finder, processor.priorSearch(config.dpi, config.cm360).size)
     }
 
     /** Volume of the flash and hit sounds and the brightness of the flash white-out. */
@@ -267,17 +305,17 @@ class AppContext(
     /** Whether curves are bounded to the measured speeds (curve finder v2); the launch option overrides the setting. */
     val boundedCurves: Boolean get() = (options.curveFinder ?: settings.current.curveFinder) == CurveFinder.V2
 
-    /** Starts the acceleration steps at the recommended sensitivity; back to the intro if there is none yet. */
+    /** Starts the acceleration steps at the game sensitivity (or the finder's confident result, if chosen); onboarding until the setup is complete. */
     fun startAccelRun(search: Boolean = false) {
         if (!source.hasReportTimestamps) return showAccel()
-        val stored = storedAnalysis() ?: return showOnboarding(afterFinish = ::showMenu)
-        val result = stored.result ?: return showAccel()
-        val base = stored.config.copy(cm360 = result.optimumCm360)
+        val baseline = accelBaseline() ?: return showOnboarding(afterFinish = ::showMenu)
+        val config = trainerConfig() ?: return showOnboarding(afterFinish = ::showMenu)
+        val base = config.copy(cm360 = baseline.cm360(useFinderResult))
         // A run looks for the earlier rounds of what it starts with: the calibration or the search.
         val prior = if (search) PriorCalibration.NONE else processor.priorCalibration(base.dpi, base.cm360)
         val priorSearch = if (search && usePriorSearch) processor.priorSearch(base.dpi, base.cm360) else emptyList()
         val run = AccelRun(
-            base, stored.weights, runKey = System.currentTimeMillis(), seed = nextSeed++, prior = prior, startWithSearch = search,
+            base, metricWeights(), runKey = System.currentTimeMillis(), seed = nextSeed++, prior = prior, startWithSearch = search,
             flash = settings.current.flashImportance() != FlashImportance.NEVER, priorSearch = priorSearch,
             boundedCurves = boundedCurves,
         )
@@ -316,6 +354,37 @@ class AppContext(
         RawAccelExport.write(dir, curve.curve, dpi, curve.sensitivityFactor)
     }
 
+    /** The import step of "Refine my Raw Accel curve". */
+    fun showRefine() = switchTo(RefineImportScreen(this))
+
+    /** Starts the refine run for [profile] of [source] at the game sensitivity of the settings. */
+    fun startRefineRun(source: RefineSource, profile: RawAccelProfile) {
+        if (!this.source.hasReportTimestamps || !rawAccelConfirmed) return showRefine()
+        val config = trainerConfig() ?: return showOnboarding(afterFinish = ::showMenu)
+        showRefineStep(
+            RefineRun(config, metricWeights(), runKey = System.currentTimeMillis(), seed = nextSeed++, source = source, profile = profile, flash = settings.current.flashImportance() != FlashImportance.NEVER),
+        )
+    }
+
+    /** The screen that fits the refine run: a round while one is due, the stage result, or the verdict. */
+    fun showRefineStep(run: RefineRun) = switchTo(
+        when (run.phase) {
+            RefinePhase.WARMUP, RefinePhase.SEARCH, RefinePhase.TEST -> RefineBetweenScreen(this, run)
+            RefinePhase.STAGE_RESULT -> RefineStageScreen(this, run)
+            RefinePhase.DONE -> RefineResultScreen(this, run)
+        },
+    )
+
+    fun showRefineRound(run: RefineRun) = switchTo(TrainerScreen(this, run.nextRoundConfig(), RefineSession(this, run)))
+
+    /** Writes a copy of the player's file with the refined profile added into the export folder; the path, or the reason it failed. */
+    fun exportRefine(run: RefineRun): Result<Path> = runCatching {
+        val dir = checkNotNull(exportDir) { "no data folder to write to" }
+        val candidate = run.engine.candidate
+        val root = RawAccelExport.patch(run.source.file.root, run.profile.name, candidate.args, candidate.outputDpi, run.exportName)
+        RawAccelExport.write(dir, root, run.exportName)
+    }
+
     /** Number of stored blind rounds for the current setup, for the menu. */
     fun storedRoundCount(): Int {
         val config = trainerConfig() ?: return 0
@@ -348,14 +417,5 @@ class AppContext(
 
     val currentScreen: Screen? get() = game.screen
 }
-
-/** The sensitivity the acceleration steps start from, with how sure the optimizer is about it. */
-data class AccelBaseline(
-    val cm360: Double,
-    val confidencePercent: Int,
-    val rounds: Int,
-    /** Stored search rounds at this setup that a new strength search could build on. */
-    val searchRounds: Int = 0,
-)
 
 private val APP_VERSION = AppVersion.current

@@ -13,12 +13,12 @@ import de.yuuto.aimtune.storage.SessionKind
 import de.yuuto.aimtune.storage.scoreInputs
 import kotlin.math.abs
 
-/** What the stored blind strength searches at one setup found together, computed again from their rounds. [offer] is the curve when the search excluded "no curve". */
+/** What the stored blind strength searches at one setup found together, computed again from their rounds. [offer] is the curve to test, and only when the search clearly excluded "no curve". */
 data class LastSearch(val dpi: Double, val cm360: Double, val rounds: Int, val sessions: Int, val result: StrengthResult?) {
-    /** The curve of the best strength whenever that is a real curve, even when "no curve" is still inside the range (see [clear]). */
-    val offer: AccelFit? get() = result?.takeIf { CurveStrength.isCurve(it.strength) }?.let { strengthAccel(it.strength) }
+    /** The curve of the best strength when the search is [clear]; an unclear result is explained, not offered. */
+    val offer: AccelFit? get() = result?.takeIf { clear }?.let { strengthAccel(it.strength) }
 
-    /** True when the range of the best strength excludes "no curve", i.e. the search says clearly that a curve scored better. */
+    /** True when the range of the best strength excludes "no curve" (a falling one only below the falling limit), i.e. the search says clearly that a curve scored better. */
     val clear: Boolean get() = result?.excludesPlain == true
 }
 
@@ -66,7 +66,7 @@ object StoredSearches {
     fun searchRounds(kind: SessionKind, rounds: List<RoundRow>): List<RoundRow> = when (kind) {
         SessionKind.ACCEL_SEARCH -> rounds
         SessionKind.ACCEL_AB -> legacySearchRounds(rounds)
-        SessionKind.SENSITIVITY -> emptyList()
+        SessionKind.SENSITIVITY, SessionKind.ACCEL_REFINE -> emptyList()
     }
 
     private fun legacySearchRounds(rounds: List<RoundRow>): List<RoundRow> {

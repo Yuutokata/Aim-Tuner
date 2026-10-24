@@ -46,6 +46,15 @@ Main menu ─ Start test ─▶ [first launch: Onboarding 1-4] ─▶ Pre-test n
 
 Keyboard: menu hotkeys as shown, Enter to confirm, Esc to pause/back, Tab navigation in all forms.
 
+### Refine my Raw Accel curve (M18)
+
+New screens, all in the existing style (cards, mono for parameters, the shared chart):
+
+- **Import** (`refine-import`): left column with the intro, "Paste from clipboard", up to four file buttons from the import folder and its path, profile buttons, and the Raw Accel check box; right card "What was read" with the parameters in mono, the total factor and the multiplier chart (curve times output DPI / device DPI against hand speed, line at 1). A refused profile gets a caution card with the reasons; "Start refining" stays disabled until a profile is playable and the check is ticked.
+- **Between rounds**: the usual progress bar, with "Skip warm-up" and "End this part now" as secondary buttons; never a value or an arm.
+- **Stage result** (`refine-stage`): heading "Level: result", one card with the best change as a signed percent, its range, confidence and rounds, and one sentence saying whether it is carried on; footer "Skip the rest, go to the test" and "Next: ...".
+- **Result**: verdict, and for "better" a card listing the changed fields as `field: old -> new` with the export button; after saving the card says where the file is.
+
 ## Trainer visual style
 
 Minimal, high contrast, low distraction: dark room, soft horizon, no decoration. Targets use the accent ramp (fill `#b5abfc`, ring accent 700), crosshair is a small neutral cross. HUD text is mono for numbers and sits in the 72 px margins, away from the center.
@@ -66,6 +75,10 @@ LibGDX `I18NBundle`: `assets/i18n/messages.properties` (English default) and `me
 - Skin generated from `tokens.json` (colors, font sizes, radii) into `assets/ui/` (`uiskin.json` + atlas). Outlined buttons, cards and inputs use 9-patch drawables generated for radii 4/8/14.
 - Fonts: Inter 4.1 (Regular, Medium) and JetBrains Mono 2.304 (Regular), both SIL OFL 1.1, are bundled in `app/src/main/resources/assets/fonts/` with their license files and rasterized with gdx-freetype at the exact pixel size of the framebuffer (`Fonts.kt`), rebuilt when the window height changes by more than 8%. Scaling a bitmap font instead blurs the text.
 - Charts are custom actors drawn with `ShapeRenderer` (lines, filled band with alpha, dashed segments, dots), not Scene2D widgets.
+
+### Range mode (M15c)
+
+Original geometry, no assets of any game. The bot is a head sphere in sand (`#e6d9b8`) on an ochre torso and pelvis (`#c79a55`) with darker limbs (`#8f7048`), boxes only, turned to face the player; its proportions are those of the hit model (`BotShape`: 1.8 m, head 0.25 m, body capsule radius 0.2 m), so what is drawn is what is hit. The colours are warm so the bot stands out from the blue-grey room. In front of the player stands a low counter (1.6 x 0.4 m, 0.8 m high); on the floor, lit lines mark a lane every 10 degrees of bearing from -50 to +80 degrees and arcs at 5, 12.5 and 20 m (the near, middle and far distance of the profile). Corners and doorways are left out in Range mode. The HUD shows "Kills n   Shots m" at the top right instead of "Hits / Misses". Settings: the "Range mode" tile appears only for games with Range mode; when it is on, one row of two selects (speed, bots) sits under the tiles, and the update-check switch moved to the footer to make room.
 
 ## Deviations
 
@@ -93,7 +106,7 @@ LibGDX `I18NBundle`: `assets/i18n/messages.properties` (English default) and `me
 | Onboarding 3/4 (1e) has only the aim style cards; Settings (1n) has no flash row | The aim style step also asks "Turning away from flashes" (never / sometimes / often) below the cards, and the settings have a "Flash turn-away" row with the same three buttons (the flash scenario is switched by it, not by a tile) | The flash scenario (M10) needs the importance as a user setting without a fifth onboarding step |
 | Language selector in Settings (1n) | A select box under Round length; the language applies at once as a preview and is stored on Save | English and German as in the mockup |
 | Trainer: dark room, soft horizon, no decoration (frame 1h) | A minimal map: a darker floor at eye height, a ring wall, pillars at corners, door frames at doorways and a column under each head-sized target (accent ramp). Results (1j) has one more sentence under the confidence card: which axis the misses come from | M11: targets stand on the floor at head height and at corners, so crosshair placement can be trained; the sentence tells vertical from horizontal errors |
-| Crosshair is a small neutral cross (frame 1h) | The player's own Valorant crosshair, drawn in screen pixels; new screen Crosshair (menu C): four columns (profiles, code and preview; color, outlines, dot; inner lines; outer lines), swatches for the eight presets, sliders with the game's ranges, bright / dark / trainer preview. The menu items are 84 high so that six fit | M12: players aim differently with an unfamiliar crosshair |
+| Crosshair is a small neutral cross (frame 1h) | The player's own Valorant crosshair, drawn in screen pixels; new screen Crosshair (menu C): four columns (profiles, code and preview; color, outlines, dot; inner lines; outer lines), swatches for the eight presets, sliders with the game's ranges, bright / dark / trainer preview. The menu items are 72 high (gap 8) so that seven fit, with "Range mode" (M) between Start test and Results for games with a Range block | M12: players aim differently with an unfamiliar crosshair |
 | Pad presets include Desk mat | Adopted (small / medium / large / desk mat / custom) | Extends the spec's three presets |
 
 ## Open design questions

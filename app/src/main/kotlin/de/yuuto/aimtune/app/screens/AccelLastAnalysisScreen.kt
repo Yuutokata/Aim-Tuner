@@ -40,9 +40,9 @@ class AccelLastAnalysisScreen(ctx: AppContext, private val last: LastCalibration
             content.add(ui.label(reasonText(fit), Styles.BODY_MUTED, wrap = true)).left().width(TEXT_WIDTH).colspan(2).padBottom(24f).row()
             val recommended = fit.recommended
             if (recommended != null) {
-                // The export card sits next to the curve, so the screen stays within the window.
+                // The card about the missing export sits next to the curve, so the screen stays within the window.
                 content.add(curveCard(recommended, fit.points, SIDE_CARD_WIDTH)).left().top().width(SIDE_CARD_WIDTH)
-                content.add(exportCard("accel.last.untested")).left().top().width(EXPORT_CARD_WIDTH).padLeft(24f).row()
+                content.add(unconfirmedCard()).left().top().width(EXPORT_CARD_WIDTH).padLeft(24f).row()
             } else if (fit.points.size >= 2) {
                 content.add(ui.caps(t("accel.analysis.chart_plain"))).left().padBottom(8f).row()
                 content.add(ChartActor(ui, accelChart(ui.tokens, fit.points, null))).left().width(CARD_WIDTH).height(CHART_HEIGHT).row()

@@ -49,10 +49,15 @@ fun summarize(events: List<TargetEvent>): RoundSummary {
                 totalHitTime += event.timeNanos - maxOf(spawn, previousHitNanos)
                 previousHitNanos = event.timeNanos
             }
-            is TargetEvent.Miss -> {
+            is TargetEvent.Miss, is TargetEvent.BodyHit -> {
                 misses++
                 if (awaitingFirstShot) firstShots++
                 awaitingFirstShot = false
+            }
+            // A bot that left unshot was a first shot that did not hit; the next bot starts a new reach.
+            is TargetEvent.Despawned -> {
+                if (awaitingFirstShot) firstShots++
+                awaitingFirstShot = true
             }
             is TargetEvent.Waypoint, is TargetEvent.FlashCue, is TargetEvent.FlashPop -> Unit
         }

@@ -21,7 +21,7 @@ import kotlin.math.ln
 import kotlin.math.sqrt
 
 /**
- * T5 of M14: the prototype gate for the closed loop (docs/OPTIMIZER-REVIEW.md, section 6). The loop plays batches of
+ * T5 of M14: the prototype gate for the closed loop (the removed docs/OPTIMIZER-REVIEW.md (git history), section 6). The loop plays batches of
  * rounds with the current curve, reads the remaining wanted gain per speed from the errors of the measured rounds (the
  * first round of a batch is for getting used to the curve and is not measured), moves the curve by [DAMPING] of it and
  * plays again. It is compared with the one-shot fit (legacy and bounded) on what reaches the player: a curve is exported

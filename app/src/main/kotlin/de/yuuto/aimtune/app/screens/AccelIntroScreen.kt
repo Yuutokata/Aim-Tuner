@@ -5,6 +5,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.CheckBox
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import de.yuuto.aimtune.app.AccelBaseline
 import de.yuuto.aimtune.app.AppContext
+import de.yuuto.aimtune.app.FinderResult
 import de.yuuto.aimtune.app.accel.AccelRun
 import de.yuuto.aimtune.app.accel.StrengthSearch
 import de.yuuto.aimtune.app.ui.Styles
@@ -17,31 +18,44 @@ import de.yuuto.aimtune.app.ui.onChange
 import de.yuuto.aimtune.input.windows.WindowsPointerSettings
 import java.util.Locale
 
-private const val TEXT_WIDTH = 1000f
-private const val CARD_WIDTH = 760f
+private const val TEXT_WIDTH = 880f
+private const val CARD_WIDTH = 840f
+private const val COLUMN_GAP = 56f
 private const val CARD_PADDING = 32f
 private const val FOOTER_BUTTON_HEIGHT = 64f
 
 /**
- * Entry of the acceleration steps: what they are, the sensitivity they start from (the result of
- * the blind test), and the check that Raw Accel is off, since the calibration needs a plain mouse.
+ * Entry of the acceleration steps: what they are, the sensitivity they are played at (the player's game sensitivity, or
+ * the finder's result when it is confident and switched on), and the check that Raw Accel is off, since the calibration
+ * needs a plain mouse.
  */
 class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = ctx.accelBaseline()) : UiScreen(ctx) {
     private val pointerAcceleration = WindowsPointerSettings.readAcceleration()
 
     override fun build(): Actor {
-        val content = Table()
-        content.add(ui.label(t("accel.title"), Styles.HEADING)).left().padBottom(24f).row()
-        content.add(
+        // Two columns, so the screen fits 1080 lines: what the steps are on the left, the setup they start from on the right.
+        val left = Table()
+        left.add(ui.label(t("accel.title"), Styles.HEADING)).left().padBottom(24f).row()
+        left.add(
             ui.label(t("accel.intro", StrengthSearch.DEFAULT_ROUNDS, AccelRun.DEFAULT_CALIBRATION_ROUNDS), Styles.BODY_MUTED, wrap = true),
         ).left().width(TEXT_WIDTH).padBottom(16f).row()
-        content.add(ui.label(t("accel.experimental"), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padBottom(40f).row()
-        content.add(baselineCard()).left().width(CARD_WIDTH).padBottom(24f).row()
-        content.add(rawAccelCheck()).left().row()
-        if (baseline != null && baseline.searchRounds > 0) content.add(priorSearchCheck(baseline.searchRounds)).left().padTop(24f).row()
+        left.add(ui.label(t("accel.experimental"), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padBottom(32f).row()
+        left.add(ui.button(t("refine.intro.button"), Styles.SECONDARY) { ctx.showRefine() }).left().height(FOOTER_BUTTON_HEIGHT).row()
+        left.add(ui.label(t("refine.intro.help"), Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).padTop(8f).row()
+
+        val right = Table()
+        right.add(baselineCard()).left().width(CARD_WIDTH).padBottom(24f).row()
+        right.add(rawAccelCheck()).left().row()
+        if (baseline != null && baseline.canUseFinder) right.add(finderCheck(baseline)).left().padTop(24f).row()
+        val searchRounds = baseline?.searchRounds(ctx.useFinderResult) ?: 0
+        if (searchRounds > 0) right.add(priorSearchCheck(searchRounds)).left().padTop(24f).row()
         if (!ctx.source.hasReportTimestamps) {
-            content.add(ui.label(t("accel.needs_raw_input", ctx.source.name), Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padTop(24f)
+            right.add(ui.label(t("accel.needs_raw_input", ctx.source.name), Styles.CAUTION, wrap = true)).left().width(CARD_WIDTH).padTop(24f)
         }
+
+        val content = Table()
+        content.add(left).top().left().width(TEXT_WIDTH)
+        content.add(right).top().left().width(CARD_WIDTH).padLeft(COLUMN_GAP)
 
         val footer = Table()
         footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
@@ -74,10 +88,13 @@ class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = c
             card.add(ui.label(t("accel.baseline_none"), Styles.TITLE)).left().padTop(8f).row()
             card.add(ui.label(t("accel.baseline_none_help"), Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(4f)
         } else {
-            card.add(ui.label("%.1f cm/360°".format(Locale.ROOT, baseline.cm360), Styles.NUMBER_MD)).left().padTop(8f).row()
-            val note = t("accel.baseline_note", baseline.rounds, baseline.confidencePercent) +
-                if (baseline.confidencePercent < LOW_CONFIDENCE) " " + t("accel.baseline_low") else ""
-            card.add(ui.label(note, Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(4f)
+            val finder = baseline.finder?.takeIf { ctx.useFinderResult && baseline.canUseFinder }
+            val cm360 = baseline.cm360(ctx.useFinderResult)
+            val sensitivity = finder?.sensitivityText ?: baseline.gameSensitivityText
+            val value = t("accel.baseline_value", "%.1f".format(Locale.ROOT, cm360), baseline.gameName, sensitivity)
+            card.add(ui.label(value, Styles.NUMBER_MD)).left().padTop(8f).row()
+            val source = if (finder != null) t("accel.baseline_finder", finder.rounds, finder.confidencePercent) else t("accel.baseline_game")
+            card.add(ui.label(source, Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH - 2 * CARD_PADDING).padTop(4f)
         }
         return card
     }
@@ -92,7 +109,23 @@ class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = c
         }
         block.add(box).left().row()
         val windows = if (pointerAcceleration?.enabled == true) t("accel.windows_on") else ""
-        if (windows.isNotEmpty()) block.add(ui.label(windows, Styles.CAUTION, wrap = true)).left().width(TEXT_WIDTH).padTop(8f)
+        if (windows.isNotEmpty()) block.add(ui.label(windows, Styles.CAUTION, wrap = true)).left().width(CARD_WIDTH).padTop(8f)
+        return block
+    }
+
+    /** Lets the player play the curve runs at the finder's result; shown only when the finder is confident enough. */
+    private fun finderCheck(baseline: AccelBaseline): Table {
+        val finder = checkNotNull(baseline.finder)
+        val block = Table()
+        val label = t("accel.use_finder", "%.1f".format(Locale.ROOT, finder.cm360), baseline.gameName, finder.sensitivityText, finder.rounds, finder.confidencePercent)
+        val box = CheckBox("  $label", ui.skin)
+        box.isChecked = ctx.useFinderResult
+        box.onChange {
+            ctx.useFinderResult = box.isChecked
+            rebuild()
+        }
+        block.add(box).left().row()
+        block.add(ui.label(t("accel.use_finder_help", FinderResult.MIN_CONFIDENCE), Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH).padTop(8f)
         return block
     }
 
@@ -103,11 +136,7 @@ class AccelIntroScreen(ctx: AppContext, private val baseline: AccelBaseline? = c
         box.isChecked = ctx.usePriorSearch
         box.onChange { ctx.usePriorSearch = box.isChecked }
         block.add(box).left().row()
-        block.add(ui.label(t("accel.use_prior_help"), Styles.CAPTION_MUTED, wrap = true)).left().width(TEXT_WIDTH).padTop(8f)
+        block.add(ui.label(t("accel.use_prior_help"), Styles.CAPTION_MUTED, wrap = true)).left().width(CARD_WIDTH).padTop(8f)
         return block
-    }
-
-    private companion object {
-        const val LOW_CONFIDENCE = 50
     }
 }

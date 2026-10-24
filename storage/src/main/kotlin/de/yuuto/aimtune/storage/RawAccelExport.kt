@@ -6,6 +6,8 @@ import de.yuuto.aimtune.core.accel.LookupCurve
 import de.yuuto.aimtune.core.accel.NaturalCurve
 import de.yuuto.aimtune.core.accel.NoAccel
 import de.yuuto.aimtune.core.accel.PowerCurve
+import de.yuuto.aimtune.core.accel.RawAccelArgs
+import de.yuuto.aimtune.core.accel.RawAccelCurve
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -20,6 +22,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.math.roundToInt
 
 /**
  * Writes a Raw Accel `settings.json` for a fitted curve. AimTune never touches the driver: the file
@@ -31,13 +34,28 @@ import java.nio.file.Path
  * a value that passes `common/rawaccel-validate.hpp`. The curve is exported in the Velocity form
  * (`Gain / Velocity` false), which is the form AimTune simulates. The sensitivity factor goes into
  * the profile's output DPI (device DPI times the factor), so the in-game sensitivity stays as it is.
- * The file could not be loaded into Raw Accel from here; see docs/ALGORITHMS.md ("Acceleration").
+ * The file could not be loaded into Raw Accel from here; see docs/ALGORITHMS.md ("Acceleration"). The device DPI is an int in
+ * Raw Accel 1.7.1, so it is written rounded.
+ *
+ * [patch] is the other way to produce a file: it keeps a file the user already has and adds one changed copy of a profile.
  */
 object RawAccelExport {
     const val RAW_ACCEL_VERSION = "1.7.1"
     const val PROFILE_NAME = "AimTune"
 
+    /** Speed (in/s) of the extra lut point that holds the last value; far beyond any hand movement. */
+    const val FLAT_TAIL_SPEED = 10_000.0
+
     private val pretty = Json { prettyPrint = true }
+
+    /** Raw Accel writes its own file with two-space indentation. */
+    private val patchedJson = Json {
+        prettyPrint = true
+        prettyPrintIndent = "  "
+    }
+
+    /** `MAX_NAME_LEN` is 256 wide characters including the terminator (`rawaccel-base.hpp:233`). */
+    private const val MAX_PROFILE_NAME = 255
 
     /**
      * @param dpi the mouse DPI, which Raw Accel needs to turn counts per ms into inches per second.
@@ -46,14 +64,17 @@ object RawAccelExport {
     fun settingsJson(curve: AccelCurve, dpi: Double, sensitivityFactor: Double = 1.0): String {
         require(dpi > 0.0) { "dpi must be positive" }
         require(sensitivityFactor > 0.0 && sensitivityFactor.isFinite()) { "sensitivity factor must be positive" }
+        // `int dpi` in DeviceConfig (wrapper.cpp:271): Json.NET refuses 800.5 for it, so a fractional DPI cannot be written. The
+        // rounded value is used for the output DPI too, so the in-game sensitivity stays as it is for the DPI the file declares.
+        val deviceDpi = dpi.roundToInt()
         val root = buildJsonObject {
             put("version", RAW_ACCEL_VERSION)
             putJsonObject("defaultDeviceConfig") {
                 put("disable", false)
-                put("DPI (normalizes input speed unit: counts/ms -> in/s)", dpi.toInt())
+                put("DPI (normalizes input speed unit: counts/ms -> in/s)", deviceDpi)
                 put("Polling rate Hz (keep at 0 for automatic adjustment)", 0)
             }
-            putJsonArray("profiles") { add(profile(curve, dpi, sensitivityFactor)) }
+            putJsonArray("profiles") { add(profile(curve, deviceDpi.toDouble(), sensitivityFactor)) }
             putJsonArray("devices") {}
         }
         return pretty.encodeToString(JsonElement.serializer(), root) + "\n"
@@ -93,6 +114,73 @@ object RawAccelExport {
         }
         return curve to factor
     }
+
+    /**
+     * The user's own file with one profile added: a deep copy of [profileName] named [newName], with the acceleration of [newArgs]
+     * in both the whole and the vertical parameter block and, if given, [newOutputDpi]. Everything else is the original tree, so
+     * key order, the "### ..." comment keys, the other profiles and the devices stay as they were. A field whose value already
+     * equals the new one keeps its original JSON text (`2` stays `2`), and the parameters [RawAccelArgs] does not hold (outputOffset,
+     * gamma, scale, ...) are never touched.
+     *
+     * @throws RawAccelImportException if the file has no profile [profileName].
+     * @throws IllegalArgumentException if [newName] is empty, too long for Raw Accel (255 characters) or already used.
+     */
+    fun patch(original: JsonObject, profileName: String, newArgs: RawAccelArgs, newOutputDpi: Double?, newName: String): JsonObject {
+        val profiles = RawAccelFile.profiles(original)
+        val source = RawAccelFile(original).profileObject(profileName)
+        require(newName.isNotBlank() && newName.length <= MAX_PROFILE_NAME) { "the profile name must have 1 to $MAX_PROFILE_NAME characters" }
+        require(profiles.none { it[RawAccelKeys.NAME]?.jsonPrimitive?.content == newName }) { "the file already has a profile named '$newName'" }
+        require(newOutputDpi == null || (newOutputDpi > 0.0 && newOutputDpi.isFinite())) { "output DPI must be positive" }
+        val copy = LinkedHashMap(source)
+        copy[RawAccelKeys.NAME] = JsonPrimitive(newName)
+        for (key in listOf(RawAccelKeys.WHOLE_ARGS, RawAccelKeys.VERTICAL_ARGS)) {
+            copy[key] = withArgs(source.getValue(key).jsonObject, newArgs)
+        }
+        if (newOutputDpi != null) copy[RawAccelKeys.OUTPUT_DPI] = keepIfEqual(source[RawAccelKeys.OUTPUT_DPI], JsonPrimitive(newOutputDpi))
+        val root = LinkedHashMap(original)
+        root[RawAccelKeys.PROFILES] = JsonArray(profiles + JsonObject(copy))
+        return JsonObject(root)
+    }
+
+    /** Writes [root] as `settings-<name>.json` into [directory] (created if needed), with ` (2)`, ` (3)`, ... before the extension if the name is taken; returns the path. */
+    fun write(directory: Path, root: JsonObject, name: String): Path {
+        Files.createDirectories(directory)
+        val stem = "settings-" + name.replace(Regex("[^A-Za-z0-9._-]+"), "_").trim('_').ifEmpty { "profile" }
+        val file = generateSequence(1) { it + 1 }
+            .map { if (it == 1) directory.resolve("$stem.json") else directory.resolve("$stem ($it).json") }
+            .first { !Files.exists(it) }
+        Files.writeString(file, patchedJson.encodeToString(JsonElement.serializer(), root) + "\n")
+        return file
+    }
+
+    /** [block] with the acceleration fields of [args] set; the keys keep their place and an unchanged field keeps its original element. */
+    private fun withArgs(block: JsonObject, args: RawAccelArgs): JsonObject {
+        val map = LinkedHashMap(block)
+        fun set(key: String, value: JsonElement) {
+            map[key] = keepIfEqual(block[key], value)
+        }
+        set(RawAccelKeys.MODE, JsonPrimitive(args.mode.json))
+        set(RawAccelKeys.GAIN, JsonPrimitive(args.gain))
+        set(RawAccelKeys.INPUT_OFFSET, JsonPrimitive(args.inputOffset))
+        set(RawAccelKeys.ACCELERATION, JsonPrimitive(args.acceleration))
+        set(RawAccelKeys.DECAY_RATE, JsonPrimitive(args.decayRate))
+        set(RawAccelKeys.EXPONENT_CLASSIC, JsonPrimitive(args.exponentClassic))
+        set(RawAccelKeys.LIMIT, JsonPrimitive(args.limit))
+        set(RawAccelKeys.CAP_MODE, JsonPrimitive(args.capMode.json))
+        val oldCap = block[RawAccelKeys.CAP] as? JsonObject
+        map[RawAccelKeys.CAP] = JsonObject(
+            LinkedHashMap(oldCap ?: JsonObject(emptyMap())).also {
+                it["x"] = keepIfEqual(oldCap?.get("x"), JsonPrimitive(args.capX))
+                it["y"] = keepIfEqual(oldCap?.get("y"), JsonPrimitive(args.capY))
+            },
+        )
+        // The table is compared as floats, the type Raw Accel stores: a double written as text in the file is the same entry.
+        val oldData = (block[RawAccelKeys.DATA] as? JsonArray)?.map { (it as? JsonPrimitive)?.content?.toFloatOrNull() }
+        if (oldData != args.lut) map[RawAccelKeys.DATA] = JsonArray(args.lut.map { JsonPrimitive(it) })
+        return JsonObject(map)
+    }
+
+    private fun keepIfEqual(old: JsonElement?, new: JsonElement): JsonElement = if (old != null && RawAccelImport.sameJson(old, new)) old else new
 
     private fun JsonPrimitive.double(): Double = requireNotNull(doubleOrNull) { "not a number: $content" }
 
@@ -155,10 +243,17 @@ object RawAccelExport {
                 capY = curve.cap
             }
             is LookupCurve -> mode = "lut"
+            is RawAccelCurve -> throw IllegalArgumentException("a RawAccelCurve is exported with patch(), which keeps the rest of the user's profile")
         }
         // lut reads only "data": x1, y1, x2, y2, ... (speed in in/s, multiplier, since "Gain / Velocity" is false);
         // wrapper.cpp takes the array's length as the table size (common/accel-lookup.hpp, v1.7.1).
-        val table = (curve as? LookupCurve)?.let { lut -> lut.speeds.indices.flatMap { listOf(lut.speeds[it], lut.multipliers[it]) } } ?: emptyList()
+        // Above its last point Raw Accel continues the line through the last two points (lerp with t > 1,
+        // accel-lookup.hpp:36-43, 83-89), while LookupCurve holds the last value; a far point with the same
+        // value makes the last segment flat, so the driver plays what was tested.
+        val table = (curve as? LookupCurve)?.let { lut ->
+            val points = lut.speeds.indices.flatMap { listOf(lut.speeds[it], lut.multipliers[it]) }
+            if (lut.speeds.size < LookupCurve.MAX_POINTS && lut.speeds.last() < FLAT_TAIL_SPEED) points + listOf(FLAT_TAIL_SPEED, lut.multipliers.last()) else points
+        } ?: emptyList()
         return buildJsonObject {
             put("mode", mode)
             // true would be the Gain form; the curves here are sensitivity multipliers per speed.

@@ -19,6 +19,8 @@ data class MicroConfig(
     val targetRadius: Double = 0.15,
     /** When set, targets are head-sized angles and the steps come from the game's geometry. */
     val geometry: TrainerGeometry? = null,
+    /** When set, the target strafes (move, stop, move) while it waits to be hit; this is the [ScenarioKind.MICRO_STRAFE] round. */
+    val strafe: StrafeConfig? = null,
 ) {
     init {
         require(durationNanos > 0) { "durationNanos must be positive" }
@@ -33,9 +35,10 @@ data class MicroConfig(
  * degrees away, so the round is about fine corrections instead of big flicks.
  */
 class MicroScenario(private val config: MicroConfig, seed: Long) : Scenario {
-    override val kind = ScenarioKind.MICRO
+    override val kind = if (config.strafe != null) ScenarioKind.MICRO_STRAFE else ScenarioKind.MICRO
 
     private val random = Random(seed)
+    private val strafing = config.strafe?.let { StrafingTargets(it, seed) }
     private val eventLog = mutableListOf<TargetEvent>()
     private var current: Target? = null
     private var yaw = 0.0
@@ -51,12 +54,21 @@ class MicroScenario(private val config: MicroConfig, seed: Long) : Scenario {
         spawn(nowNanos)
     }
 
+    /** Moves a strafing target to [nowNanos]; static targets do not move. */
+    override fun update(nowNanos: Long) {
+        val moving = strafing ?: return
+        if (startNanos == null) return
+        current = moving.advance(listOfNotNull(current), nowNanos, eventLog).firstOrNull()
+    }
+
     override fun isFinished(nowNanos: Long): Boolean {
         val start = startNanos ?: return false
         return nowNanos - start >= config.durationNanos
     }
 
     override fun fire(origin: Vec3, direction: Vec3, nowNanos: Long): ShotResult {
+        // The shot goes at the target where it is now, whether or not the caller updated first.
+        update(nowNanos)
         val target = current
         if (startNanos == null || isFinished(nowNanos) || target == null) return ShotResult.IGNORED
         if (!target.isHitBy(origin, direction)) {
@@ -64,6 +76,11 @@ class MicroScenario(private val config: MicroConfig, seed: Long) : Scenario {
             return ShotResult.MISS
         }
         eventLog += TargetEvent.Hit(nowNanos, target.id)
+        if (strafing != null) {
+            // The crosshair is where the target was hit, which is no longer where it spawned.
+            strafing.remove(target)
+            anglesOf(target.center).let { (hitYaw, hitPitch) -> yaw = hitYaw; pitch = hitPitch }
+        }
         spawn(nowNanos)
         return ShotResult.HIT
     }
@@ -79,6 +96,7 @@ class MicroScenario(private val config: MicroConfig, seed: Long) : Scenario {
         val target = Target(nextId++, ViewAngles.directionOf(yaw, pitch) * visible.distance, radius)
         current = target
         eventLog += TargetEvent.Spawned(nowNanos, target)
+        strafing?.add(target, nowNanos, eventLog)
     }
 
     /** A random spot whose true angle to the previous target is within the step range and inside the field. */

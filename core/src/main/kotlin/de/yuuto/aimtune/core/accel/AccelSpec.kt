@@ -4,6 +4,10 @@ package de.yuuto.aimtune.core.accel
  * A one-line text form of a curve, used to store it with a round: `none`, or the mode name followed
  * by `name=value` parameters separated by semicolons, for example `classic;acceleration=0.08;exponent=2.0;inputOffset=0.0;cap=0.0`.
  * Doubles are written with Kotlin's shortest round-trip form, so decoding gives an equal curve.
+ *
+ * A [RawAccelCurve] is `rawaccel1;mode=classic;gain=true;acceleration=...;exponentClassic=...;inputOffset=...;decayRate=...;limit=...;capX=...;capY=...;capMode=in_out;lut=x:y,x:y`
+ * (`lut` empty unless the mode is lut, floats in their shortest round-trip form). The `1` is the version of this layout: a field added
+ * later gets a `rawaccel2` form and this one keeps decoding.
  */
 object AccelSpec {
     fun encode(curve: AccelCurve): String = when (curve) {
@@ -11,6 +15,7 @@ object AccelSpec {
         is ClassicCurve -> "classic;acceleration=${curve.acceleration};exponent=${curve.exponent};inputOffset=${curve.inputOffset};cap=${curve.cap}"
         is NaturalCurve -> "natural;decayRate=${curve.decayRate};limit=${curve.limit};inputOffset=${curve.inputOffset}"
         is PowerCurve -> "power;scale=${curve.scale};exponent=${curve.exponent};outputOffset=${curve.outputOffset};cap=${curve.cap}"
+        is RawAccelCurve -> encodeRaw(curve.args)
         is LookupCurve -> "$LUT;points=" + curve.speeds.indices.joinToString(",") { "${curve.speeds[it]}:${curve.multipliers[it]}" }
     }
 
@@ -18,6 +23,7 @@ object AccelSpec {
     fun decode(text: String): AccelCurve {
         val parts = text.trim().split(';')
         if (parts.first() == LUT) return decodeLookup(text, parts)
+        if (parts.first() == RAW_V1) return decodeRaw(text, parts)
         val values = parts.drop(1).associate { part ->
             val (name, value) = part.split('=', limit = 2).also { require(it.size == 2) { "bad parameter '$part' in '$text'" } }
             name to requireNotNull(value.toDoubleOrNull()) { "'$value' is not a number in '$text'" }
@@ -44,6 +50,34 @@ object AccelSpec {
         return LookupCurve(pairs.map { it.first }, pairs.map { it.second })
     }
 
+    private fun encodeRaw(args: RawAccelArgs): String =
+        "$RAW_V1;mode=${args.mode.json};gain=${args.gain};acceleration=${args.acceleration};exponentClassic=${args.exponentClassic};" +
+            "inputOffset=${args.inputOffset};decayRate=${args.decayRate};limit=${args.limit};capX=${args.capX};capY=${args.capY};" +
+            "capMode=${args.capMode.json};lut=" + args.lut.chunked(2).joinToString(",") { "${it[0]}:${it[1]}" }
+
+    private fun decodeRaw(text: String, parts: List<String>): RawAccelCurve {
+        val fields = parts.drop(1).associate { part ->
+            val (name, value) = part.split('=', limit = 2).also { require(it.size == 2) { "bad parameter '$part' in '$text'" } }
+            name to value
+        }
+        fun get(name: String) = requireNotNull(fields[name]) { "missing '$name' in '$text'" }
+        fun number(name: String) = requireNotNull(get(name).toDoubleOrNull()) { "'${get(name)}' is not a number in '$text'" }
+        val mode = requireNotNull(RawAccelMode.entries.firstOrNull { it.json == get("mode") }) { "unknown mode in '$text'" }
+        val capMode = requireNotNull(RawAccelCapMode.entries.firstOrNull { it.json == get("capMode") }) { "unknown cap mode in '$text'" }
+        val gain = requireNotNull(get("gain").toBooleanStrictOrNull()) { "'gain' is not true or false in '$text'" }
+        val lut = get("lut").takeIf { it.isNotEmpty() }?.split(',')?.flatMap { point ->
+            point.split(':').also { require(it.size == 2) { "bad point '$point' in '$text'" } }
+                .map { requireNotNull(it.toFloatOrNull()) { "'$it' is not a number in '$text'" } }
+        } ?: emptyList()
+        return RawAccelCurve(
+            RawAccelArgs(
+                mode, gain, number("acceleration"), number("exponentClassic"), number("inputOffset"), number("decayRate"),
+                number("limit"), number("capX"), number("capY"), capMode, lut,
+            ),
+        )
+    }
+
+    private const val RAW_V1 = "rawaccel1"
     private const val NONE = "none"
     private const val LUT = "lut"
 }
