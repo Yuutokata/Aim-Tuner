@@ -1,7 +1,6 @@
 package de.yuuto.aimtune.core.sim
 
-import de.yuuto.aimtune.core.accel.AccelCurve
-import de.yuuto.aimtune.core.accel.AccelProcessor
+import de.yuuto.aimtune.core.accel.AccelModel
 import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.scenario.FlashState
@@ -43,7 +42,7 @@ class SimulatedAimer(
     private val cm360: Double,
     seed: Long,
     private val kind: ScenarioKind = ScenarioKind.FLICK,
-    accel: AccelCurve? = null,
+    accel: AccelModel? = null,
 ) {
     /**
      * A planned movement: [dYaw]/[dPitch] degrees the player intends, delivered by a hand movement
@@ -69,8 +68,8 @@ class SimulatedAimer(
     private val random = Random(seed)
     private val degPerCount = degreesPerCount(dpi, cm360)
     private val dpiValue = dpi
-    private val accelCurve = accel
-    private val accelProcessor = accel?.let { AccelProcessor(it, dpi) }
+    private val accelModel = accel
+    private val modifier = accel?.newModifier(dpi)
     private val reaches = ArrayList<Reach>()
     private var baseYaw = 0.0
     private var basePitch = 0.0
@@ -110,7 +109,7 @@ class SimulatedAimer(
         baseHandPitch = 0.0
         trueYaw = 0.0
         truePitch = 0.0
-        accelProcessor?.reset()
+        modifier?.reset()
         emittedX = 0
         emittedY = 0
         mode = Mode.NO_TARGET
@@ -239,12 +238,12 @@ class SimulatedAimer(
      */
     private fun gains(amplitude: Double, seconds: Double, peak: Boolean): Pair<Double, Double> {
         var expected = 1.0
-        var delivered = accelCurve?.multiplier(0.0) ?: 1.0
+        var delivered = accelModel?.planningGain(0.0, dpiValue) ?: 1.0
         repeat(GAIN_ITERATIONS) {
             val handInches = amplitude / (degPerCount * expected) / dpiValue
             val speed = (if (peak) PEAK_TO_MEAN_SPEED else 1.0) * handInches / seconds
             expected = player.gainPreference(speed) * (player.adaptation?.factor(speed) ?: 1.0)
-            delivered = accelCurve?.multiplier(speed) ?: 1.0
+            delivered = accelModel?.planningGain(speed, dpiValue) ?: 1.0
             lastSpeed = speed
         }
         return expected to delivered
@@ -466,7 +465,7 @@ class SimulatedAimer(
             (if (primary) 1.0 else CORRECTION_SPEEDUP)
         // Time, noise and gain depend on each other through the hand speed; three rounds settle them.
         var expected = 1.0
-        var delivered = accelCurve?.multiplier(0.0) ?: 1.0
+        var delivered = accelModel?.planningGain(0.0, dpiValue) ?: 1.0
         var effectiveCm360 = cm360 / (player.optimumScale * delivered)
         var durationMs = MIN_REACH_MS
         // Under a deadline a first reach is compressed into the time left: faster, and noisier in proportion (Schmidt et al. 1979).
@@ -568,9 +567,9 @@ class SimulatedAimer(
         emittedX = x
         emittedY = y
         if (dx != 0 || dy != 0) {
-            val scale = accelProcessor?.scaleFor(MouseEvent(nowNanos, dx, dy)) ?: 1.0
-            trueYaw += dx * scale * degPerCount
-            truePitch -= dy * scale * degPerCount
+            val move = modifier?.modify(MouseEvent(nowNanos, dx, dy))
+            trueYaw += (move?.dx ?: dx.toDouble()) * degPerCount
+            truePitch -= (move?.dy ?: dy.toDouble()) * degPerCount
         }
         return if (dx == 0 && dy == 0 && !click) AimerStep.IDLE else AimerStep(dx, dy, click)
     }

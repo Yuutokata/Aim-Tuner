@@ -43,6 +43,22 @@ object AccelSpec {
         }
     }
 
+    /** The stored text of any model: a finder curve in its own form, a profile as `rawaccel2`. */
+    fun encodeModel(model: AccelModel): String = when (model) {
+        is AccelCurve -> encode(model)
+        is RawAccelProfile -> encodeProfile(model)
+    }
+
+    /**
+     * The model of a stored text. `rawaccel2` is the whole profile (the round's cm/360 is the game cm/360); every other form,
+     * `rawaccel1` included, is a curve only (for `rawaccel1` the stored cm/360 already includes the output DPI factor).
+     */
+    fun decodeModel(text: String): AccelModel =
+        if (isProfile(text)) decodeProfile(text) else decode(text)
+
+    /** True for the text of a whole profile, which no finder analysis may read as a curve. */
+    fun isProfile(text: String): Boolean = text.trim().startsWith("${RawAccelProfileSpec.VERSION};")
+
     /** The `rawaccel2` text of [profile]; decodes to an equal profile. */
     fun encodeProfile(profile: RawAccelProfile): String = RawAccelProfileSpec.encode(profile)
 

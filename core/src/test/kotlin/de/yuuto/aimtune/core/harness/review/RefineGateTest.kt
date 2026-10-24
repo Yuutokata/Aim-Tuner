@@ -14,7 +14,6 @@ import de.yuuto.aimtune.core.accel.RefinePhase
 import de.yuuto.aimtune.core.accel.RefineResult
 import de.yuuto.aimtune.core.accel.RefineRound
 import de.yuuto.aimtune.core.accel.adjusted
-import de.yuuto.aimtune.core.accel.played
 import de.yuuto.aimtune.core.harness.TEST_DPI
 import de.yuuto.aimtune.core.harness.geometricGrid
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
@@ -81,7 +80,7 @@ class RefineGateTest {
 
     private fun play(player: SimulatedPlayer, round: RefineRound, index: Int): Map<ScoreMetric, Double> =
         computeRoundMetrics(
-            HeadlessRound.of(round.scenario, player, TEST_DPI, round.cm360, round.seed, ROUND_SECONDS, index * ROUND_SECONDS * NANOS_PER_SECOND, accel = round.curve),
+            HeadlessRound.of(round.scenario, player, TEST_DPI, round.cm360, round.seed, ROUND_SECONDS, index * ROUND_SECONDS * NANOS_PER_SECOND, accel = round.profile),
         ).scoreInputs()
 
     /** The level factor at which a stateless player with [optimumScale] scores best with the imported profile (smooth fit of a sweep). */
@@ -92,7 +91,7 @@ class RefineGateTest {
         val kinds = AccelScenarios.WITH_FLASH
         val inputs = grid.indices.map { gi ->
             parallelList(per) { r ->
-                val round = RefineRound(kinds[r % kinds.size], 77L * 1_009 + gi * 101 + r, imported.curve, imported.played(gameCm360).cm360 / grid[gi])
+                val round = RefineRound(kinds[r % kinds.size], 77L * 1_009 + gi * 101 + r, imported, gameCm360 / grid[gi])
                 play(base, round, gi * per + r)
             }
         }
@@ -142,8 +141,7 @@ class RefineGateTest {
         val rounds = (0 until 2 * pairs).map { plan.round(it) }
         val inputs = rounds.mapIndexed { i, r ->
             val profile = if (r.condition == AbCondition.ACCEL) candidate else imported
-            val played = profile.played(gameCm360)
-            play(player, RefineRound(r.scenario, r.seed, played.curve, played.cm360), i)
+            play(player, RefineRound(r.scenario, r.seed, profile, gameCm360), i)
         }
         val scores = ScoreCalculator(weights).scoreRounds(inputs, rounds.map { it.scenario.id })
         val diffs = (0 until pairs).mapNotNull { p ->

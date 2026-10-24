@@ -67,7 +67,7 @@ data class RawAccelProfile(
     val snapDegrees: Double = 0.0,
     val speedCap: Double = 0.0,
     val device: RawAccelDevice = RawAccelDevice(),
-) {
+) : AccelModel {
     init {
         require(outputDpi > 0 && outputDpi.isFinite()) { "output DPI must be positive" }
         require(deviceDpi >= 0 && deviceDpi.isFinite()) { "device DPI must not be negative" }
@@ -87,4 +87,12 @@ data class RawAccelProfile(
 
     /** The factor the counts get at [speed] inches per second: the curve times `outputDpi / deviceDpi`. */
     fun totalMultiplier(speed: Double): Double = curve.multiplier(speed) * outputDpi / effectiveDeviceDpi
+
+    /** The trainer's DPI is not used: the driver normalizes with the device DPI of the file, so the profile replays like the driver. */
+    override fun newModifier(dpi: Double): MouseModifier = ProfileModifier(this)
+
+    override val finderCurve: AccelCurve? get() = null
+
+    /** A hand speed at [dpi] counts per inch is `speed * dpi / deviceDpi` inches per second for the driver. */
+    override fun planningGain(speed: Double, dpi: Double): Double = totalMultiplier(speed * dpi / effectiveDeviceDpi)
 }

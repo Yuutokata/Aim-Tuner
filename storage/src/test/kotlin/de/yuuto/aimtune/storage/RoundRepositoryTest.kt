@@ -3,9 +3,15 @@ package de.yuuto.aimtune.storage
 import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.accel.AccelSpec
 import de.yuuto.aimtune.core.accel.NaturalCurve
+import de.yuuto.aimtune.core.accel.RawAccelArgs
+import de.yuuto.aimtune.core.accel.RawAccelCapMode
+import de.yuuto.aimtune.core.accel.RawAccelMode
+import de.yuuto.aimtune.core.accel.RawAccelProfile
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.metrics.computeRoundMetrics
 import de.yuuto.aimtune.core.recording.RoundRecording
+import de.yuuto.aimtune.core.recording.ViewTrack
+import de.yuuto.aimtune.core.score.scoreInputs
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.Target
 import de.yuuto.aimtune.core.scenario.TargetEvent
@@ -112,6 +118,36 @@ class RoundRepositoryTest {
             assertNull(repo.loadRecording(plainId)?.accel)
             assertEquals(curve, repo.loadRecording(accelId)?.accel)
             assertEquals(listOf(null, AccelSpec.encode(curve)), repo.rounds(session).map { it.accel })
+        }
+    }
+
+    @Test
+    fun `a refine round is stored as rawaccel2 at the game cm360 and replays to the same view`() {
+        val profile = RawAccelProfile(
+            "default",
+            RawAccelArgs(RawAccelMode.CLASSIC, gain = true, inputOffset = 10.0, capX = 62.5, capY = 1.6, capMode = RawAccelCapMode.IN_OUT),
+            outputDpi = 600.0,
+            deviceDpi = 800.0,
+            rotationDegrees = 3.0,
+            yxRatio = 0.9,
+        )
+        val played = HeadlessRound.of(ScenarioKind.FLICK, SimulatedPlayer(), 800.0, 55.0, seed = 9, roundSeconds = 10, accel = profile)
+        Database.open(dir.resolve("a.db")).use { db ->
+            val repo = RoundRepository(db)
+            val session = repo.createSession(1, "valorant", 800.0, SessionKind.ACCEL_REFINE)
+            val id = repo.saveRound(session, played, 1, blind = true, metrics = computeRoundMetrics(played))
+
+            val row = repo.rounds(session).single()
+            assertEquals(55.0, row.cm360, "the game cm/360, the output DPI sits inside the profile")
+            assertTrue(row.accel!!.startsWith("rawaccel2;"), row.accel)
+            val loaded = assertNotNull(repo.loadRecording(id))
+            assertEquals(profile, loaded.accel)
+            val before = ViewTrack(played)
+            val after = ViewTrack(loaded)
+            assertEquals(before.movedX.toList(), after.movedX.toList())
+            assertEquals(before.movedY.toList(), after.movedY.toList())
+            assertEquals(before.viewAt(played.endNanos), after.viewAt(loaded.endNanos))
+            assertEquals(computeRoundMetrics(played).scoreInputs(), computeRoundMetrics(loaded).scoreInputs())
         }
     }
 

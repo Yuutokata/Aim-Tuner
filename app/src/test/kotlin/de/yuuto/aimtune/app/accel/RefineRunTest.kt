@@ -2,7 +2,7 @@ package de.yuuto.aimtune.app.accel
 
 import de.yuuto.aimtune.app.TrainerConfig
 import de.yuuto.aimtune.core.accel.RefinePhase
-import de.yuuto.aimtune.core.accel.RawAccelCurve
+import de.yuuto.aimtune.core.accel.RawAccelProfile
 import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.sim.HeadlessRound
 import de.yuuto.aimtune.core.sim.SimulatedPlayer
@@ -36,13 +36,13 @@ class RefineRunTest {
     }
 
     @Test
-    fun `rounds play the profile at its own cm360 with its curve, warm-up first`() {
+    fun `rounds play the whole profile at the game cm360, warm-up first`() {
         val imported = checkNotNull(profile().profile)
         val run = RefineRun(config, MetricWeights.DEFAULT, 1, 2, source, imported, flash = false)
         val first = run.nextRoundConfig()
-        assertEquals(55.0 / 0.75, first.cm360, 1e-9)
-        assertEquals(imported.curve, first.accel)
-        assertTrue(first.accel is RawAccelCurve)
+        assertEquals(55.0, first.cm360, 1e-9)
+        assertEquals(imported, first.accel)
+        assertTrue(first.accel is RawAccelProfile)
         assertEquals(800.0, first.dpi)
     }
 

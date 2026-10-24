@@ -56,15 +56,18 @@ enum class RefineParameter(val min: Double, val max: Double) {
 /** The smallest `capY` / `limit` an adjusted profile gets, so that a falling curve scaled up never reaches or crosses 0. */
 private const val MIN_HIGH_OUTPUT = 0.05
 
-/** True when the profile has something [parameter] could change. */
+/**
+ * True when the profile has something [parameter] could change. By-component profiles only support [RefineParameter.LEVEL]
+ * for now: the curve parameters would have to change both axes, which comes with the stage mappings of M22c.
+ */
 fun RawAccelProfile.supports(parameter: RefineParameter): Boolean = when (parameter) {
     RefineParameter.LEVEL -> true
-    RefineParameter.HIGH_GAIN -> when (args.mode) {
+    RefineParameter.HIGH_GAIN -> speed.whole && when (args.mode) {
         RawAccelMode.CLASSIC -> hasHighOutput()
         RawAccelMode.NATURAL -> args.limit != 1.0
         RawAccelMode.LUT, RawAccelMode.NOACCEL, RawAccelMode.JUMP, RawAccelMode.SYNCHRONOUS, RawAccelMode.POWER -> false
     }
-    RefineParameter.TRANSITION -> when (args.mode) {
+    RefineParameter.TRANSITION -> speed.whole && when (args.mode) {
         RawAccelMode.CLASSIC -> args.inputOffset > 0.0 && hasHighOutput()
         RawAccelMode.NATURAL -> args.limit != 1.0
         RawAccelMode.LUT, RawAccelMode.NOACCEL, RawAccelMode.JUMP, RawAccelMode.SYNCHRONOUS, RawAccelMode.POWER -> false
@@ -116,17 +119,4 @@ private fun RawAccelArgs.withTransition(t: Double): RawAccelArgs = when (mode) {
     }
     RawAccelMode.NATURAL -> copy(decayRate = decayRate / t)
     else -> error("unreachable: $mode has no transition")
-}
-
-/**
- * What one arm of a round plays for a profile: the curve and the cm/360 that gives the game sensitivity the profile would
- * give in the game. Raw Accel multiplies the counts by `outputDpi / deviceDpi` after the curve, so a bigger output DPI is
- * the same as a smaller cm/360; [AccelProcessor] sees the DPI of the settings, which an import requires to equal the file's.
- */
-data class PlayedProfile(val curve: RawAccelCurve, val cm360: Double)
-
-/** The arm of this profile when the player's game sensitivity is [gameCm360] (at the device DPI, output DPI factor 1). */
-fun RawAccelProfile.played(gameCm360: Double): PlayedProfile {
-    require(gameCm360 > 0.0) { "cm360 must be positive" }
-    return PlayedProfile(curve, gameCm360 / (outputDpi / effectiveDeviceDpi))
 }

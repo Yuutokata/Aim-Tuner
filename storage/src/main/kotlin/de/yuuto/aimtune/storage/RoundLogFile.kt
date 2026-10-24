@@ -48,7 +48,7 @@ object RoundLogFile {
             mouseEventCount = recording.mouseEvents.size,
             mouseEvents = Base64.getEncoder().encodeToString(MouseEventCodec.encode(recording.mouseEvents, origin)),
             targetEvents = recording.targetEvents.map { it.toDto(origin) },
-            accel = recording.accel?.let(AccelSpec::encode),
+            accel = recording.accel?.let(AccelSpec::encodeModel),
         )
         return json.encodeToString(RoundLogDto.serializer(), dto)
     }
@@ -67,7 +67,7 @@ object RoundLogFile {
                 endNanos = dto.durationNanos,
                 mouseEvents = MouseEventCodec.decode(Base64.getDecoder().decode(dto.mouseEvents), dto.mouseEventCount, 0L),
                 targetEvents = dto.targetEvents.map { it.toEvent() },
-                accel = dto.accel?.let(AccelSpec::decode),
+                accel = dto.accel?.let(AccelSpec::decodeModel),
             )
         } catch (e: SerializationException) {
             throw RoundLogException("not a round log: ${e.message}", e)

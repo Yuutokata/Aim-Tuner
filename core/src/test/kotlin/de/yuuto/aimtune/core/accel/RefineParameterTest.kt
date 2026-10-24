@@ -147,14 +147,6 @@ class RefineParameterTest {
     }
 
     @Test
-    fun `the played arm sits at the game sensitivity divided by the output dpi factor`() {
-        val played = user.played(48.0)
-        assertEquals(48.0 / 0.75, played.cm360, 1e-12)
-        assertEquals(user.curve, played.curve)
-        assertEquals(48.0 / 0.75 / 1.15, user.adjusted(RefineParameter.LEVEL, 1.15).played(48.0).cm360, 1e-12)
-    }
-
-    @Test
     fun `excluding the neutral value needs a real change and a range on one side of one`() {
         val p = RefineParameter.LEVEL
         assertTrue(p.excludesNeutral(1.1, 1.04, 1.16))

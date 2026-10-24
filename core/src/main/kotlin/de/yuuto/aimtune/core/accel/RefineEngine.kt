@@ -34,14 +34,13 @@ enum class RefinePhase {
     DONE,
 }
 
-/** What the next round plays. The blind part is only the factor; [curve] and [cm360] are what the trainer needs. */
-data class RefineRound(val scenario: ScenarioKind, val seed: Long, val curve: RawAccelCurve, val cm360: Double)
+/** What the next round plays: the whole [profile] at the player's game cm/360 ([cm360]); the output DPI factor is inside the driver model. The blind part is only the factor. */
+data class RefineRound(val scenario: ScenarioKind, val seed: Long, val profile: RawAccelProfile, val cm360: Double)
 
 /**
  * "Refine my Raw Accel curve" without UI: warm-up rounds with the imported [profile], one blind search per [RefineParameter]
  * the profile supports (level, high-speed gain, transition, in this order), and a blind A/B test of the refined profile against
- * the imported one. Every round is played at the player's game sensitivity [gameCm360] with a profile's curve, at the cm/360 its
- * output DPI gives ([played]).
+ * the imported one. Every round plays a whole profile through the driver model at the player's game sensitivity [gameCm360].
  *
  * A stage searches the factor of its parameter on top of the factors the earlier stages carried. A stage's best factor is
  * carried on only when its credible range excludes 1 ([RefineResult.carried]); otherwise the stage leaves the profile alone. The
@@ -177,10 +176,7 @@ class RefineEngine(
         phase = RefinePhase.DONE
     }
 
-    private fun round(scenario: ScenarioKind, seed: Long, profile: RawAccelProfile): RefineRound {
-        val played = profile.played(gameCm360)
-        return RefineRound(scenario, seed, played.curve, played.cm360)
-    }
+    private fun round(scenario: ScenarioKind, seed: Long, profile: RawAccelProfile): RefineRound = RefineRound(scenario, seed, profile, gameCm360)
 
     private fun searchProfile(parameter: RefineParameter, factor: Double): RawAccelProfile = candidate.let { if (it.supports(parameter)) it.adjusted(parameter, factor) else it }
 

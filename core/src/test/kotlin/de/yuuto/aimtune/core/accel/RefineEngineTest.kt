@@ -29,8 +29,8 @@ class RefineEngineTest {
     private fun playWarmup(e: RefineEngine) {
         repeat(e.warmupRounds) {
             val round = e.nextRound()
-            assertEquals(user.curve, round.curve, "the warm-up plays the imported curve")
-            assertEquals(48.0 / 0.75, round.cm360, 1e-9)
+            assertEquals(user, round.profile, "the warm-up plays the imported profile")
+            assertEquals(48.0, round.cm360, 1e-9, "at the game sensitivity, the output DPI factor is inside the driver model")
             e.record(inputs(null, 1.0))
         }
     }
@@ -43,10 +43,10 @@ class RefineEngineTest {
         playWarmup(e)
         assertEquals(RefinePhase.SEARCH, e.phase)
         assertEquals(RefineParameter.LEVEL, e.stage)
-        // level stage: the better the closer the played cm360 is to a level of 1.12
+        // level stage: the better the closer the played output DPI is to a level of 1.12 times the imported one
         while (e.phase == RefinePhase.SEARCH) {
             val round = e.nextRound()
-            val level = (48.0 / round.cm360) / 0.75
+            val level = round.profile.outputDpi / user.outputDpi
             e.record(inputs(level, 1.12))
         }
         assertEquals(RefinePhase.STAGE_RESULT, e.phase)
@@ -107,7 +107,7 @@ class RefineEngineTest {
         // force a candidate by running the level stage with a strong preference
         while (e.phase == RefinePhase.SEARCH) {
             val round = e.nextRound()
-            e.record(inputs((48.0 / round.cm360) / 0.75, 1.17))
+            e.record(inputs(round.profile.outputDpi / user.outputDpi, 1.17))
         }
         val level = e.currentResult
         e.goToTest()
@@ -117,9 +117,10 @@ class RefineEngineTest {
         val second = e.nextRound()
         assertEquals(first.scenario, second.scenario)
         assertEquals(first.seed, second.seed)
-        val curves = setOf(first.cm360, second.cm360)
+        val curves = setOf(first.profile, second.profile)
         assertEquals(2, curves.size, "one arm is the imported profile, the other the refined one")
-        assertTrue(48.0 / 0.75 in curves)
+        assertTrue(user in curves)
+        assertEquals(setOf(48.0), setOf(first.cm360, second.cm360), "both arms play the game sensitivity")
     }
 
     @Test

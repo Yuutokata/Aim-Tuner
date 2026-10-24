@@ -117,7 +117,7 @@ object RawAccelExport {
 
     /**
      * The user's own file with one profile added: a deep copy of [profileName] named [newName], with the acceleration of [newArgs]
-     * in both the whole and the vertical parameter block and, if given, [newOutputDpi]. Everything else is the original tree, so
+     * in the whole parameter block (and the vertical one when the original had the same values in both) and, if given, [newOutputDpi]. Everything else is the original tree, so
      * key order, the "### ..." comment keys, the other profiles and the devices stay as they were. A field whose value already
      * equals the new one keeps its original JSON text (`2` stays `2`), and the parameters [RawAccelArgs] does not hold (outputOffset,
      * gamma, scale, ...) are never touched.
@@ -133,7 +133,11 @@ object RawAccelExport {
         require(newOutputDpi == null || (newOutputDpi > 0.0 && newOutputDpi.isFinite())) { "output DPI must be positive" }
         val copy = LinkedHashMap(source)
         copy[RawAccelKeys.NAME] = JsonPrimitive(newName)
+        // The vertical block only matters for by-component profiles; it follows the whole block when it was a copy of it (the
+        // only case before M22b) and stays as the user wrote it otherwise.
+        val verticalFollows = RawAccelImport.sameJson(source[RawAccelKeys.WHOLE_ARGS], source[RawAccelKeys.VERTICAL_ARGS])
         for (key in listOf(RawAccelKeys.WHOLE_ARGS, RawAccelKeys.VERTICAL_ARGS)) {
+            if (key == RawAccelKeys.VERTICAL_ARGS && !verticalFollows) continue
             copy[key] = withArgs(source.getValue(key).jsonObject, newArgs)
         }
         if (newOutputDpi != null) copy[RawAccelKeys.OUTPUT_DPI] = keepIfEqual(source[RawAccelKeys.OUTPUT_DPI], JsonPrimitive(newOutputDpi))

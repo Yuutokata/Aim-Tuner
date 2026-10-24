@@ -45,6 +45,7 @@ object StoredSearches {
     /** The strength a round was played with, or null when its curve is not one of the search's (e.g. a fitted curve of the error analysis). */
     fun strengthOf(accel: String?): Double? {
         if (accel == null) return CurveStrength.NEUTRAL
+        if (AccelSpec.isProfile(accel)) return null // a whole Raw Accel profile (refine round) is no finder strength
         val curve = try {
             AccelSpec.decode(accel)
         } catch (e: IllegalArgumentException) {
