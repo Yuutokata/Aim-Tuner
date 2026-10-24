@@ -66,6 +66,9 @@ import de.yuuto.aimtune.core.units.searchRange
 import de.yuuto.aimtune.games.GameProfiles
 import de.yuuto.aimtune.input.RawMouseSource
 import de.yuuto.aimtune.storage.CurveFinder
+import de.yuuto.aimtune.app.files.ExportFiles
+import de.yuuto.aimtune.app.files.FileDialogs
+import de.yuuto.aimtune.app.files.TinyfdFileDialogs
 import de.yuuto.aimtune.storage.RawAccelExport
 import de.yuuto.aimtune.storage.ResearchExportResult
 import de.yuuto.aimtune.storage.SettingsException
@@ -93,6 +96,8 @@ class AppContext(
     val researchDir: Path? = null,
     /** Where the player drops Raw Accel settings.json files to refine; null without a data folder. */
     val importDir: Path? = null,
+    /** The native open and save dialogs; a fake in the screenshot tour and in tests. */
+    val fileDialogs: FileDialogs = TinyfdFileDialogs(),
 ) {
     private var nextSeed = options.seed ?: System.nanoTime()
     /** A newer release than this build, found by the update check; null when none is known. Set on the render thread. */
@@ -354,6 +359,12 @@ class AppContext(
         RawAccelExport.write(dir, curve.curve, dpi, curve.sensitivityFactor)
     }
 
+    /** Writes the Raw Accel settings.json of the tested curve to [path], chosen in the save dialog. */
+    fun saveAccelAs(run: AccelRun, path: Path): Result<Path> = runCatching {
+        val curve = checkNotNull(run.candidate) { "there is no curve to export" }
+        RawAccelExport.settingsJson(curve.curve, run.dpi, curve.sensitivityFactor)
+    }.mapCatching { ExportFiles.saveText(path, it).getOrThrow() }
+
     /** The import step of "Refine my Raw Accel curve". */
     fun showRefine() = switchTo(RefineImportScreen(this))
 
@@ -380,9 +391,15 @@ class AppContext(
     /** Writes a copy of the player's file with the refined profile added into the export folder; the path, or the reason it failed. */
     fun exportRefine(run: RefineRun): Result<Path> = runCatching {
         val dir = checkNotNull(exportDir) { "no data folder to write to" }
-        val candidate = run.engine.candidate
-        val root = RawAccelExport.patch(run.source.file.root, run.profile.name, candidate.args, candidate.outputDpi, run.exportName)
-        RawAccelExport.write(dir, root, run.exportName)
+        RawAccelExport.write(dir, refinedRoot(run), run.exportName)
+    }
+
+    /** Like [exportRefine], to [path] chosen in the save dialog. */
+    fun saveRefineAs(run: RefineRun, path: Path): Result<Path> = runCatching { refinedRoot(run) }
+        .mapCatching { ExportFiles.savePatched(path, it, run.exportName).getOrThrow() }
+
+    private fun refinedRoot(run: RefineRun) = run.engine.candidate.let {
+        RawAccelExport.patch(run.source.file.root, run.profile.name, it.args, it.outputDpi, run.exportName)
     }
 
     /** Number of stored blind rounds for the current setup, for the menu. */

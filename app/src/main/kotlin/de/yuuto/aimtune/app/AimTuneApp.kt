@@ -5,6 +5,8 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Graphics
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3WindowAdapter
+import de.yuuto.aimtune.app.files.FakeFileDialogs
+import de.yuuto.aimtune.app.files.TinyfdFileDialogs
 import de.yuuto.aimtune.app.input.GlfwMouseSource
 import de.yuuto.aimtune.app.screens.MainMenuScreen
 import de.yuuto.aimtune.app.screens.TrainerScreen
@@ -72,6 +74,8 @@ class AimTuneApp(private val options: LaunchOptions) : Game() {
             exportDir = paths?.dataDir?.resolve("exports")?.resolve("rawaccel"),
             researchDir = paths?.dataDir?.resolve("exports")?.resolve("research"),
             importDir = paths?.dataDir?.resolve("imports")?.also { runCatching { java.nio.file.Files.createDirectories(it) } },
+            // The tour must never open a real dialog.
+            fileDialogs = if (sampleMode) FakeFileDialogs() else TinyfdFileDialogs(),
         )
         context = ctx
         val screenshotDir = options.screenshotDir
