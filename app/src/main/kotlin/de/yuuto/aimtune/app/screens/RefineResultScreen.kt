@@ -4,6 +4,7 @@ import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import de.yuuto.aimtune.app.AppContext
 import de.yuuto.aimtune.app.accel.RefineRun
+import de.yuuto.aimtune.app.files.ExportFiles
 import de.yuuto.aimtune.app.ui.Styles
 import de.yuuto.aimtune.app.ui.addButton
 import de.yuuto.aimtune.app.ui.button
@@ -39,6 +40,7 @@ class RefineResultScreen(ctx: AppContext, private val run: RefineRun) : UiScreen
         footer.add(ui.button(t("common.back_to_menu"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
         if (better && exported?.isSuccess != true) {
+            footer.addButton(ui.button(t("common.save_as"), Styles.SECONDARY) { saveAs() }, minWidth = 240f).padRight(16f)
             footer.addButton(ui.button(t("refine.result.export", run.exportName), Styles.PRIMARY) { export() }, minWidth = 420f)
         }
         return ui.frame(null, content, footer)
@@ -82,6 +84,14 @@ class RefineResultScreen(ctx: AppContext, private val run: RefineRun) : UiScreen
             card.add(ui.label(text, if (result.isSuccess) Styles.OK else Styles.CAUTION, wrap = true)).left().width(inner).padTop(16f)
         }
         return card
+    }
+
+    /** Asks where to save; a cancelled dialog changes nothing. */
+    private fun saveAs() {
+        val suggestion = ctx.exportDir?.resolve(ExportFiles.patchedFileName(run.exportName))
+        val path = ctx.fileDialogs.saveJson(t("file.dialog.save_title"), suggestion) ?: return
+        exported = ctx.saveRefineAs(run, path)
+        rebuild()
     }
 
     private fun export() {

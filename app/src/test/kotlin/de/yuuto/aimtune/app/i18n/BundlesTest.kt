@@ -42,7 +42,8 @@ class BundlesTest {
         val sources = File("src/main/kotlin").walkTopDown().filter { it.extension == "kt" }.toList()
         assertTrue(sources.isNotEmpty(), "source folder not found from ${File(".").absolutePath}")
         val used = sources.flatMap { file -> keyLike.findAll(file.readText()).map { it.groupValues[1] to file.name }.toList() }
-        val missing = used.filter { (key, _) -> key !in english }
+        // "settings.json" (the export file name) looks like a settings.* key but is a file name.
+        val missing = used.filter { (key, _) -> key !in english && !key.endsWith(".json") }
         assertTrue(missing.isEmpty(), "keys without a text: $missing")
     }
 

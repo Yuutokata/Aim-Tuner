@@ -9,6 +9,8 @@ import de.yuuto.aimtune.app.accel.RefineChoice
 import de.yuuto.aimtune.app.accel.RefineDiff
 import de.yuuto.aimtune.app.accel.RefineImport
 import de.yuuto.aimtune.app.accel.RefineSource
+import de.yuuto.aimtune.app.files.ImportFileReader
+import de.yuuto.aimtune.app.files.ImportFileResult
 import de.yuuto.aimtune.app.ui.ChartActor
 import de.yuuto.aimtune.app.ui.Styles
 import de.yuuto.aimtune.app.ui.addButton
@@ -86,6 +88,7 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
 
     private fun sourceBlock(): Table {
         val block = Table().left()
+        block.add(ui.button(t("refine.import.open"), Styles.PRIMARY) { openFile() }).left().height(FOOTER_BUTTON_HEIGHT).colspan(2 + MAX_FILE_BUTTONS).padBottom(12f).row()
         block.add(ui.button(t("refine.import.paste"), Styles.SECONDARY) { paste() }).left().height(FOOTER_BUTTON_HEIGHT).padRight(16f)
         val files = RefineImport.listFiles(ctx.importDir)
         files.take(MAX_FILE_BUTTONS).forEach { path ->
@@ -152,6 +155,19 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
         block.add(box).left().row()
         block.add(ui.label(t("refine.import.raw_accel_off"), Styles.CAPTION_MUTED, wrap = true)).left().width(LEFT_WIDTH).padTop(6f)
         return block
+    }
+
+    /** Asks for a file with the native dialog; a cancelled dialog changes nothing. */
+    private fun openFile() {
+        val path = ctx.fileDialogs.openJson(t("file.dialog.open_title"), ctx.importDir) ?: return
+        when (val result = ImportFileReader.read(path)) {
+            is ImportFileResult.Ok -> load(result.text, path.fileName.toString())
+            is ImportFileResult.Unreadable -> error = t("refine.import.file_unreadable", result.reason)
+            ImportFileResult.TooLarge -> error = t("refine.import.file_too_large")
+            ImportFileResult.NotJson -> error = t("refine.import.file_not_json")
+            is ImportFileResult.NotRawAccel -> error = t("refine.import.file_not_raw_accel", result.reason)
+        }
+        rebuild()
     }
 
     private fun paste() {
