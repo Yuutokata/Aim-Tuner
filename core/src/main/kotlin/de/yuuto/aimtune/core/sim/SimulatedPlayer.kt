@@ -86,6 +86,8 @@ data class SimulatedPlayer(
      * instance is mutable and carries the learning from round to round, so give every simulated person its own one.
      */
     val adaptation: HandAdaptation? = null,
+    /** Deviations of the hand's counts that a Raw Accel rotation, Y/X, L/R, U/D ratio or angle snapping corrects; neutral by default. */
+    val hand: HandGeometry = HandGeometry.NEUTRAL,
 ) {
     init {
         require(noiseLevel >= 0.0 && fatiguePerMinute >= 0.0 && optimumScale > 0.0) { "invalid player parameters" }
