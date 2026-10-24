@@ -1,6 +1,171 @@
 # Algorithms
 
-Formulas and parameter reasoning. Sections marked *(draft)* are finalised in the milestone that implements them.
+How AimTune finds a sensitivity, and how it decides whether a Raw Accel curve helps. The file has two layers:
+
+1. **Part 1 (this page, top)** explains the method in plain words with diagrams. Start here.
+2. **Part 2 (below)** is the reference: every formula, parameter and measured result, grouped by topic and tagged with the milestone (M3, M5, ...) that introduced it. Open it when you want to check a number or change the code.
+
+All numbers in Part 2 that describe how well the method works come from **simulated players**, unless a section says otherwise. See [README, Limitations](../README.md#limitations).
+
+**Contents**
+
+- [Part 1: The method in plain words](#part-1-the-method-in-plain-words)
+  - [The problem](#the-problem)
+  - [The loop](#the-loop)
+  - [From mouse movement to a score](#from-mouse-movement-to-a-score)
+  - [Choosing the next sensitivity](#choosing-the-next-sensitivity)
+  - [Reading the result](#reading-the-result)
+  - [Acceleration curves](#acceleration-curves)
+  - [How the method is tested](#how-the-method-is-tested)
+  - [Glossary](#glossary)
+- [Part 2: Reference](#part-2-reference)
+
+---
+
+# Part 1: The method in plain words
+
+## The problem
+
+You cannot find your best mouse sensitivity by feel. After a few minutes you get used to whatever you play, and what you expect to be better feels better. AimTune therefore does three things:
+
+- It measures sensitivity as **cm/360°**, the distance your mouse travels for a full turn. This is independent of the game, DPI and in-game units (`cm360 = 914.4 / (DPI × sens × yaw)`, see [Unit conversion](#unit-conversion)).
+- It plays short aim rounds at different sensitivities and **hides which one** you are playing.
+- It looks for the sensitivity at which your **own scores** are best, and says how sure it is.
+
+## The loop
+
+```mermaid
+flowchart LR
+    A["Optimizer picks a hidden<br/>cm/360 for the next round"] --> B["You play a 45 s round<br/>in the trainer"]
+    B --> C["Mouse reports and<br/>target events are recorded"]
+    C --> D["Movements are split<br/>into submovements"]
+    D --> E["Metrics per round:<br/>first-shot accuracy, time to hit,<br/>tracking"]
+    E --> F["Score relative to<br/>your own other rounds"]
+    F --> G["Model of score against<br/>ln cm/360 is refitted"]
+    G --> A
+    G --> H["Result: recommended cm/360,<br/>range and confidence"]
+```
+
+Typical use is 15 to 30 rounds, ideally on two days. The model is refitted after every round, and all stored rounds of earlier sessions with the same game and DPI take part ([Multi-session merging](#multi-session-merging-m5)).
+
+## From mouse movement to a score
+
+The score is the part that turns "how did that round go" into one number the optimizer can use.
+
+| Step | What happens | Why | Reference |
+| --- | --- | --- | --- |
+| 1. Record | Every mouse report (counts and timestamp) and every target event is stored. | Metrics can be recomputed later from the raw data. | [Metrics and score](#metrics-and-score-m3-implemented-for-flick) |
+| 2. Split | The speed of the hand is cut into **submovements**: a movement starts above 2 cm/s and ends after 30 ms below 1 cm/s; a deep valley in the speed inside a movement splits it. | A reach to a target is a fast ballistic part followed by small corrections. | [Submovement segmentation](#submovement-segmentation-m3-implemented) |
+| 3. Find the first reach | For each target, the first submovement that really goes toward it (peak at least 120 ms after the target appeared, covers at least 25 % of the distance). | Leftover motion from the previous click is not an aim. | [Metrics and score](#metrics-and-score-m3-implemented-for-flick) |
+| 4. Measure | First-shot accuracy, time to hit, tracking (share of time on target), and as diagnostics the signed error of the first reach, corrections and path efficiency. | Overshoot and undershoot of the first reach also feed the acceleration analysis. | [Metrics and score](#metrics-and-score-m3-implemented-for-flick) |
+| 5. Score | Each metric is compared with your own rounds (mean and standard deviation per scenario), turned into a percentile, and combined with weights (default accuracy 40, time to hit 30, tracking 20). | A trainer round is easier or harder depending on the scenario; the score must only reflect the sensitivity. | [Metrics and score](#metrics-and-score-m3-implemented-for-flick), [Scenarios](#scenarios-score-combination-and-the-schedule-m6) |
+
+A score is **relative to you**: a round that is one standard deviation better than your average on every metric scores 100 · Φ(1) ≈ 84, an average round 50. It is not a rating and cannot be compared between people.
+
+## Choosing the next sensitivity
+
+The program models the score as a smooth function of `x = ln(cm/360)`. The logarithm is used because a 10 % change in sensitivity feels about the same at 30 and at 60 cm/360. The model is a **Gaussian process**, a way of saying "scores of similar sensitivities are similar, and every round is noisy", fitted to all rounds at once.
+
+The shape you should expect is a broad hill:
+
+```mermaid
+xychart-beta
+    title "Illustration only: score against sensitivity (made-up numbers)"
+    x-axis "cm/360" [20, 30, 40, 50, 60, 70, 80, 90]
+    y-axis "score" 40 --> 70
+    line [48, 56, 61, 63, 62, 59, 54, 49]
+```
+
+The top of the hill is flat: in simulations a player loses under 2 points between 38 and 73 cm/360. That is why the result is a **range**, not a single number.
+
+Which sensitivity is played next ([Bayesian optimization](#bayesian-optimization-m5-implemented-in-coreoptimizer)):
+
+```mermaid
+flowchart TD
+    S{"Which round is it?"}
+    S -- "1 to 6" --> R["Spread over the whole range<br/>in a hidden random order"]
+    S -- "later" --> EI["Where is a better score most likely?<br/>(expected improvement)"]
+    S -- "every 4th after the first 6" --> SF["A point far from the others<br/>(so a drift in time cannot hide)"]
+    S -- "from round 8, or every 6th" --> RP["Replay the best point so far<br/>(makes the noise visible)"]
+```
+
+Two things make the fit robust against real people:
+
+- **Sessions.** Each day gets its own offset ("a good day or a bad day"), which the model integrates out, so day-to-day shifts do not move the optimum.
+- **Drift.** If scores rise or fall steadily inside a session (warming up, getting tired), a per-session slope absorbs it and the confidence is capped at 60 %.
+
+## Reading the result
+
+After 3 rounds the program can analyse. It draws 400 plausible score curves from the model and reports:
+
+| Output | Meaning |
+| --- | --- |
+| **Recommended cm/360** | The top of the fitted curve, refined by a parabola. Shown as your game's value and as cm/360°. |
+| **Range** | The central 80 % interval of the best cm/360 over the 400 curves. |
+| **Confidence** | The share of curves in which the recommendation loses at most a *negligible* difference (the larger of 0.5 points and 20 % of the standard deviation of your round scores) against that curve's own best. It answers "could another value be noticeably better?". It is **not** a promise about your game. |
+
+The confidence is capped at 50 % below 10 rounds and when the best value sits at an end of the searched range; it is capped at 60 % when drift was detected. More rounds are recommended while it is under 85 %. In the simulations the confidence was conservative rather than overconfident ([calibration](#bayesian-optimization-m5-implemented-in-coreoptimizer)).
+
+## Acceleration curves
+
+A speed-dependent curve (a [Raw Accel](https://github.com/RawAccelOfficial/rawaccel) profile) changes the gain with the speed of your hand. AimTune never changes your mouse: it **simulates** the curve in its trainer and exports a file. A curve is only offered if it wins a blind test.
+
+```mermaid
+flowchart TD
+    SS["Blind strength search<br/>24 rounds, from 16 may end early.<br/>A natural curve of varying strength<br/>is played at your sensitivity."] --> C1{"Strength range clearly<br/>excludes 'no curve'?"}
+    EA["Error analysis<br/>about 15 rounds without a curve.<br/>Do first reaches overshoot or<br/>undershoot depending on speed?"] --> C2{"A fitted curve beats 'no curve'<br/>by 8 BIC points and changes<br/>the gain by at least 2 %?"}
+    C1 -- yes --> AB
+    C2 -- yes --> AB
+    C1 -- no --> NO["No curve is offered"]
+    C2 -- no --> NO
+    AB["Blind A/B test<br/>plain against curve, same targets,<br/>counterbalanced pairs, up to 12"] --> V{"Verdict"}
+    V -- "better" --> EX["Export a Raw Accel settings.json"]
+    V -- "worse or undecided" --> NO
+```
+
+Rules that keep this safe ([Acceleration](#acceleration-m7), Curve safety):
+
+- **The test decides, not the analysis.** After every pair from the fourth on, a one-sided t bound at the 1 % level decides. A verdict needs at least 6 pairs and a mean difference of at least 2 score points. With no real difference the test said "better" in 2.0 % and "worse" in 3.0 % of 500 simulated runs.
+- **Falling curves need a clearer result than rising ones** (the upper end of the range below 0.90), because falling results were the ones found on noise most often.
+- **"Last search" and "Last analysis" never export.** They offer a blind test of the stored result first.
+- **Most people are told that no curve is clearly better**, which is a normal answer. The analysis finds a falling gain of 25 % or more; smaller rising preferences are missed.
+
+**Refine my Raw Accel curve.** If you already have a profile, you can import it instead of searching from plain. The program plays your profile, then searches three factors in turn (the overall level, the gain at high speed, the width of the transition) around the imported values, 12 rounds each after 8 warm-up rounds, and tests the result against your own profile in the same blind A/B test. The export is a copy of your file with the refined profile added; your other profiles stay untouched ([Refine my Raw Accel curve](#acceleration-m7), M18).
+
+## How the method is tested
+
+There are no recordings of many players yet, so correctness is checked against a **simulated player** (`core/sim`): a hand with noise, a reaction time and a preferred gain, aiming in the same trainer code. The tests ask, for example:
+
+- Does the optimizer find the best sensitivity of a simulated player within about 10-20 % at 15 rounds?
+- Does a flat player (no preference) get a curve offered? (Target: never.)
+- Does the blind test call a curve better when there is none? (Target: rarely; measured 2.0 %.)
+
+These gates are in the reference part: [Verification harness](#verification-harness-simulated-player-implemented), [Player models](#player-models-of-the-gate-harness-m14). Whether real people behave like the simulated one is not measured yet.
+
+## Glossary
+
+| Term | Meaning |
+| --- | --- |
+| **cm/360°** | Distance the mouse moves for a 360° turn in the game. Lower is faster. |
+| **Round** | One 45 s trainer run at one hidden sensitivity. |
+| **Scenario** | A type of round: flick, micro-adjust, target switching, tracking, flash turn-away, range. |
+| **Submovement** | One speed peak of the hand; a reach is a ballistic submovement plus corrections. |
+| **First reach / signed error** | The first submovement toward a target, and how far it overshot (+) or undershot (−) the target, as a share of the distance. |
+| **Score** | Weighted percentile of a round's metrics against your other rounds. |
+| **Gaussian process** | A model that estimates a smooth curve (score against sensitivity) and its uncertainty from noisy points. |
+| **Expected improvement** | The rule that picks the point where a better score is most likely. |
+| **Credible interval** | The range in which the best value lies with 80 % probability under the model. |
+| **BIC** | A fit criterion that penalises extra parameters; used to compare "curve" against "no curve". |
+| **A/B pair** | Two rounds with the same targets, one with the curve and one without. |
+| **Raw Accel** | A third-party mouse driver that applies acceleration curves; AimTune only writes its `settings.json`. |
+
+---
+
+# Part 2: Reference
+
+The sections are grouped by topic. Each one carries the milestone that introduced or last changed it.
+
+**Group: The core method: units, movements, score, optimizer**
 
 ## Unit conversion
 
@@ -47,117 +212,6 @@ The cos(pitch) scaling is a small-angle approximation; targets are within ±25°
 
 **Score.** Metrics of a round are `accuracy` (higher better), `time to hit` (lower better), `consistency` (lower better) and, from M6, `tracking` (higher better). Over all rounds given to the calculator, each metric gets a baseline (mean and sample SD) and a round's metric becomes `z = ±(x − mean) / SD` (sign flipped when lower is better). The metric score is `100 · Φ(z)` with Φ the normal CDF, and the round score is the weighted mean over the scoring metrics that round has, with weights renormalized (defaults: accuracy 40, time to hit 30, tracking 20). Baselines are kept per scenario when the scenarios are given (a micro round is easier than a flick round; pooled, they would only measure the scenario). A metric with fewer than 3 rounds (in that scenario), or without variation, has no baseline and is ignored; a round with no usable metric has no score. No population priors are invented: the baseline is the user's own rounds, so scores are relative to the user and recomputed whenever rounds are added. The 0-100 mapping and baseline window are revisited in M5 when the optimizer consumes scores.
 
-## Trainer geometry (M9, docs/history/REVIEW.md C1/M5)
-
-Targets are defined by angle, not by size in the world. A game profile (`trainer` block in `games/*.json`, `TrainerGeometry` in `core`) holds: the angular diameter range of a click target (a head), drawn log-uniformly; the distance range the targets are drawn at (only the depth of the scene; the sphere radius follows from angle and distance, `r = d sin(a/2)`); the mix of angles between consecutive flick targets (where the crosshair is after a hit) as weighted buckets; the step range of micro-adjust targets; the separation of switching targets; the angular size, distance, strafe speed range and stop probability of the tracked target (the angular speed is `v / d`; a "stop" is a segment without motion, a counter-strafe). The scenarios take all of it from the profile; without a geometry they keep the fixed values of M2-M8 (`FlickConfig` etc. defaults), which the simulation harness was calibrated on.
-
-Defaults (Valorant, `verified: false`): click targets 0.4-1.9° (a head about 0.2 m seen from 6-30 m), flick angles 30 % up to 5°, 30 % up to 10°, 20 % up to 20°, 15 % up to 40°, 5 % up to 90°, tracking target 2.0-3.7° at 14 m, strafe 3-6 m/s (12-25°/s at 14 m), 25 % stops. **These are assumptions.** Riot publishes no hitbox or speed numbers; the sources found are community statements: all agents share one hitbox size, the head is about 13 % of the standing body height (Reddit measurement on the Jett model), head hitboxes were larger in the beta and were reduced later. Nothing was extracted from the game. The pre-test notice says "estimate" until `verified` is true. How to measure a head with the mouse in the shooting range is in docs/history/REVIEW.md ("Realism"). Why this matters: on the simulated player the optimum moved from 117 cm/360° at head-sized targets (r = 0.10 m) to 54 cm/360° at the old r = 0.25 m, about x0.64 per doubling of the radius.
-
-The trainer draws the scene in a viewport letterboxed to the profile's `trainerAspect` (16:9 by default), so the horizontal FOV is the game's value at that shape and does not depend on the window shape (Valorant: 103° at 16:9, which `UnitChainTest` checks through the projection). How Valorant scales its FOV at other shapes is not documented and sources conflict, so the trainer does not guess.
-
-## Vertical distribution and the map (M11)
-
-Until M10 the targets of flick and switching were drawn uniformly in a field of +-50 x +-25 degrees, the micro steps and flash returns in random directions, tracking with half of its movement vertical: players trained large vertical movements that Valorant fights hardly contain (maps are mostly flat, enemies stand where the crosshair is placed). The profile now holds (`trainer`, `TrainerGeometry`, `ElevationMix`, `ArenaLayout`):
-
-- `eyeHeightMeters` 1.6 and `headHeightMeters` 1.65: the pitch of a head on the player's level at distance d is `atan((head - eye) / d)` (+0.3 degrees at 10 m). **Assumptions**: Riot publishes no eye or head height (secondary sources say all agents are about 2 m tall); to be measured in the shooting range with the procedure of docs/history/REVIEW.md "Realism".
-- `elevation`: 88 % of the targets at head level with a normal spread of 1.5 degrees, 12 % on another level 3-10 degrees up or down (40 % of those below the player). Assumptions as well: heaven positions, ramps, stairs and crouching players exist, but there is no published statistic. The field limit (`fieldPitchDegrees`, 25) stays the hard bound. `elevation.uniform` restores the old field for comparisons.
-- Flick and micro steps (`placeNearLevel`): the pitch of the next target is drawn from the distribution first, limited to 90 % of the flick angle; the rest of the angle goes into yaw, to the side that stays in the field. So flicks are mostly horizontal and keep their angle from the mix. Switching draws pitch from the distribution; tracking has a pitch share of 0.1 (0.5 before) within +-4 degrees; flash cues are at most 12 degrees above or below the view, the returning enemy is placed with the same rule as a flick target.
-- Map (`arena`): floor at eye height below the camera, a ring wall at 36 m, pillars at corners and door frames at doorways at 8 fixed yaw/distance pairs. For 30 % of the flick and switching targets (`featureShare`) the nearest feature within 2.5 degrees of the drawn yaw replaces yaw and distance, so enemies stand at corners and in doorways, where crosshair placement counts; the target keeps its height relative to head level. Angular size does not change (the radius follows the new distance). Micro, tracking and flash do not use features. The scene draws a column from the floor to the bottom of every head-sized target.
-- Vertical sensitivity: no separate vertical multiplier was found for Valorant (pitch uses the same 0.07 degrees per count as yaw) and none exists in the code (one `degreesPerCount` for both axes); a `pitchMultiplier` in the profile can be added when a game needs one.
-- Metrics: the first movement's endpoint is split into a horizontal and a vertical error (screen-plane degrees, `firstErrorHDegrees` > 0 right of the target, `firstErrorVDegrees` > 0 above it). Rounds store `mean_abs_first_error_h_deg`, `mean_abs_first_error_v_deg` and `mean_first_error_v_deg` (`METRICS_VERSION` 3, older rounds are recomputed from their events). The results screen names the dominant axis when at least three rounds have movements: a share of the summed endpoint error of 60 % or more is "most of your misses" for that axis, and a mean vertical bias of at least 0.3 degrees adds "too high" or "too low". The score does not use these numbers.
-
-**Simulation** (`VerticalExperimentsTest`, before = fully 3D, after = this profile; the removed docs/ANALYSE.md (git history) section E has the tables): the best sensitivity of simulated players changes by -17 % to +13 % for flick, switching and micro with no common direction (tracking and flash +3 to +19 %), within the noise of the parabola fit at 30 rounds per grid point. Sensitivity finder, flat players' false offers (0 of 30), strength search and A/B test (false verdicts 2-5 %, real curves confirmed 97-100 %) are unchanged within the noise. The error analysis finds rising weak preferences less often at 15 rounds (+15 %: 6 -> 0 of 30, +25 %: 24 -> 17 of 30; the cause was not investigated). The vertical share of the endpoint error of flick falls from 43-47 % to 34-43 %. The simulated hand has the same noise in both axes, so none of this says how humans aim vertically.
-
-## Head-sized targets and the simulated hand (M9 assessment)
-
-The default simulated hand was calibrated on large targets (0.25 m at 12 m). With the profile's head-sized targets (0.4-1.9 degrees) its optimum is 156 cm/360 (40-640 cm/360 sweep, `assess-headtargets.txt`), far outside what people use (pros about 33-65 cm/360, a controlled study 20-80). `SimulatedPlayer.forHeadSizedTargets(optimumCm360)` scales the hand (all effects depend on `cm360 / optimumScale` only) so that the optimum with the profile's targets lies at a chosen value (default 50); `HeadTargetPlayerTest` guards it. With that hand the finder behaves as with the old one (50 cm/360 optimum, geometry targets, 40 players): median error 18 / 16 / 9 % at 8 / 15 / 30 rounds, within +-15 % in 40 / 48 / 73 %, true loss 1.4 / 0.8 / 0.45 points, a cost of 0.4-0.6 points for +-15 % and 3.4 / 6.9 points for x0.7 / x2. The old default stays for the large-target harness tests. Neither hand is validated against people.
-
-## Verification harness: simulated player (implemented)
-
-Used to test the pipeline without a human. Per target the aimer waits a reaction time (normal, at least 120 ms), makes a minimum-jerk primary reach, waits a feedback delay (140 ms), and corrects until its remaining error is inside the target's angular radius, then clicks after a click delay; a hand twitch at the click can turn a marginal hit into a miss. All randomness comes from one seeded generator.
-
-For a reach of amplitude `A` degrees at cm/360 `c` (with `c_eff = c / optimumScale / gainPreference(speed)`):
-
-- endpoint error per axis: `sigma = noiseLevel * fatigue * sqrt((signalNoise * A)^2 + (handNoiseCm * 360 / c_eff)^2)`. The second term is the fixed hand precision seen in degrees: it hurts at high sensitivity (small `c`). First reaches also fall short by `undershootBias`.
-- duration: `(a + b * log2(1 + A / W) + handCm / maxHandSpeed) * fatigue`, with `handCm = A * c_eff / 360` and `W` the target's angular width. The last term hurts at low sensitivity (large `c`). Corrections use 60 % of the Fitts term.
-- `fatigue = 1 + fatiguePerMinute * minutes of session time` scales noise and all times.
-- Counts are the rounded position along the reach, reported only when they change, so quantization and event timing look like a real sensor.
-
-The two terms give an interior optimum. Because everything depends on `c / optimumScale`, `withOptimum(c*)` moves the optimum to `c*` exactly (up to count quantization). With the default parameters the score peaks at about 50 cm/360 with a flat top (within 2 points from roughly 38 to 73 cm); `noiseLevel` also moves the optimum, so cases with other noise levels take their ground truth from a dense reference sweep (17 grid points x 30 rounds, parabola through the best three points) instead of the configured value. `PipelineConvergenceTest` checks that the sweep peak matches the configured optimum.
-
-Measured with the baseline estimator (9 grid points x 4 rounds = 36 rounds, 20-140 cm/360, 8 seeds): within a factor 1.3 of the truth in 88-100 % of the runs, median error factor 1.06-1.18 (see `core/build/reports/harness/baseline-convergence.txt`). That is the number the optimizer has to beat with fewer rounds. These tolerances describe this simulated player; they say nothing about real humans.
-
-## Player models of the gate harness (M14)
-
-The default simulated hand makes every analysis look as good as the model it was tuned on (the removed docs/OPTIMIZER-REVIEW.md (git history)). The
-gate harness (`core/src/test/.../harness/review/GateHarness.kt`, `GateTest`, reports `gate-<tag>.txt`) therefore reruns every
-table with hands that break one assumption each. All are options of `SimulatedPlayer`; the defaults keep the old hand.
-
-- **DECOUPLED** (`noiseModel = NoiseModel.DECOUPLED`). In the default hand the endpoint noise is added to the planned distance in the planned time, so a reach that goes further is also faster. Within one target distance the signed error then correlates with the peak speed (r about 0.36 in the calibration mix). DECOUPLED stretches the duration with the distance the noise produced along the reach, so the peak speed stays the planned one (r about 0.06; `PlayerModelsTest`).
-- **RANGE** (`rangeBias = 0.05`, `rangeReferenceDegrees = 20`). The range effect: first reaches are scaled by `(20 / A)^0.05`, so a 5° reach overshoots by 7 % and a 60° reach falls short by 5 %, whatever the gain. Because distance and speed go together (corr 0.956), this looks like a gain that rises with speed.
-- **ADAPTIVE** (`adaptation = HandAdaptation.adaptedTo(preference)`). Motor adaptation, see the next section.
-- **PRESSURE** (`pressureUndershoot`). A first reach that a deadline forces to be `s` times faster than unhurried is scaled by `1 - pressureUndershoot * (s - 1)` (only in speed rounds, below).
-
-**Hand adaptation** (`HandAdaptation`, two-state model of Smith, Ghazizadeh & Shadmehr 2006, their fit values: fast retention 0.59 and rate 0.21, slow retention 0.992 and rate 0.02). The gain the hand expects at speed v is `preference(v) * exp(fast(v) + slow(v))`. After every first reach the error `ln(delivered / expected)` at its peak speed moves both states: `x <- retention^w * x + rate * w * error`, where `w` is a Gaussian weight over ln speed (width 0.35). The retention applies per exposure, so a speed that is not played keeps what was learned there. The decay toward the preference leaves a share `1 / (1 + 0.21/0.41 + 0.02/0.008) = 0.25` of any constant mismatch. A preference therefore stays measurable but at a quarter of its size, and a new curve first gives an aftereffect. `adaptedTo` starts in the steady state for plain sensitivity, which is the situation of a player who comes from the game. After a 10 % gain step the mismatch falls below half within 50 reaches (`HandAdaptationTest`). The linear sensitivity is still treated as known exactly, as before. The parameters come from reaching studies, not from mouse aiming.
-
-## M14: what the gate showed (the removed docs/OPTIMIZER-REVIEW.md (git history), "Umsetzung und Ergebnisse")
-
-Commands: `AIMTUNE_REVIEW=1 ./gradlew.bat :core:cleanTest :core:test --tests "*GateTest*"` (env `AIMTUNE_GATE_TAG`, `AIMTUNE_GATE_SECTIONS` = S,C,F,A,N,V, `AIMTUNE_GATE_CURVE` = legacy|bounded), `*ClosedLoopGateTest*`, `*DriftGateTest*`, `*SpeedRoundProbeTest*`, `*PlateauGateTest*`. All numbers are simulated players.
-
-**Bounded curves (curve finder v2, the default).** The detection is unchanged (BIC 8, range 1.02). The recommended family is played and exported as a Raw Accel lookup table of 32 points, evenly spaced in log speed between the 5th and 95th percentile of the used speeds. It is flat outside them (`AccelFit.boundedTo`, `boundedRecommendation`; Raw Accel 1.7.1 `common/accel-lookup.hpp` holds the first and last value, and "Gain / Velocity" false makes y the multiplier). The fitted families keep rising or falling beyond the narrow window of the data. Bounding them changes nothing where reaches happen (error over the used speeds 0.010 against 0.010 for +30 %) and removes most of the error at 20-40 in/s: +30 % 0.235 → 0.067, -30 % 0.162 → 0.061, range-biased +15 % 0.405 → 0.010 (15 rounds, `gate-t3c.txt` against `gate-t1t2.txt`).
-- Exported benefit, from 16 players per row in a second, independent A/B run (`gate-t5-closed-loop.txt`):
-  - -30 %: +45.6 against +41.9 points (oracle +58.6);
-  - -15 %: +33.0 against +27.7;
-  - +30 %: +10.8 against +7.8.
-- Flat range-biased players get a curve exported in 13 of 32 runs against 23.
-- In one cell, the decoupled hand at -15 %, the A/B test confirmed 15 against 20 of 21 offered curves.
-
-**A/B test with per-scenario baselines (T2): not taken.** In 1000 tests with identical arms (`gate-v.txt`) grouped scoring gave false verdicts in 6.1 % of the tests (30 better, 31 worse) against 4.7 % pooled. At a per-look level of 0.006 it is back at 5.0 %, but it then confirmed real curves no more often: -15 % 16 against 23 of 24, decoupled +15 % 11 against 10. `evaluateAb(groupByScenario = false)` stays the default, and `AbOutcome.scenarioId` is stored for later use.
-
-**Speed rounds (T4): not taken.** The plan was to decouple distance from speed. In normal rounds they correlate at 0.96, so a range effect cannot be told from a gain that depends on the speed. Calibration flicks whose targets vanish after `f` times the player's median time to hit (`FlickConfig.targetLifetimeNanos`) would make the hand move the same distances faster. `analyseSpeedRounds` (`core/accel/SpeedRoundAnalysis.kt`) then compares, within distance bins, the median error of rushed and normal reaches against their median log speed. Findings (`speed-round-probe.txt`, 20 players per cell, 60 flat):
-- At `f` = 0.75 the reaches are 30 % faster, but only 3-16 % of the targets are hit (unplayable for a person), and the correlation falls only to 0.86-0.93.
-- The estimate is unbiased for the default and the decoupled hand (flat slope +0.002) and resists the range effect: 1 of 60 flat players offered, against 200 of 200 for the fit.
-- It finds little. ±15 % was offered in 2 of 20 runs, +30 % in 5 of 18.
-- It cannot tell a hand that undershoots more when rushed (`pressureUndershoot` 0.1) from a wish for more gain at speed: 58 of 60 flat players were offered a curve. The literature suggests real hands do undershoot more when rushed.
-- The code stays as an experiment; the app does not use it.
-
-**Closed loop (T5): no-go.** 4 batches of 6 rounds (the first round of each batch is not measured, for getting used to the curve). After each batch the wanted gain relative to the delivered one per speed bin is added at 50 % damping to a lookup table anchored at 1 at its slowest speed (`ClosedLoopGateTest`).
-- Its curve shape is the closest to the truth (error over the used speeds about 0.009), but it reaches the player less often and with less benefit than the bounded fit:
-  - -30 %: exported 16 of 16 with +33.0 points against +45.6;
-  - -15 %: 5 of 16, +4.6 against +33.0;
-  - +30 %: 8 of 16, +5.1 against +10.8.
-- With the adaptive hand it exports almost nothing.
-- Flat range-biased players get a curve exported in 28 of 32 runs, against 13.
-- The score depends mostly on the gain level at the common speeds, which the fit sets through its factor, and the errors alone only give the shape.
-- A first version centred the table on the median reach and lost the A/B test by 25-40 points, because a shape centred there carries a different level.
-
-**Time in the sensitivity model (T7): not the default.** `OptimizerConfig(timeDrift = true)` lets the score curve move over days: kernel `k_x (1 + s exp(-|dt| / L))`, with `s` in 0.5-4 and `L` in 2/7/21 days chosen by marginal likelihood when it gains more than 1. It drops rounds older than 42 days and sets `dayDriftDetected`. Played for real with 4 sessions × 10 rounds, 2 days apart, 40 seeds (`gate-t7-drift-b.txt`):
-
-| optimum shift per session | median error, legacy / time model | p90 | median bias | 80 % interval coverage |
-| --- | --- | --- | --- | --- |
-| 0 % | 7.1 / 7.4 % | 18.1 / 17.1 % | -3.8 / -3.2 % | 95 / 95 % |
-| 5 % | 11.5 / 12.5 % | 23.1 / 25.7 % | -11.4 / -10.8 % | 90 / 90 % |
-| 10 % | 16.6 / 14.7 % | 27.3 / 31.9 % | -16.4 / -12.5 % | 78 / 80 % |
-
-The goal (median ≤ 9 %, bias ≤ 5 % with drift) was not met. With 10 rounds a session and an optimum this flat (±15 % costs under a point), a move of 5-10 % per session is hardly visible in the data, so the model can rarely tell it from noise. The drift hint fires in 5 % of the runs without drift and in 23-30 % with it. A single session gives identical results with either setting.
-
-**Follow-up: a curve for micro-adjustments and flash turns (M14b).** The user's goal is lower gain for small, slow corrections and more gain for turning away from a flash and back. That is a trade-off between precision and speed, which only shows in the outcome, not in the endpoint errors. Findings:
-- **Two-way sweep** of slow gain × fast ratio (`TwoWayCurveSweepTest`, `twoway-sweep.txt`; micro/flash/flick mix, flash weight 35):
-  - Lowering the slow gain never paid, because the simulated hand hits every micro target at plain sensitivity already (accuracy 1.000). The simulator cannot judge that half of the goal.
-  - A higher fast ratio paid only for a hand that adapts to the curve: 52 → 61 points at ×1.5, flash dodge 8 → 23 %.
-- **Search designs** (`BlockStrengthSearchTest.blockSearch`, `block-strength-search.txt`):
-  - Playing each strength in blocks of 3-4 rounds (first dropped) instead of a new strength every round changed nothing.
-  - A micro/flash/flick mix with range 0.70-2.00 found strong rising curves for adapting hands, but also for hands that do not want them (benefit −4 to −15).
-- **The whole chain** (`chainSearchAndBlindTest`, `chain-strength-search-flash35.txt` / `-flash15.txt`; 16 players per row): search, offer when the range excludes plain, blind A/B test, export when better.
-  - The blind test kept curves away from flat hands in every design (0-1 of 16 exported).
-  - The new mix lost against the app's mix, because the A/B test, which alternates every round, let its stronger curves through less often.
-  - The app's mix with the range widened to **0.70-1.75** won:
-    - with flash weight 35: adapting flat hand +10.5 against +4.6 points; +15 % +10.4 against +7.9; −15 % +3.7 against +3.4; non-adapting +15 % +20.9 against +20.6;
-    - with flash weight 15: mean over the four +8.8 against +7.8 (the adapting −15 % row fell from +2.7 to +0.9);
-    - flat hands got no export (against 1 of 16 at 0.70-1.45).
-  - 0.70-2.00 let single harmful curves through again.
-- `CurveStrength.MAX_WITH_FLASH = 1.75` is therefore the upper end whenever the search plays flash rounds (`searchRange(flash)`). Without flash rounds it stays 1.45, because the earlier sweep without them saw a wider range overshoot.
-
 ## Bayesian optimization (M5, implemented in `core/optimizer`)
 
 **Model.** `x = ln(cm360)`. Round scores (0-100, computed over all rounds together, see "Metrics and score") are standardized and modelled as `y = f(x) + offset(session) + noise` with a Matern 5/2 prior on `f`. The session offset (a better or worse day) is integrated out by adding a "same session" covariance `tau^2` to the kernel matrix, so rounds of many sessions give one estimate of `f` without a day-to-day shift biasing the optimum. Hyperparameters (lengthscale 0.12-0.7 times the log width of the search range, signal variance, noise variance 0.15-1.2, session variance 0 / 0.1 / 0.4, scenario variance 0 / 0.4) are picked from a small grid by marginal likelihood. The noise floor is deliberately not tiny: with few rounds a near-zero noise estimate gives an overconfident fit. Cholesky is hand-written (ADR 0004 amendment).
@@ -181,6 +235,10 @@ More rounds are recommended while the confidence is under 85 %; "about N more ro
 
 **Measured on the simulated player** (12 seeds, 28 rounds, tolerance x1.3 around the truth): 67-83 % of runs within tolerance, against 67-92 % for the 36-round grid baseline, so the optimizer reaches about the same accuracy with 22 % fewer rounds, not a dramatic gain (`core/build/reports/harness/optimizer-convergence.txt`). Calibration over 120 runs: runs reporting 80 % or more confidence were within x1.3 of the truth 96 % of the time, 60-80 % confidence 78 %, below 40 % only 57 %.
 
+## Multi-session merging (M5)
+
+Rounds with the same game and DPI from all sessions enter one fit; each blind-test run is its own session for the offset term. Scores are recomputed over all of them every time. See `SensitivityOptimizerTest` (merged sessions with a 10 point worse second day).
+
 ## Scenarios, score combination and the schedule (M6)
 
 **Scenarios.** Flick: one target at a time, at least 15 degrees from the previous one. Micro-adjust: radius 0.15 m at 10-14 m, each target 2.5-9 degrees from the previous one. Target switching: three targets visible, a hit replaces only that one (at least 14 degrees from the others and from the hit one). Tracking: one target of radius 0.5 m at 14 m moving in straight segments of 1.2-2.8 s at 6-22 degrees per second (the first version, 12-40 degrees per second in 0.5-1.4 s segments, was too fast and twitchy for a person to follow) inside a +-35 / +-15 degree field; no clicks. Speeds and headings of the segments are stratified (spread evenly over their ranges in random order), so every round is about equally hard; without this the path alone moved the on-target time by as much as the sensitivity did.
@@ -196,6 +254,29 @@ More rounds are recommended while the confidence is under 85 %; "about N more ro
 **Simulated player, new scenarios.** Switching: the aimer goes for the visible target nearest to its aim and keeps it; a target that was already visible is re-acquired after `reacquireMs` (110 ms) instead of the full reaction time. Tracking: every 40 ms the aimer sees the target as it was `trackingLagMs` (150 ms) ago, estimates its velocity, anticipates `trackingPrediction` (80 %) of the motion during the delay plus half a reach, and commands `trackingGain` (70 %) of the remaining error as an 80 ms minimum-jerk reach. The command is limited by `trackingMaxHandSpeedCmPerS` (4 cm/s, which hurts a high cm/360 on fast segments) and perturbed by signal-dependent noise plus `trackingNoiseShare` (2x) times the flick hand noise (which hurts a low cm/360). These parameters are hand-tuned for a clear optimum, like the flick model.
 
 **Measured on the simulated player** (45 s rounds, 13 grid points, 12 rounds each, `scenario-sweeps.txt`): flick scores peak at about 49 cm/360, target switching at about 59, tracking at about 64 (on target 0.29 at 20 cm/360, 0.66 at 53-73, 0.33 at 140). Micro-adjust keeps improving up to the largest value of the range (precision on tiny targets, no travel-time penalty), so its optimum is the edge. A blind test of 30 rounds with all four scenarios and the default weights (16 seeds, `mixed-scenarios.txt`) ended within a factor 1.3 of the weighted blend of the four curves (65 cm/360) in 94 % of the runs, with a median loss against the blend of 0.6 score points (with the faster first tracking version: 69 %). Flick only: 88 % within 1.3 (8 seeds). Mixed tests are less certain than flick-only tests for the same number of rounds, because each scenario gets only a fraction of them, and a scenario needs 3 rounds of its own before its rounds have a score (until then they count as a neutral 50 and carry no information). With the real app a user with 9 rounds in 3 sessions and all four scenarios on saw 19 % confidence, which is why flick only is the default. These numbers describe the simulated player only.
+
+**Group: The trainer world: geometry, targets, scenarios**
+
+## Trainer geometry (M9, docs/history/REVIEW.md C1/M5)
+
+Targets are defined by angle, not by size in the world. A game profile (`trainer` block in `games/*.json`, `TrainerGeometry` in `core`) holds: the angular diameter range of a click target (a head), drawn log-uniformly; the distance range the targets are drawn at (only the depth of the scene; the sphere radius follows from angle and distance, `r = d sin(a/2)`); the mix of angles between consecutive flick targets (where the crosshair is after a hit) as weighted buckets; the step range of micro-adjust targets; the separation of switching targets; the angular size, distance, strafe speed range and stop probability of the tracked target (the angular speed is `v / d`; a "stop" is a segment without motion, a counter-strafe). The scenarios take all of it from the profile; without a geometry they keep the fixed values of M2-M8 (`FlickConfig` etc. defaults), which the simulation harness was calibrated on.
+
+Defaults (Valorant, `verified: false`): click targets 0.4-1.9° (a head about 0.2 m seen from 6-30 m), flick angles 30 % up to 5°, 30 % up to 10°, 20 % up to 20°, 15 % up to 40°, 5 % up to 90°, tracking target 2.0-3.7° at 14 m, strafe 3-6 m/s (12-25°/s at 14 m), 25 % stops. **These are assumptions.** Riot publishes no hitbox or speed numbers; the sources found are community statements: all agents share one hitbox size, the head is about 13 % of the standing body height (Reddit measurement on the Jett model), head hitboxes were larger in the beta and were reduced later. Nothing was extracted from the game. The pre-test notice says "estimate" until `verified` is true. How to measure a head with the mouse in the shooting range is in docs/history/REVIEW.md ("Realism"). Why this matters: on the simulated player the optimum moved from 117 cm/360° at head-sized targets (r = 0.10 m) to 54 cm/360° at the old r = 0.25 m, about x0.64 per doubling of the radius.
+
+The trainer draws the scene in a viewport letterboxed to the profile's `trainerAspect` (16:9 by default), so the horizontal FOV is the game's value at that shape and does not depend on the window shape (Valorant: 103° at 16:9, which `UnitChainTest` checks through the projection). How Valorant scales its FOV at other shapes is not documented and sources conflict, so the trainer does not guess.
+
+## Vertical distribution and the map (M11)
+
+Until M10 the targets of flick and switching were drawn uniformly in a field of +-50 x +-25 degrees, the micro steps and flash returns in random directions, tracking with half of its movement vertical: players trained large vertical movements that Valorant fights hardly contain (maps are mostly flat, enemies stand where the crosshair is placed). The profile now holds (`trainer`, `TrainerGeometry`, `ElevationMix`, `ArenaLayout`):
+
+- `eyeHeightMeters` 1.6 and `headHeightMeters` 1.65: the pitch of a head on the player's level at distance d is `atan((head - eye) / d)` (+0.3 degrees at 10 m). **Assumptions**: Riot publishes no eye or head height (secondary sources say all agents are about 2 m tall); to be measured in the shooting range with the procedure of docs/history/REVIEW.md "Realism".
+- `elevation`: 88 % of the targets at head level with a normal spread of 1.5 degrees, 12 % on another level 3-10 degrees up or down (40 % of those below the player). Assumptions as well: heaven positions, ramps, stairs and crouching players exist, but there is no published statistic. The field limit (`fieldPitchDegrees`, 25) stays the hard bound. `elevation.uniform` restores the old field for comparisons.
+- Flick and micro steps (`placeNearLevel`): the pitch of the next target is drawn from the distribution first, limited to 90 % of the flick angle; the rest of the angle goes into yaw, to the side that stays in the field. So flicks are mostly horizontal and keep their angle from the mix. Switching draws pitch from the distribution; tracking has a pitch share of 0.1 (0.5 before) within +-4 degrees; flash cues are at most 12 degrees above or below the view, the returning enemy is placed with the same rule as a flick target.
+- Map (`arena`): floor at eye height below the camera, a ring wall at 36 m, pillars at corners and door frames at doorways at 8 fixed yaw/distance pairs. For 30 % of the flick and switching targets (`featureShare`) the nearest feature within 2.5 degrees of the drawn yaw replaces yaw and distance, so enemies stand at corners and in doorways, where crosshair placement counts; the target keeps its height relative to head level. Angular size does not change (the radius follows the new distance). Micro, tracking and flash do not use features. The scene draws a column from the floor to the bottom of every head-sized target.
+- Vertical sensitivity: no separate vertical multiplier was found for Valorant (pitch uses the same 0.07 degrees per count as yaw) and none exists in the code (one `degreesPerCount` for both axes); a `pitchMultiplier` in the profile can be added when a game needs one.
+- Metrics: the first movement's endpoint is split into a horizontal and a vertical error (screen-plane degrees, `firstErrorHDegrees` > 0 right of the target, `firstErrorVDegrees` > 0 above it). Rounds store `mean_abs_first_error_h_deg`, `mean_abs_first_error_v_deg` and `mean_first_error_v_deg` (`METRICS_VERSION` 3, older rounds are recomputed from their events). The results screen names the dominant axis when at least three rounds have movements: a share of the summed endpoint error of 60 % or more is "most of your misses" for that axis, and a mean vertical bias of at least 0.3 degrees adds "too high" or "too low". The score does not use these numbers.
+
+**Simulation** (`VerticalExperimentsTest`, before = fully 3D, after = this profile; the removed docs/ANALYSE.md (git history) section E has the tables): the best sensitivity of simulated players changes by -17 % to +13 % for flick, switching and micro with no common direction (tracking and flash +3 to +19 %), within the noise of the parabola fit at 30 rounds per grid point. Sensitivity finder, flat players' false offers (0 of 30), strength search and A/B test (false verdicts 2-5 %, real curves confirmed 97-100 %) are unchanged within the noise. The error analysis finds rising weak preferences less often at 15 rounds (+15 %: 6 -> 0 of 30, +25 %: 24 -> 17 of 30; the cause was not investigated). The vertical share of the endpoint error of flick falls from 43-47 % to 34-43 %. The simulated hand has the same noise in both axes, so none of this says how humans aim vertically.
 
 ## Moving targets (M15a)
 
@@ -332,22 +413,7 @@ For a player without preference the search with flicks, switching and micro alon
 
 **Limits.** Every number above comes from simulated players, the pop delay and the exit margin are assumptions, the simulated hand is not validated against people (it is slow with head-sized targets: plain movements reach only 3-5 in/s), and the flash is a simplified model: its sounds are synthesized (below), not the game's, there is no gradual fade, no blind duration that depends on how far the player turned or on the distance.
 
-## Two-stage strength search, M19 experiment (not adopted)
-
-Question (docs/history/CURVE-FINDER-AUDIT.md, option O4): does a level stage (a 20-round sensitivity search at 20-140 cm/360) before the strength search keep the detection of a true rising or falling preference and still remove the falling results of hands that only want another overall level? `TwoStageStrengthTest` (`AIMTUNE_REVIEW=1`, `AIMTUNE_SEEDS=100` = 60 seeds per row, `core/build/reports/harness/two-stage-strength.txt`) plays the audit's hands (ADAPTED = 0.75 x the user's curve, ADAPTED_HIGH = 0.53 x, FLAT, RISING / FALLING = gainPlayer +-0.30) through the strength search of `dev` (with the M16 falling rule) and three level variants. Export = offered and the blind A/B says better; the A/B plays at the level the search used.
-
-| Variant | ADAPTED export (falling) | ADAPTED_HIGH | FLAT | RISING right | FALLING right |
-|---|---|---|---|---|---|
-| current (game sensitivity, no level stage) | 8 % (0 %) | 3 % (0 %) | 3 % | 100 % | 87 % |
-| O4 full level, 20 extra rounds | 23 % (0 %) | 58 % (0 %) | 0 % | 53 % | 78 % |
-| level only when its interval excludes the game sensitivity | 23 % (0 %) | 45 % (0 %) | 3 % | 75 % | 83 % |
-| level half-way (geometric mean) | 25 % (0 %) | 37 % (0 %) | 0 % | 82 % | 88 % |
-
-Result: the audit's problem is already solved by M16 (the current row has no falling export for any adapted hand, no harmful export for a flat hand, RISING 100 %). The level stage adds a gain for hands adapted to a lower level (ADAPTED_HIGH 3 % to 37-58 % exported) but costs 20 rounds and no variant meets the gate (RISING >= 80 % and FALLING >= 90 % together; the best, half-way, has 82 % and 88 %, and the full stage 53 % and 78 %), because a rising preference is partly absorbed by the level. Not adopted; the strength search stays as it is. Not simulated: flash rounds in the strength search, a 2-D joint search of level and strength. Differences of 5-8 points between rows are within the noise of 60 seeds.
-
-## Multi-session merging (M5)
-
-Rounds with the same game and DPI from all sessions enter one fit; each blind-test run is its own session for the offset term. Scores are recomputed over all of them every time. See `SensitivityOptimizerTest` (merged sessions with a 10 point worse second day).
+**Group: Acceleration curves**
 
 ## Acceleration (M7)
 
@@ -441,3 +507,108 @@ No offer was harmful (worse) in any cell. **A falling gain of 25 % or more is fo
 **Acceleration needs per-report timestamps** (M9, docs/history/REVIEW.md M4). The speed of a report is its counts over the time since the previous report. With timestamps taken in the frame loop (the GLFW fallback) a frame of reports shares one time, the clamp makes them look 16x faster, and the analysis is meaningless: one simulated 30° reach had a per-report maximum of 320 in/s instead of 20 in/s with timestamps batched per 8 ms frame, 35 in/s with 1 kHz ±0.3 ms jitter, 40 in/s at 8 kHz with ±0.05 ms jitter. `RawMouseSource.hasReportTimestamps` is true for Raw Input only, and the acceleration screens refuse to start without it. On the real mouse (1 kHz, 584 k reports) the inter-report time had p5/p50/p95 of 0.97/1.00/3.00 ms and no zero intervals. 4 and 8 kHz mice are untested.
 
 **Measured on the simulated players, M7** (`core/build/reports/harness/accel-pipeline.txt`, `accel-ab-power.txt`, `accel-ab-calibration.txt`): 15 calibration rounds (flick, switching, micro in turn) at 43-55 cm/360 offered a curve to every rising-gain player (60 of 60, mostly the power family, factor about 0.95, gain change 1.16-1.19) and to none of 10 flat players; the blind test confirmed it in 55 of 60 runs (92 %), median 5 pairs, the rest undecided after 12 pairs; a curve that gets in a flat player's way was called worse in 10 of 10 runs within 4-5 pairs. With fewer calibration rounds the simulated rising-gain players were still offered a curve in 20 of 20 runs from 5 rounds on (18 of 20 with 3) and flat players in at most 1 of 20, which is why the app plays 8 rounds and lets you analyse from 5. These numbers describe the simulated player only: real hands may not show errors this systematic, and a real player also adapts to a new curve over many rounds, which a short A/B test cannot capture (the counterbalanced order only spreads that effect over both conditions).
+
+**Group: Validation: the simulated player and the gates**
+
+## Head-sized targets and the simulated hand (M9 assessment)
+
+The default simulated hand was calibrated on large targets (0.25 m at 12 m). With the profile's head-sized targets (0.4-1.9 degrees) its optimum is 156 cm/360 (40-640 cm/360 sweep, `assess-headtargets.txt`), far outside what people use (pros about 33-65 cm/360, a controlled study 20-80). `SimulatedPlayer.forHeadSizedTargets(optimumCm360)` scales the hand (all effects depend on `cm360 / optimumScale` only) so that the optimum with the profile's targets lies at a chosen value (default 50); `HeadTargetPlayerTest` guards it. With that hand the finder behaves as with the old one (50 cm/360 optimum, geometry targets, 40 players): median error 18 / 16 / 9 % at 8 / 15 / 30 rounds, within +-15 % in 40 / 48 / 73 %, true loss 1.4 / 0.8 / 0.45 points, a cost of 0.4-0.6 points for +-15 % and 3.4 / 6.9 points for x0.7 / x2. The old default stays for the large-target harness tests. Neither hand is validated against people.
+
+## Verification harness: simulated player (implemented)
+
+Used to test the pipeline without a human. Per target the aimer waits a reaction time (normal, at least 120 ms), makes a minimum-jerk primary reach, waits a feedback delay (140 ms), and corrects until its remaining error is inside the target's angular radius, then clicks after a click delay; a hand twitch at the click can turn a marginal hit into a miss. All randomness comes from one seeded generator.
+
+For a reach of amplitude `A` degrees at cm/360 `c` (with `c_eff = c / optimumScale / gainPreference(speed)`):
+
+- endpoint error per axis: `sigma = noiseLevel * fatigue * sqrt((signalNoise * A)^2 + (handNoiseCm * 360 / c_eff)^2)`. The second term is the fixed hand precision seen in degrees: it hurts at high sensitivity (small `c`). First reaches also fall short by `undershootBias`.
+- duration: `(a + b * log2(1 + A / W) + handCm / maxHandSpeed) * fatigue`, with `handCm = A * c_eff / 360` and `W` the target's angular width. The last term hurts at low sensitivity (large `c`). Corrections use 60 % of the Fitts term.
+- `fatigue = 1 + fatiguePerMinute * minutes of session time` scales noise and all times.
+- Counts are the rounded position along the reach, reported only when they change, so quantization and event timing look like a real sensor.
+
+The two terms give an interior optimum. Because everything depends on `c / optimumScale`, `withOptimum(c*)` moves the optimum to `c*` exactly (up to count quantization). With the default parameters the score peaks at about 50 cm/360 with a flat top (within 2 points from roughly 38 to 73 cm); `noiseLevel` also moves the optimum, so cases with other noise levels take their ground truth from a dense reference sweep (17 grid points x 30 rounds, parabola through the best three points) instead of the configured value. `PipelineConvergenceTest` checks that the sweep peak matches the configured optimum.
+
+Measured with the baseline estimator (9 grid points x 4 rounds = 36 rounds, 20-140 cm/360, 8 seeds): within a factor 1.3 of the truth in 88-100 % of the runs, median error factor 1.06-1.18 (see `core/build/reports/harness/baseline-convergence.txt`). That is the number the optimizer has to beat with fewer rounds. These tolerances describe this simulated player; they say nothing about real humans.
+
+## Player models of the gate harness (M14)
+
+The default simulated hand makes every analysis look as good as the model it was tuned on (the removed docs/OPTIMIZER-REVIEW.md (git history)). The
+gate harness (`core/src/test/.../harness/review/GateHarness.kt`, `GateTest`, reports `gate-<tag>.txt`) therefore reruns every
+table with hands that break one assumption each. All are options of `SimulatedPlayer`; the defaults keep the old hand.
+
+- **DECOUPLED** (`noiseModel = NoiseModel.DECOUPLED`). In the default hand the endpoint noise is added to the planned distance in the planned time, so a reach that goes further is also faster. Within one target distance the signed error then correlates with the peak speed (r about 0.36 in the calibration mix). DECOUPLED stretches the duration with the distance the noise produced along the reach, so the peak speed stays the planned one (r about 0.06; `PlayerModelsTest`).
+- **RANGE** (`rangeBias = 0.05`, `rangeReferenceDegrees = 20`). The range effect: first reaches are scaled by `(20 / A)^0.05`, so a 5° reach overshoots by 7 % and a 60° reach falls short by 5 %, whatever the gain. Because distance and speed go together (corr 0.956), this looks like a gain that rises with speed.
+- **ADAPTIVE** (`adaptation = HandAdaptation.adaptedTo(preference)`). Motor adaptation, see the next section.
+- **PRESSURE** (`pressureUndershoot`). A first reach that a deadline forces to be `s` times faster than unhurried is scaled by `1 - pressureUndershoot * (s - 1)` (only in speed rounds, below).
+
+**Hand adaptation** (`HandAdaptation`, two-state model of Smith, Ghazizadeh & Shadmehr 2006, their fit values: fast retention 0.59 and rate 0.21, slow retention 0.992 and rate 0.02). The gain the hand expects at speed v is `preference(v) * exp(fast(v) + slow(v))`. After every first reach the error `ln(delivered / expected)` at its peak speed moves both states: `x <- retention^w * x + rate * w * error`, where `w` is a Gaussian weight over ln speed (width 0.35). The retention applies per exposure, so a speed that is not played keeps what was learned there. The decay toward the preference leaves a share `1 / (1 + 0.21/0.41 + 0.02/0.008) = 0.25` of any constant mismatch. A preference therefore stays measurable but at a quarter of its size, and a new curve first gives an aftereffect. `adaptedTo` starts in the steady state for plain sensitivity, which is the situation of a player who comes from the game. After a 10 % gain step the mismatch falls below half within 50 reaches (`HandAdaptationTest`). The linear sensitivity is still treated as known exactly, as before. The parameters come from reaching studies, not from mouse aiming.
+
+## M14: what the gate showed (the removed docs/OPTIMIZER-REVIEW.md (git history), "Umsetzung und Ergebnisse")
+
+Commands: `AIMTUNE_REVIEW=1 ./gradlew.bat :core:cleanTest :core:test --tests "*GateTest*"` (env `AIMTUNE_GATE_TAG`, `AIMTUNE_GATE_SECTIONS` = S,C,F,A,N,V, `AIMTUNE_GATE_CURVE` = legacy|bounded), `*ClosedLoopGateTest*`, `*DriftGateTest*`, `*SpeedRoundProbeTest*`, `*PlateauGateTest*`. All numbers are simulated players.
+
+**Bounded curves (curve finder v2, the default).** The detection is unchanged (BIC 8, range 1.02). The recommended family is played and exported as a Raw Accel lookup table of 32 points, evenly spaced in log speed between the 5th and 95th percentile of the used speeds. It is flat outside them (`AccelFit.boundedTo`, `boundedRecommendation`; Raw Accel 1.7.1 `common/accel-lookup.hpp` holds the first and last value, and "Gain / Velocity" false makes y the multiplier). The fitted families keep rising or falling beyond the narrow window of the data. Bounding them changes nothing where reaches happen (error over the used speeds 0.010 against 0.010 for +30 %) and removes most of the error at 20-40 in/s: +30 % 0.235 → 0.067, -30 % 0.162 → 0.061, range-biased +15 % 0.405 → 0.010 (15 rounds, `gate-t3c.txt` against `gate-t1t2.txt`).
+- Exported benefit, from 16 players per row in a second, independent A/B run (`gate-t5-closed-loop.txt`):
+  - -30 %: +45.6 against +41.9 points (oracle +58.6);
+  - -15 %: +33.0 against +27.7;
+  - +30 %: +10.8 against +7.8.
+- Flat range-biased players get a curve exported in 13 of 32 runs against 23.
+- In one cell, the decoupled hand at -15 %, the A/B test confirmed 15 against 20 of 21 offered curves.
+
+**A/B test with per-scenario baselines (T2): not taken.** In 1000 tests with identical arms (`gate-v.txt`) grouped scoring gave false verdicts in 6.1 % of the tests (30 better, 31 worse) against 4.7 % pooled. At a per-look level of 0.006 it is back at 5.0 %, but it then confirmed real curves no more often: -15 % 16 against 23 of 24, decoupled +15 % 11 against 10. `evaluateAb(groupByScenario = false)` stays the default, and `AbOutcome.scenarioId` is stored for later use.
+
+**Speed rounds (T4): not taken.** The plan was to decouple distance from speed. In normal rounds they correlate at 0.96, so a range effect cannot be told from a gain that depends on the speed. Calibration flicks whose targets vanish after `f` times the player's median time to hit (`FlickConfig.targetLifetimeNanos`) would make the hand move the same distances faster. `analyseSpeedRounds` (`core/accel/SpeedRoundAnalysis.kt`) then compares, within distance bins, the median error of rushed and normal reaches against their median log speed. Findings (`speed-round-probe.txt`, 20 players per cell, 60 flat):
+- At `f` = 0.75 the reaches are 30 % faster, but only 3-16 % of the targets are hit (unplayable for a person), and the correlation falls only to 0.86-0.93.
+- The estimate is unbiased for the default and the decoupled hand (flat slope +0.002) and resists the range effect: 1 of 60 flat players offered, against 200 of 200 for the fit.
+- It finds little. ±15 % was offered in 2 of 20 runs, +30 % in 5 of 18.
+- It cannot tell a hand that undershoots more when rushed (`pressureUndershoot` 0.1) from a wish for more gain at speed: 58 of 60 flat players were offered a curve. The literature suggests real hands do undershoot more when rushed.
+- The code stays as an experiment; the app does not use it.
+
+**Closed loop (T5): no-go.** 4 batches of 6 rounds (the first round of each batch is not measured, for getting used to the curve). After each batch the wanted gain relative to the delivered one per speed bin is added at 50 % damping to a lookup table anchored at 1 at its slowest speed (`ClosedLoopGateTest`).
+- Its curve shape is the closest to the truth (error over the used speeds about 0.009), but it reaches the player less often and with less benefit than the bounded fit:
+  - -30 %: exported 16 of 16 with +33.0 points against +45.6;
+  - -15 %: 5 of 16, +4.6 against +33.0;
+  - +30 %: 8 of 16, +5.1 against +10.8.
+- With the adaptive hand it exports almost nothing.
+- Flat range-biased players get a curve exported in 28 of 32 runs, against 13.
+- The score depends mostly on the gain level at the common speeds, which the fit sets through its factor, and the errors alone only give the shape.
+- A first version centred the table on the median reach and lost the A/B test by 25-40 points, because a shape centred there carries a different level.
+
+**Time in the sensitivity model (T7): not the default.** `OptimizerConfig(timeDrift = true)` lets the score curve move over days: kernel `k_x (1 + s exp(-|dt| / L))`, with `s` in 0.5-4 and `L` in 2/7/21 days chosen by marginal likelihood when it gains more than 1. It drops rounds older than 42 days and sets `dayDriftDetected`. Played for real with 4 sessions × 10 rounds, 2 days apart, 40 seeds (`gate-t7-drift-b.txt`):
+
+| optimum shift per session | median error, legacy / time model | p90 | median bias | 80 % interval coverage |
+| --- | --- | --- | --- | --- |
+| 0 % | 7.1 / 7.4 % | 18.1 / 17.1 % | -3.8 / -3.2 % | 95 / 95 % |
+| 5 % | 11.5 / 12.5 % | 23.1 / 25.7 % | -11.4 / -10.8 % | 90 / 90 % |
+| 10 % | 16.6 / 14.7 % | 27.3 / 31.9 % | -16.4 / -12.5 % | 78 / 80 % |
+
+The goal (median ≤ 9 %, bias ≤ 5 % with drift) was not met. With 10 rounds a session and an optimum this flat (±15 % costs under a point), a move of 5-10 % per session is hardly visible in the data, so the model can rarely tell it from noise. The drift hint fires in 5 % of the runs without drift and in 23-30 % with it. A single session gives identical results with either setting.
+
+**Follow-up: a curve for micro-adjustments and flash turns (M14b).** The user's goal is lower gain for small, slow corrections and more gain for turning away from a flash and back. That is a trade-off between precision and speed, which only shows in the outcome, not in the endpoint errors. Findings:
+- **Two-way sweep** of slow gain × fast ratio (`TwoWayCurveSweepTest`, `twoway-sweep.txt`; micro/flash/flick mix, flash weight 35):
+  - Lowering the slow gain never paid, because the simulated hand hits every micro target at plain sensitivity already (accuracy 1.000). The simulator cannot judge that half of the goal.
+  - A higher fast ratio paid only for a hand that adapts to the curve: 52 → 61 points at ×1.5, flash dodge 8 → 23 %.
+- **Search designs** (`BlockStrengthSearchTest.blockSearch`, `block-strength-search.txt`):
+  - Playing each strength in blocks of 3-4 rounds (first dropped) instead of a new strength every round changed nothing.
+  - A micro/flash/flick mix with range 0.70-2.00 found strong rising curves for adapting hands, but also for hands that do not want them (benefit −4 to −15).
+- **The whole chain** (`chainSearchAndBlindTest`, `chain-strength-search-flash35.txt` / `-flash15.txt`; 16 players per row): search, offer when the range excludes plain, blind A/B test, export when better.
+  - The blind test kept curves away from flat hands in every design (0-1 of 16 exported).
+  - The new mix lost against the app's mix, because the A/B test, which alternates every round, let its stronger curves through less often.
+  - The app's mix with the range widened to **0.70-1.75** won:
+    - with flash weight 35: adapting flat hand +10.5 against +4.6 points; +15 % +10.4 against +7.9; −15 % +3.7 against +3.4; non-adapting +15 % +20.9 against +20.6;
+    - with flash weight 15: mean over the four +8.8 against +7.8 (the adapting −15 % row fell from +2.7 to +0.9);
+    - flat hands got no export (against 1 of 16 at 0.70-1.45).
+  - 0.70-2.00 let single harmful curves through again.
+- `CurveStrength.MAX_WITH_FLASH = 1.75` is therefore the upper end whenever the search plays flash rounds (`searchRange(flash)`). Without flash rounds it stays 1.45, because the earlier sweep without them saw a wider range overshoot.
+
+## Two-stage strength search, M19 experiment (not adopted)
+
+Question (docs/history/CURVE-FINDER-AUDIT.md, option O4): does a level stage (a 20-round sensitivity search at 20-140 cm/360) before the strength search keep the detection of a true rising or falling preference and still remove the falling results of hands that only want another overall level? `TwoStageStrengthTest` (`AIMTUNE_REVIEW=1`, `AIMTUNE_SEEDS=100` = 60 seeds per row, `core/build/reports/harness/two-stage-strength.txt`) plays the audit's hands (ADAPTED = 0.75 x the user's curve, ADAPTED_HIGH = 0.53 x, FLAT, RISING / FALLING = gainPlayer +-0.30) through the strength search of `dev` (with the M16 falling rule) and three level variants. Export = offered and the blind A/B says better; the A/B plays at the level the search used.
+
+| Variant | ADAPTED export (falling) | ADAPTED_HIGH | FLAT | RISING right | FALLING right |
+|---|---|---|---|---|---|
+| current (game sensitivity, no level stage) | 8 % (0 %) | 3 % (0 %) | 3 % | 100 % | 87 % |
+| O4 full level, 20 extra rounds | 23 % (0 %) | 58 % (0 %) | 0 % | 53 % | 78 % |
+| level only when its interval excludes the game sensitivity | 23 % (0 %) | 45 % (0 %) | 3 % | 75 % | 83 % |
+| level half-way (geometric mean) | 25 % (0 %) | 37 % (0 %) | 0 % | 82 % | 88 % |
+
+Result: the audit's problem is already solved by M16 (the current row has no falling export for any adapted hand, no harmful export for a flat hand, RISING 100 %). The level stage adds a gain for hands adapted to a lower level (ADAPTED_HIGH 3 % to 37-58 % exported) but costs 20 rounds and no variant meets the gate (RISING >= 80 % and FALLING >= 90 % together; the best, half-way, has 82 % and 88 %, and the full stage 53 % and 78 %), because a rising preference is partly absorbed by the level. Not adopted; the strength search stays as it is. Not simulated: flash rounds in the strength search, a 2-D joint search of level and strength. Differences of 5-8 points between rows are within the noise of 60 seeds.
