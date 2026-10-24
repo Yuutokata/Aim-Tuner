@@ -77,7 +77,6 @@ class RefineStageScreen(ctx: AppContext, private val run: RefineRun) : UiScreen(
     }
 
     private fun parameterName(p: RefineParameter?) = when (p) {
-        RefineParameter.LEVEL -> t("refine.param.level")
         RefineParameter.HIGH_GAIN -> t("refine.param.high_gain")
         RefineParameter.TRANSITION -> t("refine.param.transition")
         null -> ""

@@ -20,6 +20,7 @@ import de.yuuto.aimtune.app.ui.frame
 import de.yuuto.aimtune.app.ui.label
 import de.yuuto.aimtune.app.ui.onChange
 import de.yuuto.aimtune.app.ui.profileChart
+import de.yuuto.aimtune.core.accel.refineStages
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -78,7 +79,7 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
 
     override fun onEnter() = start(choice())
 
-    private fun canStart(choice: RefineChoice?) = choice?.profile != null && ctx.rawAccelConfirmed && ctx.source.hasReportTimestamps
+    private fun canStart(choice: RefineChoice?) = choice?.profile?.refineStages()?.isNotEmpty() == true && ctx.rawAccelConfirmed && ctx.source.hasReportTimestamps
 
     private fun start(choice: RefineChoice?) {
         val profile = choice?.profile ?: return
@@ -132,6 +133,7 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
             card.add(ui.label(t("refine.import.factor", "%.3f".format(java.util.Locale.ROOT, profile.outputDpi / profile.effectiveDeviceDpi)), Styles.CAPTION_MUTED, wrap = true))
                 .left().width(inner).padTop(8f).row()
             card.add(ChartActor(ui, profileChart(ui.tokens, profile))).left().width(inner).height(CHART_HEIGHT).padTop(12f).row()
+            if (profile.refineStages().isEmpty()) card.add(ui.label(t("refine.import.nothing"), Styles.CAUTION, wrap = true)).left().width(inner).padTop(12f).row()
         } else {
             card.add(ui.caps(t("refine.import.refused"))).left().row()
         }

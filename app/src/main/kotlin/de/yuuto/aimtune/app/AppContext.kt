@@ -398,9 +398,7 @@ class AppContext(
     fun saveRefineAs(run: RefineRun, path: Path): Result<Path> = runCatching { refinedRoot(run) }
         .mapCatching { ExportFiles.savePatched(path, it, run.exportName).getOrThrow() }
 
-    private fun refinedRoot(run: RefineRun) = run.engine.candidate.let {
-        RawAccelExport.patch(run.source.file.root, run.profile.name, it.args, it.outputDpi, run.exportName)
-    }
+    private fun refinedRoot(run: RefineRun) = RawAccelExport.patch(run.source.file.root, run.profile.name, run.profile, run.engine.candidate, run.exportName)
 
     /** Number of stored blind rounds for the current setup, for the menu. */
     fun storedRoundCount(): Int {

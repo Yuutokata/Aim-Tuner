@@ -39,7 +39,7 @@ data class RefineRound(val scenario: ScenarioKind, val seed: Long, val profile: 
 
 /**
  * "Refine my Raw Accel curve" without UI: warm-up rounds with the imported [profile], one blind search per [RefineParameter]
- * the profile supports (level, high-speed gain, transition, in this order), and a blind A/B test of the refined profile against
+ * the profile supports (high-speed gain, transition, in this order), and a blind A/B test of the refined profile against
  * the imported one. Every round plays a whole profile through the driver model at the player's game sensitivity [gameCm360].
  *
  * A stage searches the factor of its parameter on top of the factors the earlier stages carried. A stage's best factor is
@@ -58,7 +58,7 @@ class RefineEngine(
     maxPairs: Int = AccelAbPlan.DEFAULT_MAX_PAIRS,
 ) {
     /** The parameters the profile supports, in the order they are searched. */
-    val stages: List<RefineParameter> = RefineParameter.entries.filter { profile.supports(it) }
+    val stages: List<RefineParameter> = profile.refineStages()
 
     private val scenarios = AccelScenarios.of(flash)
     private val plan = AccelAbPlan(scenarios, seed, maxPairs)

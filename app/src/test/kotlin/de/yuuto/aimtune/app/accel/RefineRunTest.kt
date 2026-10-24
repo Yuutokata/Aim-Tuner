@@ -69,12 +69,12 @@ class RefineRunTest {
     @Test
     fun `a refined profile exports as a patched copy that keeps the original and lists its changes`() {
         val imported = checkNotNull(profile().profile)
-        val refined = imported.copy(outputDpi = imported.outputDpi * 1.1, args = imported.args.copy(capY = 1.7))
+        val refined = imported.copy(args = imported.args.copy(capY = 1.7, inputOffset = 12.0))
         val changes = RefineDiff.changes(imported, refined)
-        assertEquals(listOf("Output DPI", "Cap / Jump y"), changes.map { it.field })
-        assertEquals("600", changes[0].old)
-        assertEquals("660", changes[0].new)
-        val root = RawAccelExport.patch(source.file.root, "default", refined.args, refined.outputDpi, "default (AimTune)")
+        assertEquals(listOf("Cap / Jump y", "inputOffset"), changes.map { it.field })
+        assertEquals("10", changes[1].old)
+        assertEquals("12", changes[1].new)
+        val root = RawAccelExport.patch(source.file.root, "default", imported, refined, "default (AimTune)")
         assertEquals(listOf("default", "default (AimTune)"), de.yuuto.aimtune.storage.RawAccelImport.parse(root.toString()).profileNames)
     }
 }

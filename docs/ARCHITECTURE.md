@@ -80,10 +80,10 @@ Rounds are analysed and saved by `RoundProcessor` on a background thread. If the
 
 ## Refine my Raw Accel curve (M18)
 
-- `core/accel/RefineParameter.kt`: `RefineParameter` (LEVEL, HIGH_GAIN, TRANSITION with their factor ranges), `RawAccelProfile.adjusted(parameter, factor)` / `supports`, `RawAccelProfile.played(gameCm360)` (curve plus the cm/360 its output DPI gives).
+- `core/accel/RefineParameter.kt`: `RefineParameter` (HIGH_GAIN, TRANSITION with their factor ranges). `RefineAdjust.kt`: `RawAccelProfile.adjusted(parameter, factor)` / `supports` / `refineStages`. `RefineLut.kt`: the lut mappings. `RefineShape.kt`: `ShapeField` and `RefineShape`, the curve-shape whitelist per mode and stage used by `adjusted` and `RawAccelExport.patch`; `RefineShape.base` blanks it (the base invariant).
 - `core/accel/RefineSearch.kt`: one stage as a blind search over a pseudo cm/360 of `100 * factor` with the sensitivity optimizer (like `CurveStrength`), `RefineResult`. `core/accel/RefineEngine.kt`: the phases WARMUP, SEARCH(stage), STAGE_RESULT, TEST, DONE without UI; the test is `AccelAbPlan` + `evaluateAb` with the control arm (`AbCondition.PLAIN`) playing the imported profile. The headless gate (`RefineGateTest`) drives this same class.
 - `app/accel`: `RefineImport` (parse, choose profile, DPI check, list `imports/`), `RefineRun` (engine plus `TrainerConfig`), `RefineSession` (`SessionKind.ACCEL_REFINE`; stored searches, calibration and "Last search" ignore it), `RefineDiff` (changed fields). Screens `RefineImportScreen`, `RefineBetweenScreen`, `RefineStageScreen`, `RefineResultScreen`; `AppContext.startRefineRun`, `showRefineStep`, `exportRefine` (`RawAccelExport.patch` + `write`).
-- Tests: `RefineParameterTest`, `RefineEngineTest` (core), `RefineRunTest` (app); gate `core/.../harness/review/RefineGateTest` (`AIMTUNE_REVIEW`, report `core/build/reports/harness/gate-m18.txt`).
+- Tests: `RefineParameterTest`, `RefineEngineTest`, `RefineBaseInvariantTest` (core), `RefineRunTest` (app); gate `core/.../harness/review/RefineGateTest` (`AIMTUNE_REVIEW`, report `core/build/reports/harness/gate-m22c.txt`).
 
 ## Optimizer review fixes (M14)
 

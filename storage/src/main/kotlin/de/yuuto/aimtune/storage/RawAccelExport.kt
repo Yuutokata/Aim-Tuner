@@ -8,6 +8,9 @@ import de.yuuto.aimtune.core.accel.NoAccel
 import de.yuuto.aimtune.core.accel.PowerCurve
 import de.yuuto.aimtune.core.accel.RawAccelArgs
 import de.yuuto.aimtune.core.accel.RawAccelCurve
+import de.yuuto.aimtune.core.accel.RawAccelProfile
+import de.yuuto.aimtune.core.accel.RefineShape
+import de.yuuto.aimtune.core.accel.ShapeField
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -116,31 +119,29 @@ object RawAccelExport {
     }
 
     /**
-     * The user's own file with one profile added: a deep copy of [profileName] named [newName], with the acceleration of [newArgs]
-     * in the whole parameter block (and the vertical one when the original had the same values in both) and, if given, [newOutputDpi]. Everything else is the original tree, so
-     * key order, the "### ..." comment keys, the other profiles and the devices stay as they were. A field whose value already
-     * equals the new one keeps its original JSON text (`2` stays `2`), and the parameters [RawAccelArgs] does not hold (outputOffset,
-     * gamma, scale, ...) are never touched.
+     * The user's own file with one profile added: a deep copy of [profileName] named [newName] whose curve-shape fields (the
+     * whitelist [RefineShape], per mode) are those of [refined]. Everything else is the original tree, so key order, the "### ..."
+     * comment keys, the other profiles, the devices and every base field of the profile (output DPI, ratios, rotation, ...) stay as
+     * they were; a shape field whose value did not change keeps its original JSON text (`2` stays `2`). The vertical block is
+     * written only for a by-component profile, because the driver ignores it otherwise.
      *
+     * @param imported the profile as imported from [profileName]; [refined] must differ from it in whitelisted fields only.
      * @throws RawAccelImportException if the file has no profile [profileName].
-     * @throws IllegalArgumentException if [newName] is empty, too long for Raw Accel (255 characters) or already used.
+     * @throws IllegalArgumentException if [refined] changes more than the curve shape, or [newName] is empty, too long for Raw Accel
+     *   (255 characters) or already used.
      */
-    fun patch(original: JsonObject, profileName: String, newArgs: RawAccelArgs, newOutputDpi: Double?, newName: String): JsonObject {
+    fun patch(original: JsonObject, profileName: String, imported: RawAccelProfile, refined: RawAccelProfile, newName: String): JsonObject {
         val profiles = RawAccelFile.profiles(original)
         val source = RawAccelFile(original).profileObject(profileName)
         require(newName.isNotBlank() && newName.length <= MAX_PROFILE_NAME) { "the profile name must have 1 to $MAX_PROFILE_NAME characters" }
         require(profiles.none { it[RawAccelKeys.NAME]?.jsonPrimitive?.content == newName }) { "the file already has a profile named '$newName'" }
-        require(newOutputDpi == null || (newOutputDpi > 0.0 && newOutputDpi.isFinite())) { "output DPI must be positive" }
+        require(RefineShape.base(imported) == RefineShape.base(refined)) { "the refined profile changes more than the curve shape" }
         val copy = LinkedHashMap(source)
         copy[RawAccelKeys.NAME] = JsonPrimitive(newName)
-        // The vertical block only matters for by-component profiles; it follows the whole block when it was a copy of it (the
-        // only case before M22b) and stays as the user wrote it otherwise.
-        val verticalFollows = RawAccelImport.sameJson(source[RawAccelKeys.WHOLE_ARGS], source[RawAccelKeys.VERTICAL_ARGS])
-        for (key in listOf(RawAccelKeys.WHOLE_ARGS, RawAccelKeys.VERTICAL_ARGS)) {
-            if (key == RawAccelKeys.VERTICAL_ARGS && !verticalFollows) continue
-            copy[key] = withArgs(source.getValue(key).jsonObject, newArgs)
+        copy[RawAccelKeys.WHOLE_ARGS] = withShape(source.getValue(RawAccelKeys.WHOLE_ARGS).jsonObject, imported.args, refined.args)
+        if (!imported.speed.whole) {
+            copy[RawAccelKeys.VERTICAL_ARGS] = withShape(source.getValue(RawAccelKeys.VERTICAL_ARGS).jsonObject, imported.accelY, refined.accelY)
         }
-        if (newOutputDpi != null) copy[RawAccelKeys.OUTPUT_DPI] = keepIfEqual(source[RawAccelKeys.OUTPUT_DPI], JsonPrimitive(newOutputDpi))
         val root = LinkedHashMap(original)
         root[RawAccelKeys.PROFILES] = JsonArray(profiles + JsonObject(copy))
         return JsonObject(root)
@@ -157,34 +158,23 @@ object RawAccelExport {
         return file
     }
 
-    /** [block] with the acceleration fields of [args] set; the keys keep their place and an unchanged field keeps its original element. */
-    private fun withArgs(block: JsonObject, args: RawAccelArgs): JsonObject {
+    /** [block] with the whitelisted shape fields of [old]'s mode that [new] changed; the keys keep their place and every other entry stays as it was. */
+    private fun withShape(block: JsonObject, old: RawAccelArgs, new: RawAccelArgs): JsonObject {
         val map = LinkedHashMap(block)
-        fun set(key: String, value: JsonElement) {
-            map[key] = keepIfEqual(block[key], value)
+        for (field in RefineShape.fields(old.mode)) {
+            if (field.read(old) == field.read(new)) continue
+            when {
+                field == ShapeField.DATA -> map[field.key] = JsonArray(new.lut.map { JsonPrimitive(it) })
+                field.subKey != null -> {
+                    val inner = LinkedHashMap(block[field.key] as? JsonObject ?: JsonObject(emptyMap()))
+                    inner[field.subKey] = JsonPrimitive(field.read(new) as Double)
+                    map[field.key] = JsonObject(inner)
+                }
+                else -> map[field.key] = JsonPrimitive(field.read(new) as Double)
+            }
         }
-        set(RawAccelKeys.MODE, JsonPrimitive(args.mode.json))
-        set(RawAccelKeys.GAIN, JsonPrimitive(args.gain))
-        set(RawAccelKeys.INPUT_OFFSET, JsonPrimitive(args.inputOffset))
-        set(RawAccelKeys.ACCELERATION, JsonPrimitive(args.acceleration))
-        set(RawAccelKeys.DECAY_RATE, JsonPrimitive(args.decayRate))
-        set(RawAccelKeys.EXPONENT_CLASSIC, JsonPrimitive(args.exponentClassic))
-        set(RawAccelKeys.LIMIT, JsonPrimitive(args.limit))
-        set(RawAccelKeys.CAP_MODE, JsonPrimitive(args.capMode.json))
-        val oldCap = block[RawAccelKeys.CAP] as? JsonObject
-        map[RawAccelKeys.CAP] = JsonObject(
-            LinkedHashMap(oldCap ?: JsonObject(emptyMap())).also {
-                it["x"] = keepIfEqual(oldCap?.get("x"), JsonPrimitive(args.capX))
-                it["y"] = keepIfEqual(oldCap?.get("y"), JsonPrimitive(args.capY))
-            },
-        )
-        // The table is compared as floats, the type Raw Accel stores: a double written as text in the file is the same entry.
-        val oldData = (block[RawAccelKeys.DATA] as? JsonArray)?.map { (it as? JsonPrimitive)?.content?.toFloatOrNull() }
-        if (oldData != args.lut) map[RawAccelKeys.DATA] = JsonArray(args.lut.map { JsonPrimitive(it) })
         return JsonObject(map)
     }
-
-    private fun keepIfEqual(old: JsonElement?, new: JsonElement): JsonElement = if (old != null && RawAccelImport.sameJson(old, new)) old else new
 
     private fun JsonPrimitive.double(): Double = requireNotNull(doubleOrNull) { "not a number: $content" }
 

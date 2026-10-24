@@ -20,9 +20,9 @@ class RefineEngineTest {
 
     private val random = Random(1)
 
-    /** Scores that favour a level factor near [bestLevel] on the level stage and are noise elsewhere. */
-    private fun inputs(level: Double?, bestLevel: Double) = mapOf(
-        ScoreMetric.ACCURACY to 0.7 - (if (level == null) 0.0 else 12.0 * (level - bestLevel) * (level - bestLevel)) + 0.002 * random.nextDouble(),
+    /** Scores that favour a cap output (`capY`) near [bestCap] for a played [capY], and are noise for null. */
+    private fun inputs(capY: Double?, bestCap: Double) = mapOf(
+        ScoreMetric.ACCURACY to 0.7 - (if (capY == null) 0.0 else 12.0 * (capY - bestCap) * (capY - bestCap)) + 0.002 * random.nextDouble(),
         ScoreMetric.TIME_TO_HIT to 600.0 + 4.0 * random.nextDouble(),
     )
 
@@ -36,31 +36,42 @@ class RefineEngineTest {
     }
 
     @Test
-    fun `the run goes warm-up, three stages, test`() {
+    fun `the run goes warm-up, two stages, test`() {
         val e = engine()
-        assertEquals(listOf(RefineParameter.LEVEL, RefineParameter.HIGH_GAIN, RefineParameter.TRANSITION), e.stages)
+        assertEquals(listOf(RefineParameter.HIGH_GAIN, RefineParameter.TRANSITION), e.stages)
         assertEquals(RefinePhase.WARMUP, e.phase)
         playWarmup(e)
         assertEquals(RefinePhase.SEARCH, e.phase)
-        assertEquals(RefineParameter.LEVEL, e.stage)
-        // level stage: the better the closer the played output DPI is to a level of 1.12 times the imported one
+        assertEquals(RefineParameter.HIGH_GAIN, e.stage)
+        // gain stage: the better the closer the played cap output is to 1.9
         while (e.phase == RefinePhase.SEARCH) {
             val round = e.nextRound()
-            val level = round.profile.outputDpi / user.outputDpi
-            e.record(inputs(level, 1.12))
+            assertEquals(user.outputDpi, round.profile.outputDpi, "the base never moves")
+            e.record(inputs(round.profile.args.capY, 1.9))
         }
         assertEquals(RefinePhase.STAGE_RESULT, e.phase)
         val result = assertNotNull(e.currentResult)
-        assertEquals(RefineParameter.LEVEL, result.parameter)
+        assertEquals(RefineParameter.HIGH_GAIN, result.parameter)
         assertEquals(12, result.rounds)
-        assertTrue(result.best in RefineParameter.LEVEL.min..RefineParameter.LEVEL.max)
+        assertTrue(result.best in RefineParameter.HIGH_GAIN.min..RefineParameter.HIGH_GAIN.max)
         e.continueToNextStage()
         assertEquals(RefinePhase.SEARCH, e.phase)
-        assertEquals(RefineParameter.HIGH_GAIN, e.stage)
+        assertEquals(RefineParameter.TRANSITION, e.stage)
         e.finishStageNowAfter(8)
         assertEquals(RefinePhase.STAGE_RESULT, e.phase)
         e.goToTest()
         assertEquals(if (e.hasCandidate) RefinePhase.TEST else RefinePhase.DONE, e.phase)
+    }
+
+    private fun RefineEngine.skipRestOfStages() {
+        while (phase == RefinePhase.SEARCH || phase == RefinePhase.STAGE_RESULT) {
+            if (phase == RefinePhase.STAGE_RESULT) {
+                continueToNextStage()
+            } else {
+                nextRound()
+                record(mapOf(ScoreMetric.ACCURACY to 0.7 + 0.001 * random.nextDouble(), ScoreMetric.TIME_TO_HIT to 600.0))
+            }
+        }
     }
 
     private fun RefineEngine.finishStageNowAfter(rounds: Int) {
@@ -83,9 +94,18 @@ class RefineEngineTest {
     }
 
     @Test
-    fun `a stage that finds no clear change leaves the profile as it was and the run ends without a test`() {
+    fun `a profile without a stage ends right after the warm-up`() {
         val e = engine(RawAccelProfile("flat", RawAccelArgs(RawAccelMode.NOACCEL), 800.0, 800.0))
-        assertEquals(listOf(RefineParameter.LEVEL), e.stages)
+        assertEquals(emptyList(), e.stages)
+        e.skipWarmup()
+        assertEquals(RefinePhase.DONE, e.phase)
+        assertEquals(e.profile, e.candidate)
+        assertNull(e.verdict)
+    }
+
+    @Test
+    fun `a stage that finds no clear change leaves the profile as it was and the run ends without a test`() {
+        val e = engine()
         e.skipWarmup()
         while (e.phase == RefinePhase.SEARCH) {
             e.nextRound()
@@ -94,9 +114,12 @@ class RefineEngineTest {
         assertEquals(RefinePhase.STAGE_RESULT, e.phase)
         if (!assertNotNull(e.currentResult).excludesNeutral) {
             e.continueToNextStage()
-            assertEquals(RefinePhase.DONE, e.phase)
-            assertNull(e.verdict)
-            assertEquals(e.profile, e.candidate)
+            e.skipRestOfStages()
+            if (!e.hasCandidate) {
+                assertEquals(RefinePhase.DONE, e.phase)
+                assertNull(e.verdict)
+                assertEquals(e.profile, e.candidate)
+            }
         }
     }
 
@@ -104,14 +127,14 @@ class RefineEngineTest {
     fun `the test plays the imported profile against the candidate in the same scenario with the same targets`() {
         val e = RefineEngine(user, 48.0, MetricWeights.DEFAULT, seed = 5, stageRounds = 30)
         e.skipWarmup()
-        // force a candidate by running the level stage with a strong preference
+        // force a candidate by running the gain stage with a strong preference
         while (e.phase == RefinePhase.SEARCH) {
             val round = e.nextRound()
-            e.record(inputs(round.profile.outputDpi / user.outputDpi, 1.17))
+            e.record(inputs(round.profile.args.capY, 1.95))
         }
-        val level = e.currentResult
+        val gain = e.currentResult
         e.goToTest()
-        assertEquals(RefinePhase.TEST, e.phase, "a clear level preference gives a candidate to test: $level")
+        assertEquals(RefinePhase.TEST, e.phase, "a clear gain preference gives a candidate to test: $gain")
         val first = e.nextRound()
         e.record(inputs(null, 1.0))
         val second = e.nextRound()
