@@ -1,9 +1,17 @@
 name: CI
 
+# main only receives merges of dev, which CI has already built, and the release workflow builds again on a tag.
 on:
   push:
-    branches: [main, dev]
+    branches: [dev]
+    paths-ignore: ["docs/**", "**.md"]
   pull_request:
+    paths-ignore: ["docs/**", "**.md"]
+
+# A newer push to the same branch makes the older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
