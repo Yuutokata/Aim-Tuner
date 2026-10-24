@@ -500,8 +500,19 @@ class SimulatedAimer(
             sqrt(sq(player.signalNoise * amplitude * speedup) + sq(player.handNoiseCm * FULL_TURN / effectiveCm360))
         val pressure = 1.0 - player.pressureUndershoot * (speedup - 1.0)
         val gain = if (primary) (1.0 - player.undershootBias) * rangeFactor(amplitude) * max(pressure, MIN_PRESSURE_GAIN) else 1.0
-        val moveX = error.x * gain + sigma * gaussian()
-        val moveY = error.y * gain + sigma * gaussian()
+        var noiseX = sigma * gaussian()
+        var noiseY = sigma * gaussian()
+        if ((player.extentNoiseScale != 1.0 || player.directionNoiseScale != 1.0) && amplitude > 0.0) {
+            // Split the noise along and across the reach and scale the parts separately (to match the spread of real rounds).
+            val ux = error.x / amplitude
+            val uy = error.y / amplitude
+            val along = (noiseX * ux + noiseY * uy) * player.extentNoiseScale
+            val across = (-noiseX * uy + noiseY * ux) * player.directionNoiseScale
+            noiseX = along * ux - across * uy
+            noiseY = along * uy + across * ux
+        }
+        val moveX = error.x * gain + noiseX
+        val moveY = error.y * gain + noiseY
         if (player.noiseModel == NoiseModel.DECOUPLED && amplitude > 0.0) {
             // Same peak speed as planned: the time stretches with the distance the noise produced along the reach.
             val along = (moveX * error.x + moveY * error.y) / amplitude

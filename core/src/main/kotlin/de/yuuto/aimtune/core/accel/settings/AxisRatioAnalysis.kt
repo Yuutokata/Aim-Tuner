@@ -12,8 +12,10 @@ enum class AxisRatio { Y_X, L_R, U_D }
  * For every direction (right, left, down, up) the gain G is how far the first movement went along that axis compared with how far
  * the target was: the weighted mean of `got / need` over the reaches whose target lies at least [MIN_COMPONENT_DEGREES] away along
  * that axis in that direction (ratio clipped to [[CLIP_LOW], [CLIP_HIGH]], weight `need^2`). The common undershoot of first
- * reaches is in every G and cancels in the ratios Raw Accel takes (`rawaccel.hpp:414-422`): Y/X = G_x / G_y (both directions
- * pooled), L/R = G_right / G_left, U/D = G_down / G_up.
+ * reaches is in every G and cancels in the ratios Raw Accel takes. The driver multiplies all vertical movement by Y/X, then upward movement by U/D and leftward movement
+ * by L/R (`rawaccel.hpp:412-422`), so right and down are the directions no ratio touches: Y/X = G_right / G_down,
+ * L/R = G_right / G_left, U/D = G_down / G_up (up multiplies by Y/X x U/D, so U/D is measured against down). A pure L/R or U/D
+ * bias therefore does not move the Y/X estimate.
  *
  * Thresholds, fixed before the gate ran: at least [MIN_PER_SIDE] reaches on each side; interval = 95 % bootstrap of the ratio;
  * recommend only if the interval excludes 1 and the change is at least [MIN_CHANGE]; value rounded to 0.01.
@@ -38,7 +40,7 @@ object AxisRatioAnalysis {
         val down = samples(reaches, horizontal = false, positive = true)
         val up = samples(reaches, horizontal = false, positive = false)
         val (top, bottom) = when (ratio) {
-            AxisRatio.Y_X -> (right + left) to (down + up)
+            AxisRatio.Y_X -> right to down
             AxisRatio.L_R -> right to left
             AxisRatio.U_D -> down to up
         }

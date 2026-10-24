@@ -39,4 +39,21 @@ class PassiveAnalysesTest {
         val result = assertIs<PassiveResult.Recommend>(AxisRatioAnalysis.analyze(reaches, AxisRatio.L_R))
         assertEquals(1.15, result.value, 1e-9)
     }
+
+    @Test
+    fun `a left or up bias alone does not move the Y over X estimate`() {
+        // Right and down are the directions no ratio touches; the biased directions must not enter Y/X.
+        val reaches = (0 until 240).map { i ->
+            when (i % 4) {
+                0 -> reach(300.0, 0.0, 300.0, 0.0)
+                1 -> reach(-300.0, 0.0, -300.0 / 1.15, 0.0)
+                2 -> reach(0.0, 300.0, 0.0, 300.0)
+                else -> reach(0.0, -300.0, 0.0, -300.0 / 1.15)
+            }
+        }
+        val yx = assertIs<PassiveResult.NoChange>(AxisRatioAnalysis.analyze(reaches, AxisRatio.Y_X))
+        assertEquals(1.0, yx.estimate, 1e-9)
+        assertEquals(1.15, assertIs<PassiveResult.Recommend>(AxisRatioAnalysis.analyze(reaches, AxisRatio.L_R)).value, 1e-9)
+        assertEquals(1.15, assertIs<PassiveResult.Recommend>(AxisRatioAnalysis.analyze(reaches, AxisRatio.U_D)).value, 1e-9)
+    }
 }
