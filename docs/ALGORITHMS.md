@@ -358,6 +358,21 @@ Reading it honestly: (a) the DEFAULT flat player gets no false curve offer in an
 
 Reading it: the default flat player still gets no false offer (0/30), so nothing was tuned. With the slower bots the simulated player kills 2.5 times as many (15 per round, still above the real 1.4 s per bot only by a factor of about 3 in time), and 2.9 range movements per run (reaches toward a bot that stood the whole reach) now enter the analysis; they did not produce a false offer for the default player. Flick + range finds the optimum as before (55 to 60 against 50, the flick-only result stays better), and the false directions of the strength search with range rounds are unchanged, which is why the curve finder excludes them. The aimer is still not calibrated against real play.
 
+## Range mode: bots outside the field of view (M21)
+
+A Range bot spawns at a bearing of -50 to 80 degrees from the counter, wherever the player's view happens to be, so on the user's real rounds 4 to 10 of about 28 bots per round (14-36 %) spawned outside the field of view (five rounds of a copy of the user's database, 2026-10-24). Measured from the spawn, the time to hit of such a bot included the search turn before the bot was in view, which says little about aim, and a click at nothing counted as a miss.
+
+For Range rounds only (`ScenarioKind.RANGE`; other scenarios are unchanged, a test pins this):
+- **Appearance.** `firstVisibleNanos` (core/metrics/BotVisibility.kt) finds the first moment, in 5 ms steps from the spawn, at which the bot (at its strafing position) lies within `MetricsParams.rangeHalfFovDegrees` = 51.5 degrees of the view yaw (Valorant's 103 degrees horizontal at 16:9, as in `FlashGeometry`). A bot in sight appears at its spawn. Pitch is not checked (bots stand on the floor).
+- **Time to hit** (`RoundSummary`, `meanTimeToHitMs`, and the Range time to kill) starts at the appearance.
+- **Shots.** A click before the bot of that moment has appeared is neither a shot nor a miss (it does not lower the first-shot accuracy).
+- **First reach.** The reach starts at the appearance, and its peak must come at least 120 ms after it (the same reaction rule as for a newly spawned target), so the search turn is not read as a first reach.
+- **New figures** `rangeOffScreenSpawns` and `rangeMedianSearchMs` (spawn until in view, over the bots that spawned out of view) are stored as `range_off_screen_spawns` and `range_median_search_ms`. `METRICS_VERSION` is 4, so stored rounds are recomputed on the next start.
+
+On the five real rounds the median time to kill fell from 836-1295 ms to 793-1071 ms and the mean time to hit by 8-12 %; the median search time was 55-685 ms per round; the first-shot accuracy did not change (no clicks before the bots were in view). The score of a Range round therefore no longer punishes a bot that spawned behind the player more than one in front.
+
+**Strafe speed.** The bots moved a touch too fast in the user's second play, so `RangeGeometry.strafeSpeedMetersPerSecond` and the profile are 2.0 m/s (from 2.2); the strafing click targets of the other scenarios keep `StrafeConfig`'s 2.2. A re-run of `M15cGateTest` (git aba31e5 plus these changes) keeps the result: default flat player 0/30 false offers in every arm, flick + range median 61.6 (x1.24, 57, before 60.3), range only 112.5 (x2.25, before 86.8; report only), 16 kills per range round (before 15), strength search with range: false direction for the flat player 13/16 (before 14/16), rising 16/16, falling 15/16.
+
 ## Flash turn-away (M10)
 
 Turning away from a flash and coming back quickly is a key use case in Valorant that none of the other scenarios measures: it needs a fast, long movement away and an accurate one back. The scenario (`FlashScenario`) measures both, and the importance of flash dodging is a setting.

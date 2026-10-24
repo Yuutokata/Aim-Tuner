@@ -175,7 +175,7 @@
         },
         "strafe": {
           "verified": false,
-          "source": "Measured, then adjusted by the player's feel: clips of 2026-10-22 gave move-stop-move with moving segments 0.36 s median (0.25-0.5), stops 0.2 s (0.1-0.3) and about 12 degrees per second at an assumed 12 m (2.5 m/s, so partly circular). The player found the bots in the first version (2.5 m/s, stops 0.1-0.3 s) moving too much and turning too fast, so the values are 2.2 m/s, moves 0.25-0.45 s and stops 0.3-0.7 s (about 40 % of the time moving). The reverse probability 0.6 and the +-2 m limit are assumptions."
+          "source": "Measured, then adjusted by the player's feel: clips of 2026-10-22 gave move-stop-move with moving segments 0.36 s median (0.25-0.5), stops 0.2 s (0.1-0.3) and about 12 degrees per second at an assumed 12 m (2.5 m/s, so partly circular). The player found the bots in the first version (2.5 m/s, stops 0.1-0.3 s) moving too much and turning too fast, so the values are 2.2 m/s, moves 0.25-0.45 s and stops 0.3-0.7 s (about 40 % of the time moving); after the second play (2026-10-24) the bots were still a touch too fast, so the speed is 2.0 m/s. The reverse probability 0.6 and the +-2 m limit are assumptions."
         },
         "killRule": {
           "verified": false,
