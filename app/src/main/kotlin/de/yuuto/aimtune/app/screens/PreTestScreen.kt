@@ -57,14 +57,14 @@ class PreTestScreen(ctx: AppContext, private val rangeMode: Boolean = false) : U
 
     override fun onEnter() = ctx.startBlindTest(rangeMode)
 
-    /** One line: this is the Range mode, and the speed and bots settings it will use. */
+    /** One line: this is the Range mode, and the speed, bots and armor settings it will use. */
     private fun rangeInfo(): Table {
         val options = ctx.settings.current.rangeOptions()
         val table = Table()
         table.background(ui.skin.getDrawable(Styles.CARD))
         table.pad(ROW_PADDING)
         val bots = t(if (options.botsStrafe) "settings.range_bots.strafe" else "settings.range_bots.reset")
-        table.add(ui.label(t("pretest.range_mode", t("settings.range_speed.${options.speed.id}"), bots), Styles.BODY, wrap = true)).left().growX()
+        table.add(ui.label(t("pretest.range_mode", t("settings.range_speed.${options.speed.id}"), bots, t(if (options.armor) "settings.range_armor.on" else "settings.range_armor.off")), Styles.BODY, wrap = true)).left().growX()
         return table
     }
 

@@ -11,6 +11,7 @@ import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -118,6 +119,18 @@ class SettingsStoreTest {
         assertEquals(setOf(ScenarioKind.FLICK, ScenarioKind.TRACKING), store.load().enabledScenarios())
         assertFailsWith<SettingsException> { store().save(AppSettings(scenarios = emptyList())) }
         assertFailsWith<SettingsException> { store().save(AppSettings(scenarios = listOf("flick", "juggling"))) }
+    }
+
+    @Test
+    fun `range bot armor defaults to on, reaches the range options and survives a round trip`() {
+        assertTrue(AppSettings().rangeOptions().armor)
+        val file = dir.resolve("old.json")
+        Files.writeString(file, """{"version":1,"dpi":800.0}""")
+        assertTrue(SettingsStore(file).load().rangeOptions().armor)
+
+        val store = store()
+        store.save(AppSettings(rangeBotArmor = false))
+        assertFalse(store.load().rangeOptions().armor)
     }
 
     @Test

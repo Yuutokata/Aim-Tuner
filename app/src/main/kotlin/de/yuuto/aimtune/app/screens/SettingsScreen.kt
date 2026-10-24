@@ -64,6 +64,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
     private var flashSound = ctx.settings.current.flashSound
     private var rangeSpeed = RangeSpeed.fromId(ctx.settings.current.rangeSpeed) ?: RangeSpeed.NONE
     private var rangeStrafe = ctx.settings.current.rangeBotsStrafe
+    private var rangeArmor = ctx.settings.current.rangeBotArmor
     private var hitSound = ctx.settings.current.hitSound
     private var checkForUpdates = ctx.settings.current.checkForUpdates
     private var message: Pair<String, Boolean>? = null
@@ -244,7 +245,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         return block
     }
 
-    /** Range mode: how long an unshot bot stays, and whether bots strafe; one row of two selects under the scenario tiles. */
+    /** Range mode: how long an unshot bot stays, and whether bots strafe; two selects in a row and the armor select below, under the scenario tiles. */
     private fun rangeOptions(): Table {
         val table = Table()
         val speeds = RangeSpeed.entries.map { t("settings.range_speed.${it.id}") }
@@ -257,10 +258,17 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         botsSelect.setItems(*bots.toTypedArray())
         botsSelect.selected = bots[if (rangeStrafe) 0 else 1]
         botsSelect.onChange { rangeStrafe = bots.indexOf(botsSelect.selected) == 0; message = null }
+        val armors = listOf(t("settings.range_armor.on"), t("settings.range_armor.off"))
+        val armorSelect = SelectBox<String>(ui.skin)
+        armorSelect.setItems(*armors.toTypedArray())
+        armorSelect.selected = armors[if (rangeArmor) 0 else 1]
+        armorSelect.onChange { rangeArmor = armors.indexOf(armorSelect.selected) == 0; message = null }
         table.add(ui.label(t("settings.range_speed"), Styles.CAPTION_MUTED)).left().padRight(SEGMENT_GAP)
         table.add(speedSelect).width(RANGE_SELECT_WIDTH).height(RANGE_SEGMENT_HEIGHT).padRight(SCENARIOS_GAP / 2)
         table.add(ui.label(t("settings.range_bots"), Styles.CAPTION_MUTED)).left().padRight(SEGMENT_GAP)
-        table.add(botsSelect).width(RANGE_SELECT_WIDTH).height(RANGE_SEGMENT_HEIGHT)
+        table.add(botsSelect).width(RANGE_SELECT_WIDTH).height(RANGE_SEGMENT_HEIGHT).row()
+        table.add(ui.label(t("settings.range_armor"), Styles.CAPTION_MUTED)).left().padRight(SEGMENT_GAP).padTop(SEGMENT_GAP)
+        table.add(armorSelect).width(RANGE_SELECT_WIDTH).height(RANGE_SEGMENT_HEIGHT).left().padTop(SEGMENT_GAP)
         return table
     }
 
@@ -307,7 +315,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
             return
         }
         val enabled = ScenarioKind.entries.map { it.id }.filter { it in scenarios }
-        val base: AppSettings = ctx.settings.current.copy(roundSeconds = roundSeconds, metricWeights = weights.toMap(), scenarios = enabled, language = language.code, flashSound = flashSound, hitSound = hitSound, checkForUpdates = checkForUpdates, rangeSpeed = rangeSpeed.id, rangeBotsStrafe = rangeStrafe)
+        val base: AppSettings = ctx.settings.current.copy(roundSeconds = roundSeconds, metricWeights = weights.toMap(), scenarios = enabled, language = language.code, flashSound = flashSound, hitSound = hitSound, checkForUpdates = checkForUpdates, rangeSpeed = rangeSpeed.id, rangeBotsStrafe = rangeStrafe, rangeBotArmor = rangeArmor)
         val error = ctx.settings.save(draft.toSettings(base, ctx.profiles))
         if (error == null) {
             ctx.showMenu()
@@ -328,6 +336,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         hitSound = true
         rangeSpeed = RangeSpeed.NONE
         rangeStrafe = true
+        rangeArmor = true
         checkForUpdates = true
         message = t("settings.reset_done") to true
         rebuild()

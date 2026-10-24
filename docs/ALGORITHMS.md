@@ -358,6 +358,21 @@ Reading it honestly: (a) the DEFAULT flat player gets no false curve offer in an
 
 Reading it: the default flat player still gets no false offer (0/30), so nothing was tuned. With the slower bots the simulated player kills 2.5 times as many (15 per round, still above the real 1.4 s per bot only by a factor of about 3 in time), and 2.9 range movements per run (reaches toward a bot that stood the whole reach) now enter the analysis; they did not produce a false offer for the default player. Flick + range finds the optimum as before (55 to 60 against 50, the flick-only result stays better), and the false directions of the strength search with range rounds are unchanged, which is why the curve finder excludes them. The aimer is still not calibrated against real play.
 
+## Range mode: bots outside the field of view (M21)
+
+A Range bot spawns at a bearing of -50 to 80 degrees from the counter, wherever the player's view happens to be, so on the user's real rounds 4 to 10 of about 28 bots per round (14-36 %) spawned outside the field of view (five rounds of a copy of the user's database, 2026-10-24). Measured from the spawn, the time to hit of such a bot included the search turn before the bot was in view, which says little about aim, and a click at nothing counted as a miss.
+
+For Range rounds only (`ScenarioKind.RANGE`; other scenarios are unchanged, a test pins this):
+- **Appearance.** `firstVisibleNanos` (core/metrics/BotVisibility.kt) finds the first moment, in 5 ms steps from the spawn, at which the bot (at its strafing position) lies within `MetricsParams.rangeHalfFovDegrees` = 51.5 degrees of the view yaw (Valorant's 103 degrees horizontal at 16:9, as in `FlashGeometry`). A bot in sight appears at its spawn. Pitch is not checked (bots stand on the floor).
+- **Time to hit** (`RoundSummary`, `meanTimeToHitMs`, and the Range time to kill) starts at the appearance.
+- **Shots.** A click before the bot of that moment has appeared is neither a shot nor a miss (it does not lower the first-shot accuracy).
+- **First reach.** The reach starts at the appearance, and its peak must come at least 120 ms after it (the same reaction rule as for a newly spawned target), so the search turn is not read as a first reach.
+- **New figures** `rangeOffScreenSpawns` and `rangeMedianSearchMs` (spawn until in view, over the bots that spawned out of view) are stored as `range_off_screen_spawns` and `range_median_search_ms`. `METRICS_VERSION` is 4, so stored rounds are recomputed on the next start.
+
+On the five real rounds the median time to kill fell from 836-1295 ms to 793-1071 ms and the mean time to hit by 8-12 %; the median search time was 55-685 ms per round; the first-shot accuracy did not change (no clicks before the bots were in view). The score of a Range round therefore no longer punishes a bot that spawned behind the player more than one in front.
+
+**Strafe speed.** The bots moved a touch too fast in the user's second play, so `RangeGeometry.strafeSpeedMetersPerSecond` and the profile are 2.0 m/s (from 2.2); the strafing click targets of the other scenarios keep `StrafeConfig`'s 2.2. A re-run of `M15cGateTest` (git aba31e5 plus these changes) keeps the result: default flat player 0/30 false offers in every arm, flick + range median 61.6 (x1.24, 57, before 60.3), range only 112.5 (x2.25, before 86.8; report only), 16 kills per range round (before 15), strength search with range: false direction for the flat player 13/16 (before 14/16), rising 16/16, falling 15/16.
+
 ## Flash turn-away (M10)
 
 Turning away from a flash and coming back quickly is a key use case in Valorant that none of the other scenarios measures: it needs a fast, long movement away and an accurate one back. The scenario (`FlashScenario`) measures both, and the importance of flash dodging is a setting.
@@ -611,4 +626,24 @@ Question (docs/history/CURVE-FINDER-AUDIT.md, option O4): does a level stage (a 
 | level only when its interval excludes the game sensitivity | 23 % (0 %) | 45 % (0 %) | 3 % | 75 % | 83 % |
 | level half-way (geometric mean) | 25 % (0 %) | 37 % (0 %) | 0 % | 82 % | 88 % |
 
-Result: the audit's problem is already solved by M16 (the current row has no falling export for any adapted hand, no harmful export for a flat hand, RISING 100 %). The level stage adds a gain for hands adapted to a lower level (ADAPTED_HIGH 3 % to 37-58 % exported) but costs 20 rounds and no variant meets the gate (RISING >= 80 % and FALLING >= 90 % together; the best, half-way, has 82 % and 88 %, and the full stage 53 % and 78 %), because a rising preference is partly absorbed by the level. Not adopted; the strength search stays as it is. Not simulated: flash rounds in the strength search, a 2-D joint search of level and strength. Differences of 5-8 points between rows are within the noise of 60 seeds.
+Result: the audit's problem is already solved by M16 (the current row has no falling export for any adapted hand, no harmful export for a flat hand, RISING 100 %). The level stage adds a gain for hands adapted to a lower level (ADAPTED_HIGH 3 % to 37-58 % exported) but costs 20 rounds and no variant meets the gate (RISING >= 80 % and FALLING >= 90 % together; the best, half-way, has 82 % and 88 %, and the full stage 53 % and 78 %), because a rising preference is partly absorbed by the level. Not adopted; the strength search stays as it is. Flash rounds in the strength search are simulated in the next section (M20); a 2-D joint search of level and strength is not. Differences of 5-8 points between rows are within the noise of 60 seeds.
+
+## Flash rounds in the strength search, M20 experiment (not adopted)
+
+The app's strength search plays flash turn-away rounds in half of its rounds when flash matters to the player, with the strength range up to 1.75 and the flash dodge weight 15 ("sometimes") or 35 ("often"); M19 and the audit simulated click rounds only. `FlashStrengthSearchTest` (gated, `AIMTUNE_REVIEW=1`, `AIMTUNE_SEEDS=100` gives 60 seeds per row, report `core/build/reports/harness/flash-strength-search.txt`) runs the same chain on the five hands of M19 (24 rounds at the game sensitivity 55 cm/360, then the 12-pair blind A/B test with the variant's own scenarios and weights). Export rate (exported in the true direction in brackets for RISING and FALLING):
+
+| hand | click only (0.70-1.45) | flash sometimes (0.70-1.75) | flash often (0.70-1.75) |
+| --- | --- | --- | --- |
+| ADAPTED | 2 % (falling 0 %) | 2 % (0 %) | 0 % |
+| ADAPTED_HIGH | 0 % | 0 % | 2 % (falling 0 %) |
+| FLAT | 3 % | 0 % | 0 % |
+| RISING | 93 % (right 93 %) | 37 % | 78 % |
+| FALLING | 93 % (right 93 %) | 20 % | 5 % |
+
+Result:
+- **Few exports for adapted and flat hands, none falling**: ADAPTED, ADAPTED_HIGH and FLAT export at most 3 % in any variant and no adapted hand exports a falling curve; with flash they export 0-2 %. Flash rounds make the search more cautious, not less.
+- **Falling curves are almost never exported when flash matters** (FALLING 93 % click only, 20 % and 5 % with flash): a fast turn-away pays for more gain at speed, so a falling curve loses in the flash rounds. This fits the player's goal (low gain for micro-adjustments, high gain for flash turns) and is why the click-only gate (FALLING >= 90 %) does not carry over.
+- **Rising detection drops with a low flash weight** (93 % click only, 37 % "sometimes", 78 % "often"): the best strength then sits at the range edge or is diluted by the dodge metric. Many "sometimes" runs are not offered at all (75 % offered for RISING).
+- The median paired benefit of the offered curves of the FLAT hand is negative with flash (-22 and -17 points) but they are not exported (0 %); the offered-but-not-confirmed share is 10-13 %.
+
+Not adopted, no app change: the search with flash exports little for hands without a real preference and is consistent with the goal; the lower rising detection at flash "sometimes" is a possible point for a later tuning (more rounds or a lower flash share in the search). 60 seeds give about +-12 points of sampling error. The 2-D joint search of level and strength stays untested.

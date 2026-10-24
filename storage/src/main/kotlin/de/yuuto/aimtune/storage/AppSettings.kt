@@ -69,6 +69,8 @@ data class AppSettings(
     val rangeSpeed: String = RangeSpeed.NONE.id,
     /** Range mode: bots strafe (true) or stand still (false, the range's "Reset"). */
     val rangeBotsStrafe: Boolean = true,
+    /** Range mode: bot armor on (the range's default; a body kill needs one more hit). */
+    val rangeBotArmor: Boolean = true,
 ) {
     /** @throws SettingsException describing the first invalid field. */
     fun validate() {
@@ -91,7 +93,7 @@ data class AppSettings(
 
     /** The Range mode options of these settings. @throws SettingsException for an unknown speed. */
     fun rangeOptions(): RangeOptions =
-        RangeOptions(speed = RangeSpeed.fromId(rangeSpeed) ?: throw SettingsException("unknown range speed '$rangeSpeed'"), botsStrafe = rangeBotsStrafe)
+        RangeOptions(speed = RangeSpeed.fromId(rangeSpeed) ?: throw SettingsException("unknown range speed '$rangeSpeed'"), botsStrafe = rangeBotsStrafe, armor = rangeBotArmor)
 
     /** @throws SettingsException for unknown scenario ids or an empty selection. */
     fun enabledScenarios(): Set<ScenarioKind> {

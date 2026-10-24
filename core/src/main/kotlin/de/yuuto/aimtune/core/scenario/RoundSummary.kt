@@ -24,9 +24,11 @@ data class RoundSummary(
 /**
  * Time to hit is measured from the later of the target's spawn and the previous hit to the hit on
  * it. With one target at a time that is the spawn; with several visible at once (switching) it is
- * the time the player needed to get from the last hit to this one.
+ * the time the player needed to get from the last hit to this one. [appearedAt] says when a target came into view where that is
+ * later than its spawn (a Range bot beside or behind the player): the time to hit starts there, and a click before it, at
+ * nothing, is neither a shot nor a miss.
  */
-fun summarize(events: List<TargetEvent>): RoundSummary {
+fun summarize(events: List<TargetEvent>, appearedAt: Map<Int, Long> = emptyMap()): RoundSummary {
     val spawnTimes = HashMap<Int, Long>()
     var hits = 0
     var misses = 0
@@ -35,9 +37,13 @@ fun summarize(events: List<TargetEvent>): RoundSummary {
     var firstShots = 0
     var firstShotHits = 0
     var awaitingFirstShot = true
+    var visibleFrom = Long.MIN_VALUE
     for (event in events) {
         when (event) {
-            is TargetEvent.Spawned -> spawnTimes[event.target.id] = event.timeNanos
+            is TargetEvent.Spawned -> {
+                spawnTimes[event.target.id] = event.timeNanos
+                visibleFrom = appearedAt[event.target.id] ?: event.timeNanos
+            }
             is TargetEvent.Hit -> {
                 if (awaitingFirstShot) {
                     firstShots++
@@ -46,10 +52,10 @@ fun summarize(events: List<TargetEvent>): RoundSummary {
                 awaitingFirstShot = true
                 hits++
                 val spawn = checkNotNull(spawnTimes[event.targetId]) { "hit without spawn: ${event.targetId}" }
-                totalHitTime += event.timeNanos - maxOf(spawn, previousHitNanos)
+                totalHitTime += event.timeNanos - maxOf(appearedAt[event.targetId] ?: spawn, previousHitNanos)
                 previousHitNanos = event.timeNanos
             }
-            is TargetEvent.Miss, is TargetEvent.BodyHit -> {
+            is TargetEvent.Miss, is TargetEvent.BodyHit -> if (event.timeNanos >= visibleFrom) {
                 misses++
                 if (awaitingFirstShot) firstShots++
                 awaitingFirstShot = false

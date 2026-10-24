@@ -2,6 +2,8 @@
 
 Branch `audit/curve-finder`, 2026-10-22. Audit and plan only; no production code was changed.
 
+> **Status (2026-10-24):** this audit is a record. Its proposals were implemented or decided afterwards: M16 (curve safety), M17 (Raw Accel model and import), M18 (refine my curve) and M19 (two-stage strength search, tested and not adopted). The findings describe the app as it was on 2026-10-22; see `docs/ALGORITHMS.md` and `docs/PROGRESS.md` for the current state.
+
 Evidence files (all on this branch):
 
 | File | What | How to regenerate |

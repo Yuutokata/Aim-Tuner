@@ -53,7 +53,7 @@ data class RoundRow(
  * 3: horizontal and vertical endpoint error of the first movement (mean_abs_first_error_h_deg / _v_deg, mean_first_error_v_deg);
  *    older rounds get them from their stored events. Flash turn-away rounds (the dodge rate) came in with this version too.
  */
-const val METRICS_VERSION = 3
+const val METRICS_VERSION = 4
 
 /** How many stored rounds [RoundRepository.refreshMetrics] recomputed, and how many could not be (unreadable events). */
 data class MetricsRefresh(val updated: Int, val failed: Int)
@@ -395,6 +395,8 @@ fun RoundMetrics.toNamedValues(): Map<String, Double> = buildMap {
     rangeKills?.let { put("range_kills", it.toDouble()) }
     rangeMedianTimeToKillMs?.let { put("range_median_ttk_ms", it) }
     rangeShotsPerKill?.let { put("range_shots_per_kill", it) }
+    rangeOffScreenSpawns?.let { put("range_off_screen_spawns", it.toDouble()) }
+    rangeMedianSearchMs?.let { put("range_median_search_ms", it) }
 }
 
 /** The stored metrics a round's score is computed from, as [de.yuuto.aimtune.core.metrics.RoundMetrics.scoreInputs] would give them. */
