@@ -611,4 +611,24 @@ Question (docs/history/CURVE-FINDER-AUDIT.md, option O4): does a level stage (a 
 | level only when its interval excludes the game sensitivity | 23 % (0 %) | 45 % (0 %) | 3 % | 75 % | 83 % |
 | level half-way (geometric mean) | 25 % (0 %) | 37 % (0 %) | 0 % | 82 % | 88 % |
 
-Result: the audit's problem is already solved by M16 (the current row has no falling export for any adapted hand, no harmful export for a flat hand, RISING 100 %). The level stage adds a gain for hands adapted to a lower level (ADAPTED_HIGH 3 % to 37-58 % exported) but costs 20 rounds and no variant meets the gate (RISING >= 80 % and FALLING >= 90 % together; the best, half-way, has 82 % and 88 %, and the full stage 53 % and 78 %), because a rising preference is partly absorbed by the level. Not adopted; the strength search stays as it is. Not simulated: flash rounds in the strength search, a 2-D joint search of level and strength. Differences of 5-8 points between rows are within the noise of 60 seeds.
+Result: the audit's problem is already solved by M16 (the current row has no falling export for any adapted hand, no harmful export for a flat hand, RISING 100 %). The level stage adds a gain for hands adapted to a lower level (ADAPTED_HIGH 3 % to 37-58 % exported) but costs 20 rounds and no variant meets the gate (RISING >= 80 % and FALLING >= 90 % together; the best, half-way, has 82 % and 88 %, and the full stage 53 % and 78 %), because a rising preference is partly absorbed by the level. Not adopted; the strength search stays as it is. Flash rounds in the strength search are simulated in the next section (M20); a 2-D joint search of level and strength is not. Differences of 5-8 points between rows are within the noise of 60 seeds.
+
+## Flash rounds in the strength search, M20 experiment (not adopted)
+
+The app's strength search plays flash turn-away rounds in half of its rounds when flash matters to the player, with the strength range up to 1.75 and the flash dodge weight 15 ("sometimes") or 35 ("often"); M19 and the audit simulated click rounds only. `FlashStrengthSearchTest` (gated, `AIMTUNE_REVIEW=1`, `AIMTUNE_SEEDS=100` gives 60 seeds per row, report `core/build/reports/harness/flash-strength-search.txt`) runs the same chain on the five hands of M19 (24 rounds at the game sensitivity 55 cm/360, then the 12-pair blind A/B test with the variant's own scenarios and weights). Export rate (exported in the true direction in brackets for RISING and FALLING):
+
+| hand | click only (0.70-1.45) | flash sometimes (0.70-1.75) | flash often (0.70-1.75) |
+| --- | --- | --- | --- |
+| ADAPTED | 2 % (falling 0 %) | 2 % (0 %) | 0 % |
+| ADAPTED_HIGH | 0 % | 0 % | 2 % (falling 0 %) |
+| FLAT | 3 % | 0 % | 0 % |
+| RISING | 93 % (right 93 %) | 37 % | 78 % |
+| FALLING | 93 % (right 93 %) | 20 % | 5 % |
+
+Result:
+- **Few exports for adapted and flat hands, none falling**: ADAPTED, ADAPTED_HIGH and FLAT export at most 3 % in any variant and no adapted hand exports a falling curve; with flash they export 0-2 %. Flash rounds make the search more cautious, not less.
+- **Falling curves are almost never exported when flash matters** (FALLING 93 % click only, 20 % and 5 % with flash): a fast turn-away pays for more gain at speed, so a falling curve loses in the flash rounds. This fits the player's goal (low gain for micro-adjustments, high gain for flash turns) and is why the click-only gate (FALLING >= 90 %) does not carry over.
+- **Rising detection drops with a low flash weight** (93 % click only, 37 % "sometimes", 78 % "often"): the best strength then sits at the range edge or is diluted by the dodge metric. Many "sometimes" runs are not offered at all (75 % offered for RISING).
+- The median paired benefit of the offered curves of the FLAT hand is negative with flash (-22 and -17 points) but they are not exported (0 %); the offered-but-not-confirmed share is 10-13 %.
+
+Not adopted, no app change: the search with flash exports little for hands without a real preference and is consistent with the goal; the lower rising detection at flash "sometimes" is a possible point for a later tuning (more rounds or a lower flash share in the search). 60 seeds give about +-12 points of sampling error. The 2-D joint search of level and strength stays untested.
