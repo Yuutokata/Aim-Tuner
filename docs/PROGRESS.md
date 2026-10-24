@@ -219,6 +219,9 @@ Gate for every task: tests green, before/after tables from the gated harness (`g
 
 ## Last session
 
+- Range bot armor setting (branch `feature/range-armor-setting`): `AppSettings.rangeBotArmor` (default on, old files load as on), a "Bot armor" select under the Range speed and bots selects in Settings (own row so the right column does not overflow), shown in the Range mode pre-test line (EN/DE), reset to on; `RangeOptions.armor` already existed. Test in `SettingsStoreTest`. The kill rule values (4 body hits armor on, 3 off) are still unverified assumptions.
+- Housekeeping: deleted the merged local feature branches; CI now builds only `dev` pushes and pull requests (no docs-only runs, older runs cancelled); the `v0.3.0` tag was re-pushed after the `ExportAuditTest` fix (the test still expected the old DPI truncation) and the release is published.
+
 - Docs rewrite (branch `docs/readme-algorithms`): README redesigned (header with badges, feature table, collapsible limitations and screenshots, Mermaid loop, module table, docs table; content kept, Range mode and Refine mode added to the feature list). `docs/ALGORITHMS.md` now starts with "Part 1: the method in plain words" (loop, score, optimizer, result, acceleration flow, testing, glossary; Mermaid diagrams, the score chart is an illustration with made-up numbers) and a table of contents; the former milestone sections are unchanged but grouped into four topics as "Part 2: Reference". Mermaid not rendered locally (GitHub renders it). No code changed.
 
 - Repo cleanup (branch `chore/cleanup`): removed the committed Python caches, `docs/PROMPT-M15-range.md`, and the German reviews `docs/ANALYSE.md` and `docs/OPTIMIZER-REVIEW.md` (comments now say "git history"); moved `ASSESSMENT.md`, `REVIEW.md`, `CURVE-FINDER-AUDIT.md` and `audit/` to `docs/history/`; stopped tracking `.idea/` and ignored `user-rawaccel-settings.json`. References updated, no code changed.
