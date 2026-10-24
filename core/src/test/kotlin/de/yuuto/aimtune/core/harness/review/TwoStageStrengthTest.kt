@@ -22,7 +22,7 @@ import kotlin.math.sqrt
 
 /**
  * M19 gate: does a level stage before the strength search keep the detection of a true rising or falling preference while it
- * removes the falling results of hands that only want another overall level (docs/CURVE-FINDER-AUDIT.md, option O4)?
+ * removes the falling results of hands that only want another overall level (docs/history/CURVE-FINDER-AUDIT.md, option O4)?
  * The hands are those of the audit: ADAPTED (adapted to 0.75 x the user's Raw Accel curve), ADAPTED_HIGH (0.53 x, the user's real
  * level), FLAT, RISING and FALLING (gainPlayer +-0.30).
  */

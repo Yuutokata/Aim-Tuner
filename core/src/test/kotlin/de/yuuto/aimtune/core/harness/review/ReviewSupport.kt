@@ -18,7 +18,7 @@ import java.util.stream.IntStream
 import kotlin.math.exp
 import kotlin.math.ln
 
-/** Helpers for the review experiments (docs/REVIEW.md). They only run when AIMTUNE_REVIEW is set. */
+/** Helpers for the review experiments (docs/history/REVIEW.md). They only run when AIMTUNE_REVIEW is set. */
 const val ROUND_SECONDS = 45
 const val NANOS_PER_SECOND = 1_000_000_000L
 

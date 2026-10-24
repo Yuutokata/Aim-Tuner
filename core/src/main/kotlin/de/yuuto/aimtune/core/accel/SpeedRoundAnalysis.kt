@@ -33,7 +33,7 @@ data class SpeedRoundFit(
  * one distance bin the two kinds of round then differ in speed but not in distance, and the change of the median error
  * between them over the change of the median log speed is the slope of the wanted log gain against log speed. Every bin
  * has its own level, so any effect of the distance alone drops out. Bins are compared by their medians: the noise of a
- * rushed reach is larger, and a mean of the log error would sink with it (the M3 artefact of docs/REVIEW.md). The speed
+ * rushed reach is larger, and a mean of the log error would sink with it (the M3 artefact of docs/history/REVIEW.md). The speed
  * of a single reach is not used as such; it carries the reach's own noise (E1 of the removed docs/OPTIMIZER-REVIEW.md (git history)).
  *
  * What it cannot see: a hand that undershoots more when rushed, whatever the gain, looks like a wish for more gain at

@@ -23,7 +23,7 @@ private const val BYTES_PER_KB = 1024
 data class StoredCounts(val sessions: Int, val rounds: Int)
 
 /**
- * Exports the stored rounds as one file for a researcher (docs/ASSESSMENT.md D4). Nothing is sent
+ * Exports the stored rounds as one file for a researcher (docs/history/ASSESSMENT.md D4). Nothing is sent
  * anywhere: the file is written to the data folder and the person sends it themselves. The screen says
  * what the file holds and what it does not hold before anything is written.
  */

@@ -59,7 +59,7 @@ fun doesTurnFitPad(cm360: Double, padWidthCm: Double): Boolean = cm360 <= padWid
  * of 6 if style and current value are far apart (the style side gives way, the current value stays
  * inside with a margin). The pad width does not shape the range: players lift the mouse for long turns,
  * and cutting the range at the pad width hid optima above the current value for small pads
- * (docs/REVIEW.md M1). [padWidthCm] only has to be valid; use [doesHalfTurnFitPad] to warn.
+ * (docs/history/REVIEW.md M1). [padWidthCm] only has to be valid; use [doesHalfTurnFitPad] to warn.
  */
 fun searchRange(
     style: AimStyle,

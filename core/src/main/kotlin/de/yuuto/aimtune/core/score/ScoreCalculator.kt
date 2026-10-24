@@ -10,7 +10,7 @@ import kotlin.math.sqrt
  * enters the score the optimizer maximizes. Consistency does not: the spread of the relative
  * first-movement error falls steadily as the sensitivity gets lower (the hand's fixed noise shrinks in
  * degrees), so it has no best sensitivity of its own and would only pull the result toward the slow
- * end (docs/REVIEW.md C3). It is kept as a diagnostic.
+ * end (docs/history/REVIEW.md C3). It is kept as a diagnostic.
  */
 enum class ScoreMetric(val higherIsBetter: Boolean, val scoresRounds: Boolean = true) {
     ACCURACY(true),

@@ -294,7 +294,7 @@ class AccelRun(
     companion object {
         const val DEFAULT_CALIBRATION_ROUNDS = 15
 
-        /** From this many rounds on the analysis can be started early; 8 rounds found rising curves far less often than 15 (docs/ASSESSMENT.md B3). */
+        /** From this many rounds on the analysis can be started early; 8 rounds found rising curves far less often than 15 (docs/history/ASSESSMENT.md B3). */
         const val MIN_CALIBRATION_ROUNDS = 8
 
         /** With earlier rounds to build on, a day still plays at least this many new ones (one pass through the click scenarios). */

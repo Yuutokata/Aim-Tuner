@@ -50,7 +50,7 @@ Heights and map: `eyeHeightMeters` and `headHeightMeters` give the camera height
 
 The `flash` block (also optional, same fallback) describes the flash turn-away scenario: how long a flash is visible before it pops, where it appears (`cueOffsetDegrees`, `cueElevationDegrees`, `distanceMeters`), the pause between flashes (`gapSeconds`), how long a player who looks at it is blind, where the enemy shows up afterwards (`returnSpreadDegrees`, `returnMinDegrees`) and how far past the edge of the screen the flash must be (`exitMarginDegrees`). The half field of view comes from `fov`. `sources` and `notes` may list where the values come from; mark them `verified` only when measured.
 
-Sizes are angles (degrees at the game's FOV), never meters or pixels; the distance only gives the scene depth. `flickAngles` is the distance of the next target from the previous one (where the crosshair is after a hit): buckets by upper limit and weight. How to measure a head in the game's shooting range is described in [docs/REVIEW.md](docs/REVIEW.md) ("Realism").
+Sizes are angles (degrees at the game's FOV), never meters or pixels; the distance only gives the scene depth. `flickAngles` is the distance of the next target from the previous one (where the crosshair is after a hit): buckets by upper limit and weight. How to measure a head in the game's shooting range is described in [docs/history/REVIEW.md](docs/history/REVIEW.md) ("Realism").
 
 Verify yaw and FOV against a current, reliable source and cite it in `sources` and the PR. Never guess values.
 

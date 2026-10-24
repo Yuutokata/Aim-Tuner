@@ -32,7 +32,7 @@ data class GainPoint(val speed: Double, val logGain: Double, val standardError: 
  * log gain over all movements is 0. The median, not the mean: the noise of a reach is about symmetric
  * in the error itself, so the mean of its logarithm is pulled down by an amount that grows with the
  * relative noise, which differs between slow, small reaches and fast, large ones; the mean therefore
- * invented a speed dependence for players who have none (docs/REVIEW.md M3): it says how the wanted gain changes with speed, not what the
+ * invented a speed dependence for players who have none (docs/history/REVIEW.md M3): it says how the wanted gain changes with speed, not what the
  * sensitivity should be (that is the optimizer's job). See docs/ALGORITHMS.md ("Acceleration").
  */
 class AccelAnalysis(
@@ -46,7 +46,7 @@ class AccelAnalysis(
      * Samples used: movements with a plausible ratio (the first movement went toward the target) and a hand
      * speed of at least [minSpeed]. Slower reaches are small ones, and their error depends on their size even
      * with a constant gain; on simulated players without any preference it looked like a falling gain of
-     * the size of a 15 % preference (docs/ASSESSMENT.md B1), and Raw Accel curves start at gain 1 there anyway.
+     * the size of a 15 % preference (docs/history/ASSESSMENT.md B1), and Raw Accel curves start at gain 1 there anyway.
      */
     val used: List<MovementSample> = samples.filter { it.speed >= minSpeed && (1.0 + it.errorRatio) in MIN_RATIO..MAX_RATIO }
 

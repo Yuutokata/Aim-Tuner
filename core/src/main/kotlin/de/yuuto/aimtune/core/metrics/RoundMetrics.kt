@@ -24,7 +24,7 @@ data class MetricsParams(
     /**
      * The speed peak of the first reach comes at least this long after a target appeared. A reach
      * whose peak comes earlier is the hand still moving from the previous click, not a reaction
-     * (docs/REVIEW.md C2). The peak, not the start, because the start of a smooth reach is found
+     * (docs/history/REVIEW.md C2). The peak, not the start, because the start of a smooth reach is found
      * early (the slow ramp-up is above the low end threshold). Not applied to targets that were
      * already visible, where the player may be on the way before the previous hit.
      */

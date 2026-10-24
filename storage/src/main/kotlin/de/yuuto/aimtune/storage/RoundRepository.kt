@@ -48,8 +48,8 @@ data class RoundRow(
 /**
  * Version of the metric definitions written with each round; raise it when ALGORITHMS.md changes them.
  * Rounds with an older version are recomputed from their stored raw events ([RoundRepository.refreshMetrics]).
- * 2: the first reach of a movement must come after a reaction time and cover a share of the distance (REVIEW.md C2);
- *    the accuracy the score uses is the first-shot accuracy (REVIEW.md M6).
+ * 2: the first reach of a movement must come after a reaction time and cover a share of the distance (docs/history/REVIEW.md C2);
+ *    the accuracy the score uses is the first-shot accuracy (docs/history/REVIEW.md M6).
  * 3: horizontal and vertical endpoint error of the first movement (mean_abs_first_error_h_deg / _v_deg, mean_first_error_v_deg);
  *    older rounds get them from their stored events. Flash turn-away rounds (the dodge rate) came in with this version too.
  */

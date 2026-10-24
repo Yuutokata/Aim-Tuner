@@ -46,7 +46,7 @@ data class OptimizationResult(
     val sessions: Int,
     /**
      * The stretch of cm/360 around [optimumCm360] in which the model's mean score is within [negligibleDifference]
-     * of the best: sensitivities in it are equivalent as far as this test can tell (docs/ASSESSMENT.md A2).
+     * of the best: sensitivities in it are equivalent as far as this test can tell (docs/history/ASSESSMENT.md A2).
      */
     val equivalentLowCm360: Double = optimumCm360,
     val equivalentHighCm360: Double = optimumCm360,
