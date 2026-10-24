@@ -66,7 +66,7 @@ Until M10 the targets of flick and switching were drawn uniformly in a field of 
 - Vertical sensitivity: no separate vertical multiplier was found for Valorant (pitch uses the same 0.07 degrees per count as yaw) and none exists in the code (one `degreesPerCount` for both axes); a `pitchMultiplier` in the profile can be added when a game needs one.
 - Metrics: the first movement's endpoint is split into a horizontal and a vertical error (screen-plane degrees, `firstErrorHDegrees` > 0 right of the target, `firstErrorVDegrees` > 0 above it). Rounds store `mean_abs_first_error_h_deg`, `mean_abs_first_error_v_deg` and `mean_first_error_v_deg` (`METRICS_VERSION` 3, older rounds are recomputed from their events). The results screen names the dominant axis when at least three rounds have movements: a share of the summed endpoint error of 60 % or more is "most of your misses" for that axis, and a mean vertical bias of at least 0.3 degrees adds "too high" or "too low". The score does not use these numbers.
 
-**Simulation** (`VerticalExperimentsTest`, before = fully 3D, after = this profile; docs/ANALYSE.md section E has the tables): the best sensitivity of simulated players changes by -17 % to +13 % for flick, switching and micro with no common direction (tracking and flash +3 to +19 %), within the noise of the parabola fit at 30 rounds per grid point. Sensitivity finder, flat players' false offers (0 of 30), strength search and A/B test (false verdicts 2-5 %, real curves confirmed 97-100 %) are unchanged within the noise. The error analysis finds rising weak preferences less often at 15 rounds (+15 %: 6 -> 0 of 30, +25 %: 24 -> 17 of 30; the cause was not investigated). The vertical share of the endpoint error of flick falls from 43-47 % to 34-43 %. The simulated hand has the same noise in both axes, so none of this says how humans aim vertically.
+**Simulation** (`VerticalExperimentsTest`, before = fully 3D, after = this profile; the removed docs/ANALYSE.md (git history) section E has the tables): the best sensitivity of simulated players changes by -17 % to +13 % for flick, switching and micro with no common direction (tracking and flash +3 to +19 %), within the noise of the parabola fit at 30 rounds per grid point. Sensitivity finder, flat players' false offers (0 of 30), strength search and A/B test (false verdicts 2-5 %, real curves confirmed 97-100 %) are unchanged within the noise. The error analysis finds rising weak preferences less often at 15 rounds (+15 %: 6 -> 0 of 30, +25 %: 24 -> 17 of 30; the cause was not investigated). The vertical share of the endpoint error of flick falls from 43-47 % to 34-43 %. The simulated hand has the same noise in both axes, so none of this says how humans aim vertically.
 
 ## Head-sized targets and the simulated hand (M9 assessment)
 
@@ -89,7 +89,7 @@ Measured with the baseline estimator (9 grid points x 4 rounds = 36 rounds, 20-1
 
 ## Player models of the gate harness (M14)
 
-The default simulated hand makes every analysis look as good as the model it was tuned on (docs/OPTIMIZER-REVIEW.md). The
+The default simulated hand makes every analysis look as good as the model it was tuned on (the removed docs/OPTIMIZER-REVIEW.md (git history)). The
 gate harness (`core/src/test/.../harness/review/GateHarness.kt`, `GateTest`, reports `gate-<tag>.txt`) therefore reruns every
 table with hands that break one assumption each. All are options of `SimulatedPlayer`; the defaults keep the old hand.
 
@@ -100,7 +100,7 @@ table with hands that break one assumption each. All are options of `SimulatedPl
 
 **Hand adaptation** (`HandAdaptation`, two-state model of Smith, Ghazizadeh & Shadmehr 2006, their fit values: fast retention 0.59 and rate 0.21, slow retention 0.992 and rate 0.02). The gain the hand expects at speed v is `preference(v) * exp(fast(v) + slow(v))`. After every first reach the error `ln(delivered / expected)` at its peak speed moves both states: `x <- retention^w * x + rate * w * error`, where `w` is a Gaussian weight over ln speed (width 0.35). The retention applies per exposure, so a speed that is not played keeps what was learned there. The decay toward the preference leaves a share `1 / (1 + 0.21/0.41 + 0.02/0.008) = 0.25` of any constant mismatch. A preference therefore stays measurable but at a quarter of its size, and a new curve first gives an aftereffect. `adaptedTo` starts in the steady state for plain sensitivity, which is the situation of a player who comes from the game. After a 10 % gain step the mismatch falls below half within 50 reaches (`HandAdaptationTest`). The linear sensitivity is still treated as known exactly, as before. The parameters come from reaching studies, not from mouse aiming.
 
-## M14: what the gate showed (docs/OPTIMIZER-REVIEW.md, "Umsetzung und Ergebnisse")
+## M14: what the gate showed (the removed docs/OPTIMIZER-REVIEW.md (git history), "Umsetzung und Ergebnisse")
 
 Commands: `AIMTUNE_REVIEW=1 ./gradlew.bat :core:cleanTest :core:test --tests "*GateTest*"` (env `AIMTUNE_GATE_TAG`, `AIMTUNE_GATE_SECTIONS` = S,C,F,A,N,V, `AIMTUNE_GATE_CURVE` = legacy|bounded), `*ClosedLoopGateTest*`, `*DriftGateTest*`, `*SpeedRoundProbeTest*`, `*PlateauGateTest*`. All numbers are simulated players.
 

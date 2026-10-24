@@ -28,7 +28,7 @@ import kotlin.math.exp
 import kotlin.test.Test
 
 /**
- * The blind strength search for the player's goal (micro-adjustments and flash turn-away, docs/OPTIMIZER-REVIEW.md):
+ * The blind strength search for the player's goal (micro-adjustments and flash turn-away, the removed docs/OPTIMIZER-REVIEW.md (git history)):
  * a micro / flash / flick mix with flash weighted 35, strengths 0.7-2.0. A search that changes the strength every round
  * measures a hand that never gets used to any of them; the block designs play each strength for [BLOCK] rounds and
  * drop the first one of every block, which is for getting used to it. The truth is a sweep over fixed strengths with the

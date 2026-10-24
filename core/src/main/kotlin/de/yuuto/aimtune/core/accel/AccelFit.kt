@@ -156,7 +156,7 @@ private val MAX_LOG_FACTOR = ln(1.1)
  * The fit as a Raw Accel lookup table over the speeds the data measured, [low] to [high] in/s ([LOOKUP_POINTS] points,
  * evenly spaced in log speed), and flat outside them. A family fitted to a narrow window keeps rising or falling beyond it,
  * where the data say nothing: fitted over 4.5-8.3 in/s, a +15 % preference was exported as x1.38 at 40 in/s against a true
- * x1.06 (docs/OPTIMIZER-REVIEW.md, E2). Holding the last measured value is the least that can be said there.
+ * x1.06 (the removed docs/OPTIMIZER-REVIEW.md (git history), E2). Holding the last measured value is the least that can be said there.
  */
 fun AccelFit.boundedTo(low: Double, high: Double, points: Int = LOOKUP_POINTS): AccelFit {
     require(low > 0.0 && high > low) { "need 0 < low < high" }
