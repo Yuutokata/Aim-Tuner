@@ -17,7 +17,7 @@ data class ResearchExportResult(val file: Path, val sessions: Int, val rounds: I
 
 /**
  * Writes all stored sessions as one gzip-compressed JSON file that a person can send to a researcher
- * (docs/ASSESSMENT.md D4: the method has never been run on other people's recordings). It holds, per
+ * (docs/history/ASSESSMENT.md D4: the method has never been run on other people's recordings). It holds, per
  * round, the raw mouse counts with their times, the target spawns, hits and misses, the sensitivity
  * and DPI, the game id and the metrics. It holds no name, no machine or user name, no clock times
  * (sessions only get a day index relative to the first one, rounds an offset within their session)

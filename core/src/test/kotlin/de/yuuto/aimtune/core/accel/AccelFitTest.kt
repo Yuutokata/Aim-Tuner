@@ -107,7 +107,7 @@ class AccelFitTest {
 
     @Test
     fun `the simulated player who expects a falling gain is found out and one who does not is left alone`() {
-        // A rising preference is not reliably found any more (ASSESSMENT.md B3): its slowing hand leaves a narrow speed range.
+        // A rising preference is not reliably found any more (docs/history/ASSESSMENT.md B3): its slowing hand leaves a narrow speed range.
         val wants = SimulatedPlayer(gainPreference = { v -> 1.0 - 0.3 * (1.0 - exp(-v / 6.0)) })
         fun analysisOf(player: SimulatedPlayer, seed: Long): AccelAnalysis {
             // Click scenarios together: micro-adjust moves slowly, flicks and switching fast.

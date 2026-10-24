@@ -11,7 +11,7 @@ import kotlin.math.abs
  * The strength is searched blind with the same optimizer that finds the sensitivity, over a pseudo
  * cm/360 of `100 * strength` (so the search is on a log scale and symmetric in rising and falling), instead
  * of being inferred from how first movements miss: that inference sees only a narrow band of hand speeds
- * (docs/ASSESSMENT.md, "Follow-up on a more precise curve").
+ * (docs/history/ASSESSMENT.md, "Follow-up on a more precise curve").
  */
 object CurveStrength {
     const val MIN = 0.7
@@ -36,7 +36,7 @@ object CurveStrength {
 
     /**
      * A falling strength counts as clear only when the upper end of its credible range is below this. Falling curves are
-     * the ones the search found on noise most often (docs/CURVE-FINDER-AUDIT.md, option O2), so they need more evidence
+     * the ones the search found on noise most often (docs/history/CURVE-FINDER-AUDIT.md, option O2), so they need more evidence
      * than rising ones, whose range only has to stay above 1.
      */
     const val FALLING_MAX_HIGH = 0.90

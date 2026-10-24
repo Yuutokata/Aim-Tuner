@@ -36,7 +36,7 @@ import kotlin.test.Test
 
 /**
  * The simulation experiments before and after the vertical distribution of M11 (docs/ALGORITHMS.md "Vertical
- * distribution", docs/ANALYSE.md). "before" is the fully 3D field of the first trainer versions (every pitch
+ * distribution", the removed docs/ANALYSE.md (git history)). "before" is the fully 3D field of the first trainer versions (every pitch
  * in the field equally likely, flash cues up to 30 degrees high, no map features), "after" is the profile
  * default (head level with a small off-level share, 12 degree flash cues, corners and doorways).
  * Gated like the other review experiments: set AIMTUNE_REVIEW; AIMTUNE_RUNS scales the runs per cell.

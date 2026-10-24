@@ -20,14 +20,14 @@ interface RawMouseSource : AutoCloseable {
      * True when every event is stamped when its own device report arrived (Raw Input on its own
      * thread). Sources that deliver in the frame loop stamp a whole frame of reports with one time; the
      * speed of a report, which the acceleration simulation and its analysis need, is then meaningless
-     * (docs/REVIEW.md M4), so acceleration is only offered when this is true.
+     * (docs/history/REVIEW.md M4), so acceleration is only offered when this is true.
      */
     val hasReportTimestamps: Boolean get() = true
 
     /**
      * True when the source reports the left button in [MouseEvent.leftPressed], in the same ordered
      * stream as the movement. The trainer then shoots at the view of the click's own report instead of
-     * at the view of the frame in which the click happened to be processed (docs/REVIEW.md M8).
+     * at the view of the frame in which the click happened to be processed (docs/history/REVIEW.md M8).
      */
     val reportsClicks: Boolean get() = false
 

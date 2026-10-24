@@ -95,7 +95,7 @@ fun fitAccel(
 }
 
 /**
- * Thresholds for recommending a curve (docs/ASSESSMENT.md B1, ALGORITHMS.md "Detection power"). With the slow reaches
+ * Thresholds for recommending a curve (docs/history/ASSESSMENT.md B1, ALGORITHMS.md "Detection power"). With the slow reaches
  * left out and a trust floor of 0.005 per bin, the best BIC gain of 1 600 simulated players without any preference
  * was at most 9.4 (99th percentile 5.6, only with noise x1.6); 8 leaves a margin, and the blind test stays the final
  * judge. The gain range of such players is up to 1.04, so the BIC gain carries the decision and the range only
@@ -142,7 +142,7 @@ private val FAMILIES = listOf(
 private fun objective(family: Family, params: DoubleArray, points: List<GainPoint>, weights: List<Double>, ys: List<Double>): Pair<Double, Double> {
     val curve = family.build(params)
     val residual = points.indices.map { ys[it] - ln(max(curve.multiplier(points[it].speed), MIN_MULTIPLIER)) }
-    // The overall factor is bounded: the curve under test must not smuggle in a different sensitivity (ASSESSMENT.md B2).
+    // The overall factor is bounded: the curve under test must not smuggle in a different sensitivity (docs/history/ASSESSMENT.md B2).
     val logK = (weights.indices.sumOf { weights[it] * residual[it] } / weights.sum()).coerceIn(-MAX_LOG_FACTOR, MAX_LOG_FACTOR)
     val chi = weights.indices.sumOf { weights[it] * (residual[it] - logK).let { d -> d * d } }
     return chi to logK
@@ -156,7 +156,7 @@ private val MAX_LOG_FACTOR = ln(1.1)
  * The fit as a Raw Accel lookup table over the speeds the data measured, [low] to [high] in/s ([LOOKUP_POINTS] points,
  * evenly spaced in log speed), and flat outside them. A family fitted to a narrow window keeps rising or falling beyond it,
  * where the data say nothing: fitted over 4.5-8.3 in/s, a +15 % preference was exported as x1.38 at 40 in/s against a true
- * x1.06 (docs/OPTIMIZER-REVIEW.md, E2). Holding the last measured value is the least that can be said there.
+ * x1.06 (the removed docs/OPTIMIZER-REVIEW.md (git history), E2). Holding the last measured value is the least that can be said there.
  */
 fun AccelFit.boundedTo(low: Double, high: Double, points: Int = LOOKUP_POINTS): AccelFit {
     require(low > 0.0 && high > low) { "need 0 < low < high" }

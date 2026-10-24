@@ -62,7 +62,7 @@ fun runAccelPipeline(player: SimulatedPlayer, baseCm360: Double, seed: Long, ana
 class AccelPipelineTest {
     private val seeds = 1L..10L
 
-    /** Expects a gain that falls from 1 toward 0.7; the analysis finds these reliably, rising ones rarely (docs/ASSESSMENT.md B3). */
+    /** Expects a gain that falls from 1 toward 0.7; the analysis finds these reliably, rising ones rarely (docs/history/ASSESSMENT.md B3). */
     private val wantsFallingGain = SimulatedPlayer(gainPreference = { v -> 1.0 - 0.3 * (1.0 - exp(-v / 6.0)) })
 
     private fun summary(label: String, runs: List<AccelRun>) = buildString {

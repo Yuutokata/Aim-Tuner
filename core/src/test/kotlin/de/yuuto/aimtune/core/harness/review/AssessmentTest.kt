@@ -35,7 +35,7 @@ import kotlin.math.sqrt
 import kotlin.test.Test
 
 /**
- * Independent assessment experiments (docs/ASSESSMENT.md). Gated like the other review experiments:
+ * Independent assessment experiments (docs/history/ASSESSMENT.md). Gated like the other review experiments:
  * set AIMTUNE_REVIEW; AIMTUNE_SEEDS / AIMTUNE_RUNS scale the number of simulated players per row.
  */
 @EnabledIfEnvironmentVariable(named = "AIMTUNE_REVIEW", matches = ".+")

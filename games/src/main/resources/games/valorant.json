@@ -18,7 +18,7 @@
     "https://csdb.gg/sensitivity-converter/valorant-to-cs2/",
     "https://fovcalculatorpro.com/games/valorant-fov/"
   ],
-  "notes": "Yaw is fixed at 0.07. FOV is 103 horizontal at 16:9 (about 70.5 vertical) with the vertical angle kept for other aspect ratios; these FOV values come from community sources, not Riot documentation. Trainer geometry (the `trainer` block) is an assumption, not a measurement: head about 0.2 m wide seen from 6-30 m (0.4-1.9 degrees), duels mostly under 20 degrees, strafing at 3-6 m/s. Riot publishes no hitbox or speed numbers; measure them in the shooting range (docs/REVIEW.md, Realism) and set verified to true.",
+  "notes": "Yaw is fixed at 0.07. FOV is 103 horizontal at 16:9 (about 70.5 vertical) with the vertical angle kept for other aspect ratios; these FOV values come from community sources, not Riot documentation. Trainer geometry (the `trainer` block) is an assumption, not a measurement: head about 0.2 m wide seen from 6-30 m (0.4-1.9 degrees), duels mostly under 20 degrees, strafing at 3-6 m/s. Riot publishes no hitbox or speed numbers; measure them in the shooting range (docs/history/REVIEW.md, Realism) and set verified to true.",
   "trainer": {
     "fieldYawDegrees": 50.0,
     "fieldPitchDegrees": 25.0,
@@ -77,7 +77,7 @@
         "max": 10.0
       },
       "loweredShare": 0.4,
-      "notes": "Assumption, not a measurement. Valorant maps are mostly flat and players place the crosshair at head height, so most enemies are within about 1.5 degrees of the crosshair level; about 12 percent are on a different level (heaven positions, ramps, stairs, crouching players), 3-10 degrees up or down, more of them above. Riot publishes no eye height, head height or map elevation statistics (secondary sources only say all agents are about 2 m tall); 1.6 m eye and 1.65 m head centre only tilt level targets by a fraction of a degree. Measure in the shooting range (docs/REVIEW.md, Realism) and set verified to true."
+      "notes": "Assumption, not a measurement. Valorant maps are mostly flat and players place the crosshair at head height, so most enemies are within about 1.5 degrees of the crosshair level; about 12 percent are on a different level (heaven positions, ramps, stairs, crouching players), 3-10 degrees up or down, more of them above. Riot publishes no eye height, head height or map elevation statistics (secondary sources only say all agents are about 2 m tall); 1.6 m eye and 1.65 m head centre only tilt level targets by a fraction of a degree. Measure in the shooting range (docs/history/REVIEW.md, Realism) and set verified to true."
     },
     "flash": {
       "popDelaySeconds": {

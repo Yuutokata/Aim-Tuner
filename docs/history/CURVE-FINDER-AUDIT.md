@@ -6,11 +6,11 @@ Evidence files (all on this branch):
 
 | File | What | How to regenerate |
 |---|---|---|
-| `docs/audit/forensics.txt` | Real data, copy of `%APPDATA%\AimTune\aimtune.db` from 2026-10-19 | `AIMTUNE_REAL_DB=<copy> ./gradlew.bat :app:test --tests "*CurveAuditForensics*"` (`app/src/test/.../audit/CurveAuditForensicsTest.kt`) |
-| `docs/audit/audit-curve.txt` | Simulation, n = 24 seeds per row (level checks 8) | `AIMTUNE_REVIEW=1 ./gradlew.bat :core:test --tests "*CurveAuditTest*" --rerun-tasks` (`core/src/test/.../harness/review/CurveAuditTest.kt`) |
-| `docs/audit/export.txt` | Export vs Raw Accel 1.7.1 formulas | `./gradlew.bat :storage:test --tests "*ExportAuditTest*"` (`storage/src/test/.../audit/ExportAuditTest.kt`) |
-| `docs/audit/user-curve-table.txt` | The user's Raw Accel curve computed from the 1.7.1 source | Python script in the session scratchpad (formulas below) |
-| `docs/audit/valorant-range-research.md` | Public sources on the Valorant shooting range | Web research, sources cited inside |
+| `docs/history/audit/forensics.txt` | Real data, copy of `%APPDATA%\AimTune\aimtune.db` from 2026-10-19 | `AIMTUNE_REAL_DB=<copy> ./gradlew.bat :app:test --tests "*CurveAuditForensics*"` (`app/src/test/.../audit/CurveAuditForensicsTest.kt`) |
+| `docs/history/audit/audit-curve.txt` | Simulation, n = 24 seeds per row (level checks 8) | `AIMTUNE_REVIEW=1 ./gradlew.bat :core:test --tests "*CurveAuditTest*" --rerun-tasks` (`core/src/test/.../harness/review/CurveAuditTest.kt`) |
+| `docs/history/audit/export.txt` | Export vs Raw Accel 1.7.1 formulas | `./gradlew.bat :storage:test --tests "*ExportAuditTest*"` (`storage/src/test/.../audit/ExportAuditTest.kt`) |
+| `docs/history/audit/user-curve-table.txt` | The user's Raw Accel curve computed from the 1.7.1 source | Python script in the session scratchpad (formulas below) |
+| `docs/history/audit/valorant-range-research.md` | Public sources on the Valorant shooting range | Web research, sources cited inside |
 
 The real database was only read through copies; the original's SHA-256 (`9C500A24…DCE25`) was recorded before the audit.
 
@@ -357,7 +357,7 @@ All options were measured on the same seeds (audit-curve.txt §2 and §3). "Expo
 - **Sensitivity finder:** moving targets favour slightly higher sensitivity for correction speed. Expect the optimum to shift. Re-run `PlateauGateTest` with a mixed schedule.
 - **Curve finder:** score-based searches gain realism. The error analysis must exclude moving reaches, or the range and lead confounds grow.
 
-**Range mode (M15).** Research status (docs/audit/valorant-range-research.md; docs/RANGE.md; tools/range-re/out/range-spec.json):
+**Range mode (M15).** Research status (docs/history/audit/valorant-range-research.md; docs/RANGE.md; tools/range-re/out/range-spec.json):
 
 | Parameter | Value | Source | Status |
 |---|---|---|---|

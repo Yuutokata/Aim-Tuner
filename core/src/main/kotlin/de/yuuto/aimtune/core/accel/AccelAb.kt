@@ -116,7 +116,7 @@ const val DEFAULT_MIN_PAIRS = 6
 
 /**
  * One-sided level of every look. 300 simulated tests with no difference gave a 'winner' in 12 % of the
- * runs at 0.02 per look and six looks (docs/REVIEW.md M3); 0.01 and a minimum number of pairs and effect
+ * runs at 0.02 per look and six looks (docs/history/REVIEW.md M3); 0.01 and a minimum number of pairs and effect
  * bring that down (see `ReviewAccelTest`).
  */
 const val DEFAULT_ALPHA_PER_LOOK = 0.01

@@ -114,7 +114,7 @@ data class SimulatedPlayer(
 
         /**
          * Optimum of the default parameters with the head-sized targets of the game profiles (0.4-1.9 degrees, flick
-         * scenario), measured on a 40-640 cm/360 sweep (docs/ASSESSMENT.md C). The default hand was calibrated on
+         * scenario), measured on a 40-640 cm/360 sweep (docs/history/ASSESSMENT.md C). The default hand was calibrated on
          * large targets and wants about 156 cm/360 there, far outside what people use (pros 33-65 cm/360, controlled
          * study 20-80); see [forHeadSizedTargets].
          */

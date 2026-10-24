@@ -98,7 +98,7 @@ class StrengthSearch(
     }
 
     companion object {
-        /** The experiments used 24 rounds (docs/ASSESSMENT.md); the user may finish from [MIN_ROUNDS] on. */
+        /** The experiments used 24 rounds (docs/history/ASSESSMENT.md); the user may finish from [MIN_ROUNDS] on. */
         const val DEFAULT_ROUNDS = 24
         const val MIN_ROUNDS = 16
 

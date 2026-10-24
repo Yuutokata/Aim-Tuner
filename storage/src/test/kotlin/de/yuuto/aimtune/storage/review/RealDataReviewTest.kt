@@ -10,7 +10,7 @@ import kotlin.math.hypot
 import kotlin.test.Test
 
 /**
- * Review tool (REVIEW.md): reads a copy of a real aimtune.db (env AIMTUNE_REAL_DB) and reports timing,
+ * Review tool (docs/history/REVIEW.md): reads a copy of a real aimtune.db (env AIMTUNE_REAL_DB) and reports timing,
  * batching and segmentation statistics of the recorded rounds. Skipped unless the variable is set.
  */
 @EnabledIfEnvironmentVariable(named = "AIMTUNE_REAL_DB", matches = ".+")
