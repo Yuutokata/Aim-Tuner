@@ -56,11 +56,13 @@ class RefineEngine(
     val warmupRounds: Int = DEFAULT_WARMUP_ROUNDS,
     private val stageRounds: Int = RefineSearch.DEFAULT_ROUNDS,
     maxPairs: Int = AccelAbPlan.DEFAULT_MAX_PAIRS,
+    /** The rotation of the rounds instead of [AccelScenarios.of]; experiments only (the gate's flash-heavy mixes). */
+    scenarioMix: List<ScenarioKind>? = null,
 ) {
     /** The parameters the profile supports, in the order they are searched. */
     val stages: List<RefineParameter> = profile.refineStages()
 
-    private val scenarios = AccelScenarios.of(flash)
+    private val scenarios = scenarioMix?.also { require(it.isNotEmpty()) { "scenario mix must not be empty" } } ?: AccelScenarios.of(flash)
     private val plan = AccelAbPlan(scenarios, seed, maxPairs)
     private val outcomes = mutableListOf<AbOutcome>()
     private val carried = LinkedHashMap<RefineParameter, Double>()
@@ -207,7 +209,8 @@ class RefineEngine(
     private fun decide() {
         val result = evaluateAb(outcomes, weights, maxPairs = plan.maxPairs)
         verdict = result
-        if (result.status != AbStatus.NEED_MORE_ROUNDS) phase = RefinePhase.DONE
+        // Pairs without a usable score never complete, so the plan's last round ends the test whatever the verdict says.
+        if (result.status != AbStatus.NEED_MORE_ROUNDS || outcomes.size >= maxTestRounds) phase = RefinePhase.DONE
     }
 
     companion object {

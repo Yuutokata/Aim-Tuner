@@ -147,6 +147,26 @@ class RefineEngineTest {
     }
 
     @Test
+    fun `a test whose rounds have no usable score ends at the last planned pair instead of asking for more`() {
+        val e = RefineEngine(user, 48.0, MetricWeights.DEFAULT, seed = 5, stageRounds = 30)
+        e.skipWarmup()
+        while (e.phase == RefinePhase.SEARCH) {
+            val round = e.nextRound()
+            e.record(inputs(round.profile.args.capY, 1.95))
+        }
+        e.goToTest()
+        assertEquals(RefinePhase.TEST, e.phase)
+        var played = 0
+        while (e.phase == RefinePhase.TEST) {
+            check(played++ <= e.maxTestRounds) { "the test asks for rounds beyond its plan" }
+            e.nextRound()
+            e.record(emptyMap())
+        }
+        assertEquals(RefinePhase.DONE, e.phase)
+        assertEquals(e.maxTestRounds, played)
+    }
+
+    @Test
     fun `flash adds flash rounds to the warm-up and the search`() {
         val e = engine(flash = true)
         val kinds = List(6) { e.nextRound().also { _ -> e.record(inputs(null, 1.0)) }.scenario }
