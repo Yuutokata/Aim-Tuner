@@ -41,6 +41,7 @@ class AccelResultScreen(ctx: AppContext, private val run: AccelRun) : UiScreen(c
         footer.add().expandX()
         if (verdict?.status == AbStatus.ACCEL_BETTER) {
             footer.addButton(ui.button(t("accel.result.copy"), Styles.SECONDARY) { copy() }, minWidth = 260f).padRight(16f)
+            footer.addButton(ui.button(t("common.save_as"), Styles.SECONDARY) { saveAs() }, minWidth = 240f).padRight(16f)
             footer.addButton(ui.button(t("accel.result.export"), Styles.PRIMARY) { export() }, minWidth = 300f)
         }
         return ui.frame(null, content, footer)
@@ -90,6 +91,13 @@ class AccelResultScreen(ctx: AppContext, private val run: AccelRun) : UiScreen(c
 
     private fun export() {
         exported = ctx.exportAccel(run)
+        rebuild()
+    }
+
+    /** Asks where to save; a cancelled dialog changes nothing. */
+    private fun saveAs() {
+        val path = ctx.fileDialogs.saveJson(t("file.dialog.save_title"), ctx.exportDir?.resolve("settings.json")) ?: return
+        exported = ctx.saveAccelAs(run, path)
         rebuild()
     }
 

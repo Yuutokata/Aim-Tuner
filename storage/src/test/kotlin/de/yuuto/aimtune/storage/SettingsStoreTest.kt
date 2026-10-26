@@ -51,6 +51,18 @@ class SettingsStoreTest {
     }
 
     @Test
+    fun `the last imported profile path round trips and older files load without it`() {
+        val file = dir.resolve("old-import.json")
+        Files.writeString(file, """{"version":1,"dpi":800.0}""")
+        assertNull(SettingsStore(file).load().lastImportedProfilePath)
+
+        val store = store()
+        val settings = AppSettings(lastImportedProfilePath = "C:/Users/Jörg/rawaccel/settings.json")
+        store.save(settings)
+        assertEquals(settings, store.load())
+    }
+
+    @Test
     fun `volumes and the flash brightness round trip, older files get the quieter and dimmer defaults, and percents become safe factors`() {
         val file = dir.resolve("old-sound.json")
         Files.writeString(file, """{"version":1,"dpi":800.0}""")

@@ -1,27 +1,35 @@
 package de.yuuto.aimtune.app.accel
 
+import de.yuuto.aimtune.core.accel.RawAccelArgs
 import de.yuuto.aimtune.core.accel.RawAccelCapMode
 import de.yuuto.aimtune.core.accel.RawAccelMode
 import de.yuuto.aimtune.core.accel.RawAccelProfile
+import de.yuuto.aimtune.core.accel.RefineShape
 import java.util.Locale
 
-/** One field of the Raw Accel profile that the refined profile changes, with the text of the old and the new value. */
+/** One curve-shape field of the Raw Accel profile that the refined profile changes, with the text of the old and the new value. */
 data class FieldChange(val field: String, val old: String, val new: String)
 
 object RefineDiff {
-    /** The fields that differ between [old] and [new], under the names Raw Accel's file uses. */
+    /**
+     * The curve-shape fields that differ between [old] and [new], under the names Raw Accel's file uses; the vertical block of a
+     * by-component profile is listed with the prefix "vertical". Nothing else can differ: refine never changes the base.
+     */
     fun changes(old: RawAccelProfile, new: RawAccelProfile): List<FieldChange> = buildList {
-        fun add(field: String, a: Double, b: Double) {
-            if (a != b) add(FieldChange(field, number(a), number(b)))
-        }
-        add("Output DPI", old.outputDpi, new.outputDpi)
-        add("inputOffset", old.args.inputOffset, new.args.inputOffset)
-        add("acceleration", old.args.acceleration, new.args.acceleration)
-        add("decayRate", old.args.decayRate, new.args.decayRate)
-        add("limit", old.args.limit, new.args.limit)
-        add("Cap / Jump x", old.args.capX, new.args.capX)
-        add("Cap / Jump y", old.args.capY, new.args.capY)
+        addAll(axisChanges(old.args, new.args, ""))
+        if (!old.speed.whole) addAll(axisChanges(old.accelY, new.accelY, "vertical "))
     }
+
+    private fun axisChanges(old: RawAccelArgs, new: RawAccelArgs, prefix: String): List<FieldChange> =
+        RefineShape.fields(old.mode).mapNotNull { field ->
+            val a = field.read(old)
+            val b = field.read(new)
+            when {
+                a == b -> null
+                a is Double && b is Double -> FieldChange(prefix + field.label, number(a), number(b))
+                else -> FieldChange(prefix + field.label, "${old.lut.size / 2} points", "${new.lut.size / 2} points, reshaped")
+            }
+        }
 
     /** A short multi-line description of the profile's curve for the import screen. */
     fun describe(profile: RawAccelProfile): String {
@@ -37,7 +45,7 @@ object RefineDiff {
             }
             RawAccelMode.NATURAL -> lines += "inputOffset ${number(a.inputOffset)}  decayRate ${number(a.decayRate)}  limit ${number(a.limit)}"
             RawAccelMode.LUT -> lines += "${a.lut.size / 2} points"
-            RawAccelMode.NOACCEL -> Unit
+            RawAccelMode.NOACCEL, RawAccelMode.JUMP, RawAccelMode.SYNCHRONOUS, RawAccelMode.POWER -> Unit
         }
         lines += "Output DPI ${number(profile.outputDpi)}  device DPI ${number(profile.deviceDpi)}"
         return lines.joinToString("\n")

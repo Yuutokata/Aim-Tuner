@@ -42,6 +42,16 @@ class LaunchOptionsTest {
     }
 
     @Test
+    fun `the screenshot window size is parsed and unset by default`() {
+        assertNull(parse().windowSize)
+        assertEquals(WindowSize(1280, 720), parse("--window-size", "1280x720").windowSize)
+        assertEquals(WindowSize(1100, 1000), parse("--window-size", "1100X1000").windowSize)
+        listOf("1280", "1280x", "x720", "0x720", "1280x-720", "axb").forEach { bad ->
+            assertFailsWith<LaunchOptionsException>(bad) { parse("--window-size", bad) }
+        }
+    }
+
+    @Test
     fun `invalid input is rejected with the option name`() {
         assertFailsWith<LaunchOptionsException> { parse("--seed", "abc") }
         assertFailsWith<LaunchOptionsException> { parse("--source", "x") }

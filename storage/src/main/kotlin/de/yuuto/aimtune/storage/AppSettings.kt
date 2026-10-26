@@ -71,6 +71,8 @@ data class AppSettings(
     val rangeBotsStrafe: Boolean = true,
     /** Range mode: bot armor on (the range's default; a body kill needs one more hit). */
     val rangeBotArmor: Boolean = true,
+    /** The Raw Accel `settings.json` imported last (its path only, never its content); the Raw Accel hub reads it again on open. */
+    val lastImportedProfilePath: String? = null,
 ) {
     /** @throws SettingsException describing the first invalid field. */
     fun validate() {

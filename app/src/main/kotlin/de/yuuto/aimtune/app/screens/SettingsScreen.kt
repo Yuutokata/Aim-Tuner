@@ -11,6 +11,7 @@ import de.yuuto.aimtune.app.AppContext
 import de.yuuto.aimtune.app.i18n.Language
 import de.yuuto.aimtune.app.i18n.scenarioName
 import de.yuuto.aimtune.app.setup.GAME_CUSTOM
+import de.yuuto.aimtune.app.setup.SettingsExit
 import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.setup.SetupStep
 import de.yuuto.aimtune.app.ui.Styles
@@ -53,8 +54,12 @@ private val METRIC_KEYS = mapOf(
     ScoreMetric.TRACKING to "metric.tracking",
 )
 
-/** Edit game, DPI, sensitivity, round length and score weights; aim style and pad via "Run setup again". */
-class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
+/**
+ * Edit game, DPI, sensitivity, round length and score weights; aim style and pad via "Run setup again". Save, Back and Escape go to
+ * [returnTo] when another screen linked here (the Raw Accel hub), else to the menu.
+ */
+class SettingsScreen(ctx: AppContext, private val returnTo: (() -> Unit)? = null) : UiScreen(ctx) {
+    private val exit = SettingsExit(returnTo, ctx::showMenu)
     private var draft = SetupDraft.fromSettings(ctx.settings.current)
     private var roundSeconds = ctx.settings.current.roundSeconds
     private var language = Language.fromCode(ctx.settings.current.language)
@@ -84,7 +89,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         addRow(left, t("settings.flash"), flashImportanceButtons(draft.flashImportance) { draft = draft.copy(flashImportance = it); message = null; rebuild() })
         left.add(ui.label(t("settings.flash_help"), Styles.CAPTION_MUTED, wrap = true)).colspan(2).left().width(FLASH_HELP_WIDTH).padBottom(ROW_GAP).row()
         addRow(left, t("settings.sounds"), soundToggles())
-        val runSetup = ui.button(t("settings.run_setup"), Styles.SECONDARY) { ctx.showOnboarding(SetupStep.DPI, afterFinish = ctx::showSettings) }
+        val runSetup = ui.button(t("settings.run_setup"), Styles.SECONDARY) { ctx.showOnboarding(SetupStep.DPI, afterFinish = { ctx.showSettings(returnTo) }) }
         addRow(left, t("settings.style_pad"), Table().also { it.add(runSetup).height(CONTROL_HEIGHT) })
 
         val right = Table()
@@ -96,11 +101,11 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         return ui.frame(null, content, footer())
     }
 
-    override fun onEscape() = ctx.showMenu()
+    override fun onEscape() = exit.leave()
 
     private fun footer(): Table {
         val footer = Table()
-        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
+        footer.add(ui.button(t("common.back"), Styles.TEXT) { exit.leave() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         // Next to the sound switches it would widen the left column; the footer has room.
         footer.add(ui.button(t("settings.sound_levels"), Styles.SECONDARY) { ctx.showSoundSettings() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(16f)
         footer.add(updateToggle()).left().height(FOOTER_BUTTON_HEIGHT).padLeft(16f)
@@ -318,7 +323,7 @@ class SettingsScreen(ctx: AppContext) : UiScreen(ctx) {
         val base: AppSettings = ctx.settings.current.copy(roundSeconds = roundSeconds, metricWeights = weights.toMap(), scenarios = enabled, language = language.code, flashSound = flashSound, hitSound = hitSound, checkForUpdates = checkForUpdates, rangeSpeed = rangeSpeed.id, rangeBotsStrafe = rangeStrafe, rangeBotArmor = rangeArmor)
         val error = ctx.settings.save(draft.toSettings(base, ctx.profiles))
         if (error == null) {
-            ctx.showMenu()
+            exit.leave()
         } else {
             message = error to false
             rebuild()

@@ -3,7 +3,10 @@ package de.yuuto.aimtune.app.screens
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import de.yuuto.aimtune.app.AppContext
+import de.yuuto.aimtune.app.accel.PatchedChange
 import de.yuuto.aimtune.app.accel.RefineRun
+import de.yuuto.aimtune.app.accel.SettingsAnalyses
+import de.yuuto.aimtune.app.files.ExportFiles
 import de.yuuto.aimtune.app.ui.Styles
 import de.yuuto.aimtune.app.ui.addButton
 import de.yuuto.aimtune.app.ui.button
@@ -22,12 +25,17 @@ private const val FOOTER_BUTTON_HEIGHT = 64f
 /**
  * The end of a refine run: the verdict of the blind test of the refined profile against the imported one. Only a candidate
  * that was measurably better is offered for export, as a copy of the player's file with one added profile; the changed fields
- * are listed before and after saving. Nothing is written into Raw Accel's own folder.
+ * are listed before and after saving. Passive recommendations ticked on the setting pages go into the same copy and are marked
+ * "not blind-tested". Nothing is written into Raw Accel's own folder.
  */
 class RefineResultScreen(ctx: AppContext, private val run: RefineRun) : UiScreen(ctx) {
     private val verdict = run.engine.verdict
     private val better = verdict?.status == AbStatus.ACCEL_BETTER
     private var exported: Result<Path>? = null
+    private val analysesFuture = ctx.hub.analyses()
+    private var analyses: SettingsAnalyses? = null
+
+    private fun copy() = ctx.patchedCopy(run, analyses)
 
     override fun build(): Actor {
         val content = Table()
@@ -39,9 +47,18 @@ class RefineResultScreen(ctx: AppContext, private val run: RefineRun) : UiScreen
         footer.add(ui.button(t("common.back_to_menu"), Styles.TEXT) { ctx.showMenu() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
         if (better && exported?.isSuccess != true) {
+            footer.addButton(ui.button(t("common.save_as"), Styles.SECONDARY) { saveAs() }, minWidth = 240f).padRight(16f)
             footer.addButton(ui.button(t("refine.result.export", run.exportName), Styles.PRIMARY) { export() }, minWidth = 420f)
         }
         return ui.frame(null, content, footer)
+    }
+
+    override fun render(delta: Float) {
+        if (analyses == null && analysesFuture.isDone) {
+            analyses = runCatching { analysesFuture.get() }.getOrNull()
+            rebuild()
+        }
+        super.render(delta)
     }
 
     override fun onEscape() = ctx.showMenu()
@@ -74,7 +91,7 @@ class RefineResultScreen(ctx: AppContext, private val run: RefineRun) : UiScreen
         card.pad(CARD_PADDING)
         val saved = exported?.isSuccess == true
         card.add(ui.caps(t(if (saved) "refine.result.changed_saved" else "refine.result.changed", run.exportName))).left().row()
-        val lines = run.changes().joinToString("\n") { "${it.field}:  ${it.old}  ->  ${it.new}" }
+        val lines = copy().changes().joinToString("\n") { line(it) }
         card.add(ui.label(lines, Styles.MONO, wrap = true)).left().width(inner).padTop(8f).row()
         card.add(ui.label(t("refine.result.export_note"), Styles.CAPTION_MUTED, wrap = true)).left().width(inner).padTop(12f).row()
         exported?.let { result ->
@@ -84,8 +101,21 @@ class RefineResultScreen(ctx: AppContext, private val run: RefineRun) : UiScreen
         return card
     }
 
+    private fun line(change: PatchedChange): String {
+        val text = "${change.field}:  ${change.old}  ->  ${change.new}"
+        return if (change.passive) "$text   (${t("hub.export.not_tested")})" else text
+    }
+
+    /** Asks where to save; a cancelled dialog changes nothing. */
+    private fun saveAs() {
+        val suggestion = ctx.exportDir?.resolve(ExportFiles.patchedFileName(run.exportName))
+        val path = ctx.fileDialogs.saveJson(t("file.dialog.save_title"), suggestion) ?: return
+        exported = ctx.savePatchedAs(copy(), path)
+        rebuild()
+    }
+
     private fun export() {
-        exported = ctx.exportRefine(run)
+        exported = ctx.exportPatched(copy())
         rebuild()
     }
 }

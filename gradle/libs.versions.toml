@@ -1,6 +1,8 @@
 [versions]
 kotlin = "2.4.10"
 gdx = "1.14.2"
+# Must equal the LWJGL version gdx-backend-lwjgl3 brings (check with :app:dependencies when gdx changes).
+lwjgl = "3.3.3"
 jna = "5.19.1"
 sqlite-jdbc = "3.53.4.0"
 serialization-json = "1.11.0"
@@ -13,6 +15,7 @@ gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", vers
 gdx-platform = { module = "com.badlogicgames.gdx:gdx-platform", version.ref = "gdx" }
 gdx-freetype = { module = "com.badlogicgames.gdx:gdx-freetype", version.ref = "gdx" }
 gdx-freetype-platform = { module = "com.badlogicgames.gdx:gdx-freetype-platform", version.ref = "gdx" }
+lwjgl-tinyfd = { module = "org.lwjgl:lwjgl-tinyfd", version.ref = "lwjgl" }
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }

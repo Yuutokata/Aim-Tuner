@@ -42,22 +42,91 @@ class RefineParameterTest {
     }
 
     @Test
-    fun `lut and noaccel only support the level`() {
-        for (p in listOf(lut, noAccel)) {
-            assertTrue(p.supports(RefineParameter.LEVEL))
-            assertFalse(p.supports(RefineParameter.HIGH_GAIN))
-            assertFalse(p.supports(RefineParameter.TRANSITION))
+    fun `noaccel and power have no stage`() {
+        val power = profile(RawAccelArgs(RawAccelMode.POWER, gain = false, scale = 1.2, exponentPower = 0.3))
+        for (p in listOf(noAccel, power)) {
+            assertTrue(p.refineStages().isEmpty())
             assertFailsWith<IllegalArgumentException> { p.adjusted(RefineParameter.HIGH_GAIN, 1.1) }
         }
     }
 
     @Test
-    fun `level scales the output dpi and leaves the curve alone`() {
-        val adjusted = user.adjusted(RefineParameter.LEVEL, 1.15)
-        assertEquals(690.0, adjusted.outputDpi, 1e-9)
-        assertEquals(user.args, adjusted.args)
-        assertEquals(user.totalMultiplier(30.0) * 1.15, adjusted.totalMultiplier(30.0), 1e-12)
-        assertEquals(user.deviceDpi, adjusted.deviceDpi)
+    fun `a velocity lut scales the rise above its first multiplier and keeps the first point`() {
+        val adjusted = lut.adjusted(RefineParameter.HIGH_GAIN, 1.2)
+        assertEquals(listOf(2f, 0.9f), adjusted.args.lut.take(2))
+        assertEquals(0.9f + (1.0f - 0.9f) * 1.2f, adjusted.args.lut[3], 1e-6f)
+        assertEquals(0.9f + (1.6f - 0.9f) * 1.2f, adjusted.args.lut[5], 1e-6f)
+        assertEquals(lut.curveAt(1e-6), adjusted.curveAt(1e-6))
+        assertEquals(listOf(2f, 5f, 30f), adjusted.args.lut.filterIndexed { i, _ -> i % 2 == 0 })
+    }
+
+    @Test
+    fun `a gain lut keeps y over x as the multiplier it scales`() {
+        val gainLut = profile(RawAccelArgs(RawAccelMode.LUT, gain = true, lut = listOf(2f, 1.8f, 5f, 5.0f, 30f, 48f))) // multipliers 0.9, 1.0, 1.6
+        val adjusted = gainLut.adjusted(RefineParameter.HIGH_GAIN, 1.2)
+        assertEquals(gainLut.curveAt(1e-6), adjusted.curveAt(1e-6))
+        assertEquals(0.9 + 0.7 * 1.2, adjusted.curveAt(30.0), 1e-5)
+        val stretched = gainLut.adjusted(RefineParameter.TRANSITION, 2.0)
+        assertEquals(listOf(2f, 8f, 58f), stretched.args.lut.filterIndexed { i, _ -> i % 2 == 0 })
+        assertEquals(gainLut.curveAt(30.0), stretched.curveAt(58.0), 1e-5, "the multiplier at the stretched speed is the old one")
+        assertEquals(gainLut.curveAt(1e-6), stretched.curveAt(1e-6))
+    }
+
+    @Test
+    fun `a velocity lut transition stretches the speed axis from the first point`() {
+        val stretched = lut.adjusted(RefineParameter.TRANSITION, 0.5)
+        assertEquals(listOf(2f, 3.5f, 16f), stretched.args.lut.filterIndexed { i, _ -> i % 2 == 0 })
+        assertEquals(lut.args.lut.filterIndexed { i, _ -> i % 2 == 1 }, stretched.args.lut.filterIndexed { i, _ -> i % 2 == 1 })
+        assertEquals(lut.curveAt(30.0), stretched.curveAt(16.0), 1e-6)
+    }
+
+    @Test
+    fun `a flat lut has nothing to refine`() {
+        assertTrue(profile(RawAccelArgs(RawAccelMode.LUT, gain = false, lut = listOf(2f, 1f, 5f, 1f))).refineStages().isEmpty())
+    }
+
+    @Test
+    fun `jump scales the step height of a hard step and moves the step position without turning it smooth`() {
+        val hard = profile(RawAccelArgs(RawAccelMode.JUMP, gain = false, capX = 10.0, capY = 2.0, smooth = 0.05))
+        assertEquals(1.0 + 1.0 * 1.3, hard.adjusted(RefineParameter.HIGH_GAIN, 1.3).args.capY, 1e-12)
+        assertEquals(15.0, hard.adjusted(RefineParameter.TRANSITION, 1.5).args.capX, 1e-12)
+        assertTrue(hard.adjusted(RefineParameter.TRANSITION, 2.0).args.capX < 20.0, "stays below 1 / smooth = 20, so the step stays hard")
+        val smooth = profile(RawAccelArgs(RawAccelMode.JUMP, gain = false, capX = 10.0, capY = 2.0, smooth = 0.5))
+        assertFalse(smooth.supports(RefineParameter.HIGH_GAIN), "a smooth step has a low-speed multiplier the height would move")
+        assertTrue(smooth.supports(RefineParameter.TRANSITION))
+        assertTrue(smooth.adjusted(RefineParameter.TRANSITION, 0.5).args.capX >= 2.0, "never below 1 / smooth")
+        assertEquals(hard.curveAt(1e-6), hard.adjusted(RefineParameter.HIGH_GAIN, 1.3).curveAt(1e-6))
+    }
+
+    @Test
+    fun `synchronous moves the sync speed only, and only while the low-speed floor holds`() {
+        val sync = profile(RawAccelArgs(RawAccelMode.SYNCHRONOUS, gain = false, syncSpeed = 20.0, smooth = 0.01))
+        assertEquals(listOf(RefineParameter.TRANSITION), sync.refineStages())
+        val adjusted = sync.adjusted(RefineParameter.TRANSITION, 1.5)
+        assertEquals(30.0, adjusted.args.syncSpeed, 1e-12)
+        assertEquals(sync.args.motivity, adjusted.args.motivity)
+        assertEquals(sync.curveAt(1e-6), adjusted.curveAt(1e-6))
+        // a soft sigmoid is not saturated far below the sync speed, so moving the sync speed would move the floor
+        assertFalse(profile(RawAccelArgs(RawAccelMode.SYNCHRONOUS, gain = false, syncSpeed = 5.0, smooth = 1.0, gamma = 0.3)).supports(RefineParameter.TRANSITION))
+    }
+
+    @Test
+    fun `by component applies the factor to both axes and needs both to support it`() {
+        val y = RawAccelArgs(RawAccelMode.NATURAL, gain = false, decayRate = 0.15, limit = 2.0, inputOffset = 2.0)
+        val byComponent = user.copy(accelY = y, speed = RawAccelSpeedArgs(whole = false))
+        val adjusted = byComponent.adjusted(RefineParameter.HIGH_GAIN, 1.25)
+        assertEquals(1.0 + 0.6 * 1.25, adjusted.args.capY, 1e-12)
+        assertEquals(1.0 + 1.0 * 1.25, adjusted.accelY.limit, 1e-12)
+        assertFalse(byComponent.copy(accelY = RawAccelArgs(RawAccelMode.NOACCEL)).supports(RefineParameter.HIGH_GAIN))
+        // a whole profile never touches the vertical block
+        assertEquals(user.accelY, user.adjusted(RefineParameter.HIGH_GAIN, 1.25).accelY)
+    }
+
+    @Test
+    fun `adjusting changes shape fields only`() {
+        for (p in all) for (stage in p.refineStages()) {
+            assertEquals(RefineShape.base(p), RefineShape.base(p.adjusted(stage, 1.2)), "$stage ${p.args.mode}")
+        }
     }
 
     @Test
@@ -138,25 +207,16 @@ class RefineParameterTest {
 
     @Test
     fun `several factors apply in the order of the parameters and skip unsupported ones`() {
-        val adjusted = user.adjusted(mapOf(RefineParameter.TRANSITION to 2.0, RefineParameter.LEVEL to 0.9, RefineParameter.HIGH_GAIN to 1.2))
-        assertEquals(540.0, adjusted.outputDpi, 1e-9)
+        val adjusted = user.adjusted(mapOf(RefineParameter.TRANSITION to 2.0, RefineParameter.HIGH_GAIN to 1.2))
+        assertEquals(600.0, adjusted.outputDpi, 1e-9)
         assertEquals(1.72, adjusted.args.capY, 1e-12)
         assertEquals(20.0, adjusted.args.inputOffset, 1e-12)
-        assertSame(lut, lut.adjusted(mapOf(RefineParameter.HIGH_GAIN to 1.2)))
-        assertEquals(lut.copy(outputDpi = lut.outputDpi * 1.1), lut.adjusted(mapOf(RefineParameter.HIGH_GAIN to 1.2, RefineParameter.LEVEL to 1.1)))
-    }
-
-    @Test
-    fun `the played arm sits at the game sensitivity divided by the output dpi factor`() {
-        val played = user.played(48.0)
-        assertEquals(48.0 / 0.75, played.cm360, 1e-12)
-        assertEquals(user.curve, played.curve)
-        assertEquals(48.0 / 0.75 / 1.15, user.adjusted(RefineParameter.LEVEL, 1.15).played(48.0).cm360, 1e-12)
+        assertSame(noAccel, noAccel.adjusted(mapOf(RefineParameter.HIGH_GAIN to 1.2)))
     }
 
     @Test
     fun `excluding the neutral value needs a real change and a range on one side of one`() {
-        val p = RefineParameter.LEVEL
+        val p = RefineParameter.HIGH_GAIN
         assertTrue(p.excludesNeutral(1.1, 1.04, 1.16))
         assertTrue(p.excludesNeutral(0.9, 0.86, 0.96))
         assertFalse(p.excludesNeutral(1.1, 0.95, 1.16))

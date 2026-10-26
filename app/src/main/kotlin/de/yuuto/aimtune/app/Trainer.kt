@@ -1,6 +1,6 @@
 package de.yuuto.aimtune.app
 
-import de.yuuto.aimtune.core.accel.AccelProcessor
+import de.yuuto.aimtune.core.accel.MouseModifier
 import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.math.ViewAngles
@@ -36,7 +36,7 @@ class Trainer(
     private var nextSeed = config.seed
     private var scenario: Scenario? = null
     private val recordedMouse = ArrayList<MouseEvent>()
-    private var accelProcessor: AccelProcessor? = null
+    private var modifier: MouseModifier? = null
 
     var phase = Phase.READY
         private set
@@ -73,7 +73,7 @@ class Trainer(
         view = ViewAngles()
         summary = null
         recordedMouse.clear()
-        accelProcessor = config.accel?.let { AccelProcessor(it, config.dpi) }
+        modifier = config.accel?.newModifier(config.dpi)
         scenario = config.scenario.create(roundNanos, roundSeed, config.geometry, config.rangeOptions)
         roundStartNanos = nowNanos()
         scenario?.start(roundStartNanos)
@@ -135,8 +135,8 @@ class Trainer(
             rate.record(event.timeNanos)
             if (phase == Phase.RUNNING) {
                 if (event.dx != 0 || event.dy != 0) {
-                    val scale = accelProcessor?.scaleFor(event) ?: 1.0
-                    view = view.rotatedByCounts(event.dx * scale, event.dy * scale, degreesPerCount)
+                    val move = modifier?.modify(event)
+                    view = view.rotatedByCounts(move?.dx ?: event.dx.toDouble(), move?.dy ?: event.dy.toDouble(), degreesPerCount)
                     recordedMouse += if (event.leftPressed) event.copy(leftPressed = false) else event
                 }
                 // A click in the report stream is shot at the view of that very report. A click within the

@@ -13,9 +13,15 @@ import kotlin.math.pow
  * `common/accel-classic.hpp`, `accel-natural.hpp` and `accel-power.hpp` and their validation rules
  * from `common/rawaccel-validate.hpp`; see docs/ALGORITHMS.md ("Acceleration").
  */
-sealed interface AccelCurve {
+sealed interface AccelCurve : AccelModel {
     /** Sensitivity multiplier at [speed] inches per second; 1 means unchanged. */
     fun multiplier(speed: Double): Double
+
+    override fun newModifier(dpi: Double): MouseModifier = CurveModifier(this, dpi)
+
+    override val finderCurve: AccelCurve get() = this
+
+    override fun planningGain(speed: Double, dpi: Double): Double = multiplier(speed)
 }
 
 /** No acceleration: every speed gets the multiplier 1. */

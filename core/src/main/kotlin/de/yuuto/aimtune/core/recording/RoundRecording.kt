@@ -1,7 +1,6 @@
 package de.yuuto.aimtune.core.recording
 
-import de.yuuto.aimtune.core.accel.AccelCurve
-import de.yuuto.aimtune.core.accel.AccelProcessor
+import de.yuuto.aimtune.core.accel.AccelModel
 import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.ViewAngles
 import de.yuuto.aimtune.core.scenario.TargetEvent
@@ -21,8 +20,8 @@ data class RoundRecording(
     val endNanos: Long,
     val mouseEvents: List<MouseEvent>,
     val targetEvents: List<TargetEvent>,
-    /** The acceleration the round was played with (Raw Accel simulated in the trainer); null for none. */
-    val accel: AccelCurve? = null,
+    /** The acceleration the round was played with (Raw Accel simulated in the trainer, the finder's curve or a whole profile); null for none. */
+    val accel: AccelModel? = null,
 ) {
     val degreesPerCount: Double get() = degreesPerCount(dpi, cm360)
 }
@@ -33,19 +32,27 @@ class ViewTrack(recording: RoundRecording) {
     private val views: Array<ViewAngles>
     private val start = ViewAngles()
 
-    /** The factor the acceleration curve applied to each report's counts (1.0 without acceleration). */
+    /** The factor the acceleration applied to each report's counts (1.0 without acceleration; `|out| / |in|` for a Raw Accel profile). */
     val scales = DoubleArray(recording.mouseEvents.size) { 1.0 }
+
+    /** The movement in counts the view got for each report, after the acceleration (the integer driver output for a profile). */
+    val movedX = DoubleArray(recording.mouseEvents.size)
+    val movedY = DoubleArray(recording.mouseEvents.size)
 
     init {
         var view = start
         val dpc = recording.degreesPerCount
-        val processor = recording.accel?.let { AccelProcessor(it, recording.dpi) }
+        val modifier = recording.accel?.newModifier(recording.dpi)
         views = Array(recording.mouseEvents.size) { i ->
             val e = recording.mouseEvents[i]
             times[i] = e.timeNanos
-            val scale = processor?.scaleFor(e) ?: 1.0
-            scales[i] = scale
-            view = view.rotatedByCounts(e.dx * scale, e.dy * scale, dpc)
+            val move = modifier?.modify(e)
+            val dx = move?.dx ?: e.dx.toDouble()
+            val dy = move?.dy ?: e.dy.toDouble()
+            scales[i] = move?.scale ?: 1.0
+            movedX[i] = dx
+            movedY[i] = dy
+            view = view.rotatedByCounts(dx, dy, dpc)
             view
         }
     }

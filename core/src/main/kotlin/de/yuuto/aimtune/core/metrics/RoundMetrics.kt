@@ -297,9 +297,7 @@ private fun angularPath(recording: RoundRecording, track: ViewTrack, t0: Long, t
     return recording.mouseEvents.indices.asSequence()
         .filter { recording.mouseEvents[it].timeNanos in t0..t1 }
         .sumOf { i ->
-            val e = recording.mouseEvents[i]
-            val scale = track.scales[i]
-            hypot(e.dx * scale * dpc * yawScale, e.dy * scale * dpc)
+            hypot(track.movedX[i] * dpc * yawScale, track.movedY[i] * dpc)
         }
 }
 

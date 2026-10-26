@@ -2,8 +2,11 @@ package de.yuuto.aimtune.storage
 
 import de.yuuto.aimtune.core.accel.RawAccelArgs
 import de.yuuto.aimtune.core.accel.RawAccelCapMode
+import de.yuuto.aimtune.core.accel.RawAccelDevice
 import de.yuuto.aimtune.core.accel.RawAccelMode
 import de.yuuto.aimtune.core.accel.RawAccelProfile
+import de.yuuto.aimtune.core.accel.RawAccelSpeedArgs
+import de.yuuto.aimtune.core.accel.RawAccelXY
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -55,6 +58,20 @@ internal object RawAccelKeys {
     const val CAP = "Cap / Jump"
     const val CAP_MODE = "Cap mode"
     const val DATA = "data"
+    const val OUTPUT_OFFSET = "outputOffset"
+    const val GAMMA = "gamma"
+    const val MOTIVITY = "motivity"
+    const val SCALE = "scale"
+    const val EXPONENT_POWER = "exponentPower"
+    const val SYNC_SPEED = "syncSpeed"
+    const val SMOOTH = "smooth"
+
+    // DeviceConfig and DeviceSettings, wrapper.cpp:256-324
+    const val DISABLE = "disable"
+    const val SET_EXTRA_INFO = "setExtraInfo"
+    const val MIN_TIME = "minimumTime"
+    const val MAX_TIME = "maximumTime"
+    const val PROFILE = "profile"
 }
 
 /** A parsed `settings.json`: the original tree (kept untouched for [RawAccelExport.patch]) and what is needed to list its profiles. */
@@ -84,7 +101,7 @@ class RawAccelFile internal constructor(val root: JsonObject) {
     }
 }
 
-/** What importing one profile gave: the profile the trainer can reproduce, or the reasons it cannot. [warnings] are things to tell the user in both cases. */
+/** What importing one profile gave: the profile, or the reasons Raw Accel itself would refuse it. [warnings] are things to tell the user in both cases. */
 sealed interface RawAccelImportResult {
     val warnings: List<String>
 
@@ -93,13 +110,14 @@ sealed interface RawAccelImportResult {
     data class Refused(val reasons: List<String>, override val warnings: List<String>) : RawAccelImportResult
 }
 
+
 /**
- * Reads a Raw Accel 1.7.1 `settings.json` without loss: [parse] keeps the whole JSON tree, [profile] turns one profile into the
- * typed [RawAccelProfile] the trainer simulates. A profile is only imported when the trainer reproduces it exactly: the speed is
- * the magnitude of the whole input (`rawaccel.hpp:381`) and the factor is the accel function times output DPI / device DPI, so
- * everything that changes either (by-component mode, smoothing, speed cap, stretches, rotation, snapping, direction and Y/X
- * ratios, other Lp norms, other modes) is a refusal, not a silent approximation. The DPI, polling and device options that only
- * change how well the trainer matches the real driver are warnings.
+ * Reads a Raw Accel 1.7.1 `settings.json` without loss: [parse] keeps the whole JSON tree, [profile] turns one profile and the
+ * default device config into the typed [RawAccelProfile] that [de.yuuto.aimtune.core.accel.RawAccelModifier] plays exactly as the
+ * driver would, every setting included (by-component, smoothing, speed cap, stretches, rotation, snapping, ratios, Lp norm, all
+ * modes, report timing). A profile is [RawAccelImportResult.Refused] only when Raw Accel itself would refuse it (the validation of
+ * `RawAccelArgs` and `RawAccelProfile`, which mirrors `rawaccel-validate.hpp`). What only changes how well the trainer matches the
+ * real setup (DPI, polling, disabled device, other devices) is a warning.
  */
 object RawAccelImport {
     /** @throws RawAccelImportException if [text] is not JSON or lacks what Raw Accel itself requires at the top level. */
@@ -120,22 +138,56 @@ object RawAccelImport {
      */
     fun profile(file: RawAccelFile, name: String, expectedDpi: Double? = null): RawAccelImportResult {
         val profile = file.profileObject(name)
-        val warnings = warnings(file, expectedDpi)
-        val reasons = refusals(profile, name)
-        if (reasons.isNotEmpty()) return RawAccelImportResult.Refused(reasons, warnings)
-        val args = try {
-            accelArgs(profile.obj(RawAccelKeys.WHOLE_ARGS, name), name)
-        } catch (e: IllegalArgumentException) {
-            if (e is RawAccelImportException) throw e
-            throw RawAccelImportException("profile '$name' has values Raw Accel itself would refuse: ${e.message}", e)
-        }
-        val outputDpi = number(profile, RawAccelKeys.OUTPUT_DPI, name)
+        val warnings = warnings(file, name, profile, expectedDpi)
         val typed = try {
-            RawAccelProfile(name, args, outputDpi, file.deviceDpi.toDouble())
+            typedProfile(file, name, profile)
+        } catch (e: RawAccelImportException) {
+            throw e
         } catch (e: IllegalArgumentException) {
-            throw RawAccelImportException("profile '$name': ${e.message}", e)
+            return RawAccelImportResult.Refused(listOf("Raw Accel itself would refuse profile '$name': ${e.message}"), warnings)
         }
         return RawAccelImportResult.Imported(typed, warnings)
+    }
+
+    private fun typedProfile(file: RawAccelFile, name: String, profile: JsonObject): RawAccelProfile {
+        val speed = profile.obj(RawAccelKeys.SPEED_ARGS, name)
+        return RawAccelProfile(
+            name = name,
+            args = accelArgs(profile.obj(RawAccelKeys.WHOLE_ARGS, name), name),
+            outputDpi = number(profile, RawAccelKeys.OUTPUT_DPI, name),
+            deviceDpi = file.deviceDpi.toDouble(),
+            accelY = accelArgs(profile.obj(RawAccelKeys.VERTICAL_ARGS, name), name),
+            speed = RawAccelSpeedArgs(
+                whole = (speed[RawAccelKeys.WHOLE_FLAG] as? JsonPrimitive)?.booleanOrNull
+                    ?: throw RawAccelImportException("profile '$name': '${RawAccelKeys.WHOLE_FLAG}' is missing or not true/false"),
+                lpNorm = number(speed, RawAccelKeys.LP_NORM, name),
+                inputHalfLife = number(speed, RawAccelKeys.INPUT_HALFLIFE, name),
+                scaleHalfLife = number(speed, RawAccelKeys.SCALE_HALFLIFE, name),
+                outputHalfLife = number(speed, RawAccelKeys.OUTPUT_HALFLIFE, name),
+            ),
+            domain = xy(profile.obj(RawAccelKeys.DOMAIN, name), name),
+            range = xy(profile.obj(RawAccelKeys.RANGE, name), name),
+            yxRatio = number(profile, RawAccelKeys.YX_RATIO, name),
+            lrRatio = number(profile, RawAccelKeys.LR_RATIO, name),
+            udRatio = number(profile, RawAccelKeys.UD_RATIO, name),
+            rotationDegrees = number(profile, RawAccelKeys.ROTATION, name),
+            snapDegrees = number(profile, RawAccelKeys.SNAP, name),
+            speedCap = number(profile, RawAccelKeys.SPEED_CAP, name),
+            device = device(RawAccelFile.deviceConfig(file.root)),
+        )
+    }
+
+    private fun xy(obj: JsonObject, name: String) = RawAccelXY(number(obj, "x", name), number(obj, "y", name))
+
+    /** The timing part of `defaultDeviceConfig`; `minimumTime` / `maximumTime` are optional in the file (`wrapper.cpp:277-282`) and default to Raw Accel's limits. */
+    private fun device(config: JsonObject): RawAccelDevice {
+        val defaults = RawAccelDevice()
+        return RawAccelDevice(
+            pollingRate = number(config, RawAccelKeys.POLLING_RATE, "defaultDeviceConfig").toInt(),
+            pollTimeLock = (config[RawAccelKeys.POLL_TIME_LOCK] as? JsonPrimitive)?.booleanOrNull ?: false,
+            timeMin = optionalNumber(config, RawAccelKeys.MIN_TIME) ?: defaults.timeMin,
+            timeMax = optionalNumber(config, RawAccelKeys.MAX_TIME) ?: defaults.timeMax,
+        )
     }
 
     /** The typed accel parameters of one `accel_args` block; used by [profile] and to check a patched profile. */
@@ -162,10 +214,17 @@ object RawAccelImport {
             capY = number(cap, "y", profileName),
             capMode = capMode,
             lut = data,
-        )
+            outputOffset = number(block, RawAccelKeys.OUTPUT_OFFSET, profileName),
+            gamma = number(block, RawAccelKeys.GAMMA, profileName),
+            motivity = number(block, RawAccelKeys.MOTIVITY, profileName),
+            scale = number(block, RawAccelKeys.SCALE, profileName),
+            exponentPower = number(block, RawAccelKeys.EXPONENT_POWER, profileName),
+            syncSpeed = number(block, RawAccelKeys.SYNC_SPEED, profileName),
+            smooth = number(block, RawAccelKeys.SMOOTH, profileName),
+            )
     }
 
-    private fun warnings(file: RawAccelFile, expectedDpi: Double?): List<String> = buildList {
+    private fun warnings(file: RawAccelFile, name: String, profile: JsonObject, expectedDpi: Double?): List<String> = buildList {
         if (file.version != "1.7.1") add("the file is version '${file.version}', AimTune reproduces Raw Accel 1.7.1")
         val dpi = file.deviceDpi
         if (dpi == 0) add("the device DPI is 0: Raw Accel does not normalize the speed then, which AimTune treats as 1000 DPI")
@@ -173,48 +232,28 @@ object RawAccelImport {
             add("the file's device DPI is $dpi but AimTune is set to ${expectedDpi.toBigDecimal().stripTrailingZeros().toPlainString()}: the speed axis of the curve belongs to $dpi")
         }
         val device = RawAccelFile.deviceConfig(file.root)
-        if ((device[RawAccelKeys.POLLING_RATE] as? JsonPrimitive)?.doubleOrNull.let { it != null && it > 0 }) {
-            add("a polling rate is set: Raw Accel then uses it as the minimum time between reports, AimTune uses the measured time")
-        }
+        val rate = (device[RawAccelKeys.POLLING_RATE] as? JsonPrimitive)?.doubleOrNull ?: 0.0
+        if (rate > 0) add("a polling rate of ${rate.toInt()} Hz is set: Raw Accel then uses 1000 / rate as the minimum time between reports, and so does AimTune")
         if ((device[RawAccelKeys.POLL_TIME_LOCK] as? JsonPrimitive)?.booleanOrNull == true) {
-            add("'constant time interval based on polling rate' is on: AimTune uses the measured time between reports")
+            add("'constant time interval based on polling rate' is on: every report counts as the same time, whatever the real report spacing is")
         }
-        if (device.containsKey("minimumTime") || device.containsKey("maximumTime")) {
-            add("custom time limits are set: AimTune uses Raw Accel's default limits (0.0625 to 100 ms)")
+        if ((device[RawAccelKeys.DISABLE] as? JsonPrimitive)?.booleanOrNull == true) add("the default device config is disabled: Raw Accel does not touch such a mouse")
+        if ((device[RawAccelKeys.SET_EXTRA_INFO] as? JsonPrimitive)?.booleanOrNull == true) {
+            add("setExtraInfo is set: Raw Accel tags the reports for other programs, which does not change the movement")
         }
-        if ((device["disable"] as? JsonPrimitive)?.booleanOrNull == true) add("the default device config is disabled")
-        val devices = (file.root[RawAccelKeys.DEVICES] as? JsonArray)?.size ?: 0
-        if (devices > 0) add("the file lists $devices device(s) with their own settings; AimTune only reads the default device config")
+        val outputHalfLife = (profile.obj(RawAccelKeys.SPEED_ARGS, name)[RawAccelKeys.OUTPUT_HALFLIFE] as? JsonPrimitive)?.doubleOrNull ?: 0.0
+        if (outputHalfLife > 0) add("output smoothing (half-life $outputHalfLife ms) is on: it adds lag, which the trainer reproduces")
+        for (entry in (file.root[RawAccelKeys.DEVICES] as? JsonArray).orEmpty()) {
+            val device = entry as? JsonObject ?: continue
+            val mapped = (device[RawAccelKeys.PROFILE] as? JsonPrimitive)?.content ?: continue
+            if (mapped != name) {
+                val label = (device[RawAccelKeys.NAME] as? JsonPrimitive)?.content ?: "a device"
+                add("$label is mapped to profile '$mapped', not '$name': the file does not use this profile for it")
+            }
+        }
     }
 
-    /** Everything in [profile] that makes the trainer's simulation differ from the driver; empty when it matches. */
-    private fun refusals(profile: JsonObject, name: String): List<String> = buildList {
-        val speed = profile.obj(RawAccelKeys.SPEED_ARGS, name)
-        if ((speed[RawAccelKeys.WHOLE_FLAG] as? JsonPrimitive)?.booleanOrNull != true) {
-            add("by-component mode (Whole/combined accel is off): the trainer only simulates the speed of the whole movement")
-        }
-        if (number(speed, RawAccelKeys.LP_NORM, name) != 2.0) add("the Lp norm is not 2 (other distance than the euclidean speed)")
-        listOf(RawAccelKeys.INPUT_HALFLIFE to "input", RawAccelKeys.SCALE_HALFLIFE to "scale", RawAccelKeys.OUTPUT_HALFLIFE to "output").forEach { (key, what) ->
-            if (number(speed, key, name) != 0.0) add("$what smoothing half-life is not 0 (smoothing needs the driver's state)")
-        }
-        if (number(profile, RawAccelKeys.SPEED_CAP, name) != 0.0) add("Input Speed Cap is not 0")
-        for (key in listOf(RawAccelKeys.DOMAIN, RawAccelKeys.RANGE)) {
-            val stretch = profile.obj(key, name)
-            if (number(stretch, "x", name) != 1.0 || number(stretch, "y", name) != 1.0) add("'$key' is not 1 / 1")
-        }
-        if (number(profile, RawAccelKeys.ROTATION, name) != 0.0) add("Degrees of rotation is not 0")
-        if (number(profile, RawAccelKeys.SNAP, name) != 0.0) add("Degrees of angle snapping is not 0")
-        for ((key, label) in listOf(RawAccelKeys.LR_RATIO to "L/R", RawAccelKeys.UD_RATIO to "U/D", RawAccelKeys.YX_RATIO to "Y/X")) {
-            if (number(profile, key, name) != 1.0) add("the $label output DPI ratio is not 1")
-        }
-        val whole = profile.obj(RawAccelKeys.WHOLE_ARGS, name)
-        val vertical = profile.obj(RawAccelKeys.VERTICAL_ARGS, name)
-        if (!sameJson(whole, vertical)) add("the vertical accel parameters differ from the horizontal ones")
-        when (val mode = text(whole, RawAccelKeys.MODE, name)) {
-            RawAccelMode.CLASSIC.json, RawAccelMode.NATURAL.json, RawAccelMode.LUT.json, RawAccelMode.NOACCEL.json -> Unit
-            else -> add("acceleration mode '$mode' is not supported (classic, natural, lut and noaccel are)")
-        }
-    }
+    private fun optionalNumber(obj: JsonObject, key: String): Double? = (obj[key] as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull
 
     /** JSON equality that reads numbers by value, so 2 and 2.0 are the same. */
     internal fun sameJson(a: JsonElement?, b: JsonElement?): Boolean = when {

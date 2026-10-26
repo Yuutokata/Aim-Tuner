@@ -53,3 +53,6 @@ bin/
 ### IDE ###
 .idea/
 user-rawaccel-settings.json
+
+# LWJGL extracts its natives here when the app runs from Gradle
+.lwjgl/

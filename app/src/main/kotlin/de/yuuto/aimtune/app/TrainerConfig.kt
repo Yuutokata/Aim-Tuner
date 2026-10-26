@@ -2,7 +2,7 @@ package de.yuuto.aimtune.app
 
 import de.yuuto.aimtune.app.setup.SetupDraft
 import de.yuuto.aimtune.app.setup.SetupStep
-import de.yuuto.aimtune.core.accel.AccelCurve
+import de.yuuto.aimtune.core.accel.AccelModel
 import de.yuuto.aimtune.core.scenario.RangeOptions
 import de.yuuto.aimtune.core.scenario.ScenarioKind
 import de.yuuto.aimtune.core.scenario.TrainerGeometry
@@ -18,8 +18,8 @@ data class TrainerConfig(
     val roundSeconds: Int,
     val seed: Long,
     val scenario: ScenarioKind = ScenarioKind.FLICK,
-    /** Raw Accel simulated in the trainer; null plays with the plain sensitivity. */
-    val accel: AccelCurve? = null,
+    /** Raw Accel simulated in the trainer (a finder curve or a whole profile); null plays with the plain sensitivity. */
+    val accel: AccelModel? = null,
     /** Target sizes and distances of the rounds; the game's own by default, null only for the fixed legacy values (old recordings). */
     val geometry: TrainerGeometry? = profile.geometry,
     /** Speed and bot movement of Range mode rounds; the other scenarios ignore it. */
