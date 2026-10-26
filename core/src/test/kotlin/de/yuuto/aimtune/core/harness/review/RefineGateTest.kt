@@ -21,6 +21,8 @@ import de.yuuto.aimtune.core.score.MetricWeights
 import de.yuuto.aimtune.core.score.ScoreCalculator
 import de.yuuto.aimtune.core.score.ScoreMetric
 import de.yuuto.aimtune.core.score.scoreInputs
+import de.yuuto.aimtune.core.scenario.ScenarioKind
+import de.yuuto.aimtune.core.scenario.TrainerGeometry
 import de.yuuto.aimtune.core.sim.HandAdaptation
 import de.yuuto.aimtune.core.sim.HeadlessRound
 import de.yuuto.aimtune.core.sim.SimulatedPlayer
@@ -40,11 +42,60 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
  *
  * The user policy is fixed: every stage is played to its end, the player continues through all stages and takes the test.
  * AIMTUNE_SEEDS scales the run counts (40 = the numbers in the table header).
+ *
+ * AIMTUNE_HAND=real plays the same gate with a hand fitted to the user's stored rounds (accel_refine session, per-report speeds,
+ * [RefineSpeedCalibrationTest]): the game's target geometry, the user's 48.74 cm/360, and Fitts parameters and a hand speed that give
+ * its speed quantiles (the default hand is 3-4 times slower, so the profile's curve hardly acts on it).
  */
 @EnabledIfEnvironmentVariable(named = "AIMTUNE_REVIEW", matches = ".+")
 class RefineGateTest {
-    private val gameCm360 = 55.0
+    private val realHand = System.getenv("AIMTUNE_HAND") == "real"
+    private val gameCm360 = if (realHand) 48.74 else 55.0
+    private val geometry: TrainerGeometry? = if (realHand) TrainerGeometry.DEFAULT else null
+    private val handBase = if (realHand) SimulatedPlayer(fittsInterceptMs = 40.0, fittsSlopeMs = 25.0, maxHandSpeedCmPerS = 300.0) else SimulatedPlayer()
+    /** AIMTUNE_MIX=flash (flash rounds only) or heavy (three of four rounds flash): the engine's rotation for the flash-weighting experiment. */
+    private val mixName = System.getenv("AIMTUNE_MIX")
+    private val mix: List<ScenarioKind>? = when (mixName) {
+        "flash" -> listOf(ScenarioKind.FLASH)
+        "heavy" -> listOf(
+            ScenarioKind.FLASH, ScenarioKind.FLICK, ScenarioKind.FLASH, ScenarioKind.FLASH, ScenarioKind.SWITCHING, ScenarioKind.FLASH, ScenarioKind.FLASH, ScenarioKind.MICRO,
+        )
+        else -> null
+    }
+    private val startScale = if (realHand) 0.35 else 0.95
     private val weights = MetricWeights.DEFAULT
+
+    /**
+     * AIMTUNE_SCORE replaces the round score the engine searches and tests with (the weights and the metrics it is fed; "harmful" is
+     * still judged with the standard score on the standard mix). The values ride on scoring metrics, only their meaning differs:
+     * turn = the flash turn time (carried by TIME_TO_HIT, lower is better), bias = minus the absolute signed first error (the
+     * overshoot or undershoot a wrong gain causes), abserr = minus the mean absolute first error, combo = turn and abserr together.
+     */
+    private val scoreMode = System.getenv("AIMTUNE_SCORE")
+    private val engineWeights = when (scoreMode) {
+        null -> weights
+        "turn" -> MetricWeights(mapOf(ScoreMetric.TIME_TO_HIT to 1.0))
+        "bias", "abserr" -> MetricWeights(mapOf(ScoreMetric.ACCURACY to 1.0))
+        "combo" -> MetricWeights(mapOf(ScoreMetric.ACCURACY to 1.0, ScoreMetric.TIME_TO_HIT to 1.0))
+        else -> error("unknown AIMTUNE_SCORE $scoreMode")
+    }
+
+    private fun engineInputs(metrics: de.yuuto.aimtune.core.metrics.RoundMetrics): Map<ScoreMetric, Double> = when (scoreMode) {
+        null -> metrics.scoreInputs()
+        "turn" -> listOfNotNull(metrics.flashMeanTurnMs?.let { ScoreMetric.TIME_TO_HIT to it }).toMap()
+        "bias" -> listOfNotNull(metrics.meanFirstError?.let { ScoreMetric.ACCURACY to -kotlin.math.abs(it) }).toMap()
+        "abserr" -> listOfNotNull(metrics.meanAbsFirstError?.let { ScoreMetric.ACCURACY to -it }).toMap()
+        else -> listOfNotNull(
+            metrics.flashMeanTurnMs?.let { ScoreMetric.TIME_TO_HIT to it }, metrics.meanAbsFirstError?.let { ScoreMetric.ACCURACY to -it },
+        ).toMap()
+    }
+
+    private fun playEngine(player: SimulatedPlayer, round: RefineRound, index: Int): Map<ScoreMetric, Double> =
+        engineInputs(
+            computeRoundMetrics(
+                HeadlessRound.of(round.scenario, player, TEST_DPI, round.cm360, round.seed, ROUND_SECONDS, index * ROUND_SECONDS * NANOS_PER_SECOND, accel = round.profile, geometry = geometry),
+            ),
+        )
     private val imported = RawAccelProfile(
         "default", RawAccelArgs(RawAccelMode.CLASSIC, gain = true, inputOffset = 10.0, capX = 62.5, capY = 1.6, capMode = RawAccelCapMode.IN_OUT), 600.0, 800.0,
     )
@@ -103,7 +154,7 @@ class RefineGateTest {
         val preference: (Double) -> Double = { v -> model.ideal.curve.multiplier(v) }
         // The probe sees every gain evaluation of the aimer (a few per reach), not the settling of the hand below.
         val seen: (Double) -> Double = { v -> preference(v).also { probe?.see(v, imported.curve.multiplier(v)) } }
-        return SimulatedPlayer(
+        return handBase.copy(
             optimumScale = optimumScale, gainPreference = seen, rangeBias = model.rangeBias,
             // A fresh, mutable hand per simulated person, settled on the curve it has been playing: the imported one.
             adaptation = HandAdaptation.adaptedTo(preference, delivered = { v -> imported.curve.multiplier(v) }),
@@ -112,22 +163,25 @@ class RefineGateTest {
 
     private fun play(player: SimulatedPlayer, round: RefineRound, index: Int): Map<ScoreMetric, Double> =
         computeRoundMetrics(
-            HeadlessRound.of(round.scenario, player, TEST_DPI, round.cm360, round.seed, ROUND_SECONDS, index * ROUND_SECONDS * NANOS_PER_SECOND, accel = round.profile),
+            HeadlessRound.of(round.scenario, player, TEST_DPI, round.cm360, round.seed, ROUND_SECONDS, index * ROUND_SECONDS * NANOS_PER_SECOND, accel = round.profile, geometry = geometry),
         ).scoreInputs()
 
-    /** The sensitivity factor at which a stateless player with [optimumScale] scores best with the imported profile (smooth fit of a sweep). */
+    /**
+     * The sensitivity factor at which a stateless player with [optimumScale] scores best with the imported profile (smooth fit of a
+     * sweep), by the score and round mix the engine runs with, so that the null model is a null for that score.
+     */
     private fun sensitivityOptimum(rangeBias: Double, optimumScale: Double, flash: Boolean): Double {
         val grid = geometricGrid(0.75, 1.33, 9)
         val per = 300
-        val base = SimulatedPlayer(optimumScale = optimumScale, gainPreference = { imported.curve.multiplier(it) }, rangeBias = rangeBias)
-        val kinds = AccelScenarios.of(flash)
+        val base = handBase.copy(optimumScale = optimumScale, gainPreference = { imported.curve.multiplier(it) }, rangeBias = rangeBias)
+        val kinds = mix ?: AccelScenarios.of(flash)
         val inputs = grid.indices.map { gi ->
             parallelList(per) { r ->
                 val round = RefineRound(kinds[r % kinds.size], 77L * 1_009 + gi * 101 + r, imported, gameCm360 / grid[gi])
-                play(base, round, gi * per + r)
+                playEngine(base, round, gi * per + r)
             }
         }
-        val scores = ScoreCalculator(weights).scoreRounds(inputs.flatten(), grid.indices.flatMap { gi -> List(per) { kinds[it % kinds.size].id } })
+        val scores = ScoreCalculator(engineWeights).scoreRounds(inputs.flatten(), grid.indices.flatMap { gi -> List(per) { kinds[it % kinds.size].id } })
         var i = 0
         val means = grid.indices.map { (0 until per).mapNotNull { scores[i++] }.average() }
         val all = scores.filterNotNull()
@@ -138,7 +192,7 @@ class RefineGateTest {
 
     /** Scales a player's optimum so that its best sensitivity with the imported profile is 1 (the optimum is proportional to 1 / scale). */
     private fun calibrated(rangeBias: Double, flash: Boolean, log: StringBuilder): Double = optimumScales.getOrPut(rangeBias to flash) {
-        var scaleNow = 0.95
+        var scaleNow = startScale
         repeat(3) { step ->
             val k = sensitivityOptimum(rangeBias, scaleNow, flash)
             log.appendLine("  calibration rangeBias $rangeBias step ${step + 1}: optimumScale %.4f -> best sensitivity factor %.3f".format(scaleNow, k))
@@ -155,11 +209,11 @@ class RefineGateTest {
     private fun runOnce(model: Model, optimumScale: Double, seed: Long, flash: Boolean): Run {
         val probe = Probe(imported.args.inputOffset) { v -> model.ideal.curve.multiplier(v) }
         val player = player(model, optimumScale, probe)
-        val engine = RefineEngine(imported, gameCm360, weights, seed, flash = flash, stageRounds = model.stageRounds)
+        val engine = RefineEngine(imported, gameCm360, engineWeights, seed, flash = flash, stageRounds = model.stageRounds, scenarioMix = mix)
         var index = 0
         while (engine.phase != RefinePhase.DONE) {
             if (engine.phase == RefinePhase.STAGE_RESULT) engine.continueToNextStage()
-            else engine.record(play(player, engine.nextRound(), index++))
+            else engine.record(playEngine(player, engine.nextRound(), index++))
         }
         val status = engine.verdict?.status
         val benefit = if (status == AbStatus.ACCEL_BETTER) trueBenefit(model, optimumScale, engine.candidate, seed, flash) else null
@@ -188,15 +242,15 @@ class RefineGateTest {
     }
 
     @Test
-    fun gate() = runGate(flash = true, file = "gate-m22c.txt")
+    fun gate() = runGate(flash = true, file = if (realHand) "gate-realhand${mixName?.let { "-$it" } ?: ""}${scoreMode?.let { "-score-$it" } ?: ""}.txt" else "gate-m22c.txt")
 
     /** The same models without flash rounds (click scenarios only), for the side-by-side with [gate]. */
     @Test
-    fun gateNoFlash() = runGate(flash = false, file = "gate-m22-noflash.txt")
+    fun gateNoFlash() = runGate(flash = false, file = if (realHand) "gate-realhand-noflash.txt" else "gate-m22-noflash.txt")
 
     private fun runGate(flash: Boolean, file: String) {
         val out = StringBuilder()
-        out.appendLine("== GATE m22c 'Refine my Raw Accel curve' @ git ${gitShortHash()} | profile: classic gain, offset 10, cap 62.5 in/s -> 1.6, output 600 / device 800 | game ${gameCm360} cm/360 | flash ${if (flash) "on" else "off"} ==")
+        out.appendLine("== GATE m22c 'Refine my Raw Accel curve' @ git ${gitShortHash()} | hand ${if (realHand) "fitted to the user's rounds, game geometry" else "default"} | profile: classic gain, offset 10, cap 62.5 in/s -> 1.6, output 600 / device 800 | game ${gameCm360} cm/360 | flash ${if (flash) "on" else "off"} | round mix ${mixName ?: "standard"} | engine score ${scoreMode ?: "standard"} ==")
         out.appendLine("policy: 8 warm-up rounds, stages HIGH_GAIN, TRANSITION of 12 rounds each (the base never changes, no LEVEL stage), continue through all stages, then the A/B test (max 12 pairs, alpha 0.01 per look, >= 6 pairs, >= 2 points). Export = the test says the candidate is better.")
         val started = System.currentTimeMillis()
         val rows = StringBuilder()
