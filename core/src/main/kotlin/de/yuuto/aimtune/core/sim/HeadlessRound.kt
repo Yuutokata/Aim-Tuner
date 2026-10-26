@@ -1,7 +1,6 @@
 package de.yuuto.aimtune.core.sim
 
-import de.yuuto.aimtune.core.accel.AccelCurve
-import de.yuuto.aimtune.core.accel.AccelProcessor
+import de.yuuto.aimtune.core.accel.AccelModel
 import de.yuuto.aimtune.core.input.MouseEvent
 import de.yuuto.aimtune.core.math.Vec3
 import de.yuuto.aimtune.core.math.ViewAngles
@@ -31,7 +30,7 @@ object HeadlessRound {
         seed: Long,
         roundSeconds: Int = 45,
         sessionOffsetNanos: Long = 0L,
-        accel: AccelCurve? = null,
+        accel: AccelModel? = null,
     ): RoundRecording = of(ScenarioKind.FLICK, player, dpi, cm360, seed, roundSeconds, sessionOffsetNanos, accel)
 
     /** One round of [kind] with its default geometry. */
@@ -43,7 +42,7 @@ object HeadlessRound {
         seed: Long,
         roundSeconds: Int = 45,
         sessionOffsetNanos: Long = 0L,
-        accel: AccelCurve? = null,
+        accel: AccelModel? = null,
         geometry: TrainerGeometry? = null,
     ): RoundRecording = run(player, dpi, cm360, seed, roundSeconds, sessionOffsetNanos, kind.create(roundSeconds * NANOS_PER_SECOND, seed, geometry), accel)
 
@@ -55,7 +54,7 @@ object HeadlessRound {
         roundSeconds: Int,
         sessionOffsetNanos: Long,
         scenario: Scenario,
-        accel: AccelCurve? = null,
+        accel: AccelModel? = null,
     ): RoundRecording {
         val aimer = SimulatedAimer(player, dpi, cm360, seed xor AIMER_SEED_MIX, scenario.kind, accel)
         val start = CLOCK_ORIGIN_NANOS
@@ -63,7 +62,7 @@ object HeadlessRound {
         val degPerCount = degreesPerCount(dpi, cm360)
         val mouse = ArrayList<MouseEvent>()
         var view = ViewAngles()
-        val processor = accel?.let { AccelProcessor(it, dpi) }
+        val modifier = accel?.newModifier(dpi)
         var now = start
         scenario.start(now)
         aimer.reset(now, sessionOffsetNanos)
@@ -74,8 +73,8 @@ object HeadlessRound {
             if (step.dx != 0 || step.dy != 0) {
                 val event = MouseEvent(now, step.dx, step.dy)
                 mouse += event
-                val scale = processor?.scaleFor(event) ?: 1.0
-                view = view.rotatedByCounts(step.dx * scale, step.dy * scale, degPerCount)
+                val move = modifier?.modify(event)
+                view = view.rotatedByCounts(move?.dx ?: step.dx.toDouble(), move?.dy ?: step.dy.toDouble(), degPerCount)
             }
             scenario.update(now, view)
             if (step.click) scenario.fire(Vec3.ZERO, view.direction(), now)

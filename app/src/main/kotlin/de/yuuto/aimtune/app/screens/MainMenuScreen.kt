@@ -47,7 +47,7 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
         }
         left.add(menuItem(t("menu.results"), resultsSubtitle(), "R") { ctx.showStoredResults() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
-        left.add(menuItem(t("menu.acceleration"), t("menu.acceleration_sub"), "A") { ctx.showAccel() })
+        left.add(menuItem(t("menu.acceleration"), t("menu.acceleration_sub"), "A") { ctx.showRawAccelHub() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
         left.add(menuItem(t("menu.history"), t("menu.history_sub"), "H") { ctx.showHistory() })
             .width(MENU_WIDTH).height(MENU_ITEM_HEIGHT).padBottom(MENU_GAP).row()
@@ -76,7 +76,7 @@ class MainMenuScreen(ctx: AppContext) : UiScreen(ctx) {
     override fun onKey(keycode: Int): Boolean = when (keycode) {
         Input.Keys.S -> true.also { ctx.showSettings() }
         Input.Keys.R -> true.also { ctx.showStoredResults() }
-        Input.Keys.A -> true.also { ctx.showAccel() }
+        Input.Keys.A -> true.also { ctx.showRawAccelHub() }
         Input.Keys.H -> true.also { ctx.showHistory() }
         Input.Keys.C -> true.also { ctx.showCrosshair() }
         Input.Keys.M -> ctx.hasRangeMode().also { if (it) ctx.showRangeMode() }

@@ -14,7 +14,7 @@ import de.yuuto.aimtune.core.score.scoreInputs
  * "Refine my Raw Accel curve" as the app runs it: the import has happened (the import screen is the IMPORT phase), this holds
  * the rest. [RefineEngine] is the logic (warm-up, stages, test), this class the glue to [TrainerConfig] and the HUD label.
  * [baseConfig] carries the player's game sensitivity in `cm360` and the DPI of the settings, which equals the file's. Rounds
- * are played at the profile's own cm/360 (the game sensitivity divided by output DPI / device DPI) with its curve; nothing
+ * play the whole profile (the driver model, integer counts) at the game cm/360, which is also what is stored; nothing
  * here reveals the factor of a search round or the arm of a test round.
  */
 class RefineRun(
@@ -34,6 +34,9 @@ class RefineRun(
 
     val dpi: Double get() = baseConfig.dpi
 
+    /** The sensitivity this run was started with, for the "Runs use" line. */
+    val runsUse: RunsUse get() = RunsUse.running(baseConfig)
+
     val exportName: String get() = "${profile.name} (AimTune)"
 
     val label: UiText
@@ -46,7 +49,7 @@ class RefineRun(
 
     fun nextRoundConfig(): TrainerConfig {
         val round = engine.nextRound()
-        return baseConfig.copy(cm360 = round.cm360, scenario = round.scenario, seed = round.seed, accel = round.curve)
+        return baseConfig.copy(cm360 = round.cm360, scenario = round.scenario, seed = round.seed, accel = round.profile)
     }
 
     fun recordRound(recording: RoundRecording) = engine.record(computeRoundMetrics(recording).scoreInputs())

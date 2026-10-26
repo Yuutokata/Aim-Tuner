@@ -9,11 +9,16 @@ import de.yuuto.aimtune.app.accel.AccelPhase
 import de.yuuto.aimtune.app.accel.LastCalibration
 import de.yuuto.aimtune.app.accel.LastSearch
 import de.yuuto.aimtune.app.accel.PriorCalibration
+import de.yuuto.aimtune.app.accel.SettingsAnalyses
 import de.yuuto.aimtune.app.accel.sampleAccelRun
 import de.yuuto.aimtune.app.blind.sampleBlindRun
 import de.yuuto.aimtune.app.history.HistoryEntry
 import de.yuuto.aimtune.app.accel.sampleRefineRun
 import de.yuuto.aimtune.app.accel.sampleRefineText
+import de.yuuto.aimtune.app.accel.ImportedProfile
+import de.yuuto.aimtune.app.accel.RawAccelSetting
+import de.yuuto.aimtune.app.accel.RefineImport
+import de.yuuto.aimtune.app.accel.sampleSettingsAnalyses
 import de.yuuto.aimtune.app.screens.RefineImportScreen
 import de.yuuto.aimtune.app.screens.HistoryScreen
 import de.yuuto.aimtune.app.screens.ShareDataScreen
@@ -62,6 +67,10 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         Step("switching-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
         Step("range-ready") { showScenario(ScenarioKind.RANGE) },
         Step("range-running") { (ctx.currentScreen as? TrainerScreen)?.startRoundForTour() },
+        Step("hub") { showHub { ctx.showRawAccelHub(it) } },
+        Step("hub-setting-info") { showHub { ctx.showRawAccelSetting(RawAccelSetting.SNAP, it) } },
+        Step("hub-setting-analysis") { showHub { ctx.showRawAccelSetting(RawAccelSetting.ROTATION, it) } },
+        Step("hub-export") { showHub { ctx.hub.setTicked(RawAccelSetting.ROTATION, true); ctx.showPatchedExport(it) } },
         Step("accel-intro") { ctx.showAccel() },
         Step("accel-intro-prior") { ctx.showAccel(AccelBaseline(48.7, "0.335", "Valorant", FinderResult(34.4, 61, 40, "0.474", searchRounds = 50), gameSearchRounds = 12)) },
         Step("accel-last") { accelSample(AccelPhase.ANALYSIS)?.let { ctx.showLastAccelAnalysis(LastCalibration(it.dpi, it.baseCm360, PriorCalibration(it.calibrationDone, it.calibrationSamples))) } },
@@ -102,6 +111,13 @@ class ScreenshotTour(private val ctx: AppContext, private val dir: Path, private
         val current = ctx.settings.current
         ctx.settings.save(current.copy(gameId = "valorant", scenarios = (current.scenarios + ScenarioKind.RANGE.id).distinct()))
         ctx.showSettings()
+    }
+
+    /** The hub and its pages with made-up analyses and the sample profile imported; the tick on the rotation is cleared again. */
+    private fun showHub(show: (CompletableFuture<SettingsAnalyses>) -> Unit) {
+        val source = sampleRefineText()?.let { RefineImport.parse(it, "settings.json").getOrNull() }
+        ctx.hub.useSample(source?.let { ImportedProfile(it, it.file.profileNames.first()) })
+        show(CompletableFuture.completedFuture(sampleSettingsAnalyses()))
     }
 
     private fun accelSample(until: AccelPhase) = ctx.trainerConfig()?.let { sampleAccelRun(it, until) }

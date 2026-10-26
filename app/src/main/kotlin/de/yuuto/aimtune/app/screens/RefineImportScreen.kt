@@ -5,10 +5,13 @@ import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.ui.CheckBox
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import de.yuuto.aimtune.app.AppContext
+import de.yuuto.aimtune.app.accel.ImportedProfile
 import de.yuuto.aimtune.app.accel.RefineChoice
 import de.yuuto.aimtune.app.accel.RefineDiff
 import de.yuuto.aimtune.app.accel.RefineImport
 import de.yuuto.aimtune.app.accel.RefineSource
+import de.yuuto.aimtune.app.files.ImportFileReader
+import de.yuuto.aimtune.app.files.ImportFileResult
 import de.yuuto.aimtune.app.ui.ChartActor
 import de.yuuto.aimtune.app.ui.Styles
 import de.yuuto.aimtune.app.ui.addButton
@@ -18,6 +21,7 @@ import de.yuuto.aimtune.app.ui.frame
 import de.yuuto.aimtune.app.ui.label
 import de.yuuto.aimtune.app.ui.onChange
 import de.yuuto.aimtune.app.ui.profileChart
+import de.yuuto.aimtune.core.accel.refineStages
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -33,13 +37,21 @@ private const val MAX_FILE_BUTTONS = 4
  * import folder. Shows the profiles, what was read, the curve, why a profile is refused, and starts the run only for a profile
  * the trainer reproduces exactly at the DPI of the settings.
  */
-class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen(ctx) {
+class RefineImportScreen(ctx: AppContext, sampleText: String? = null, imported: ImportedProfile? = null) : UiScreen(ctx) {
     private var source: RefineSource? = null
     private var error: String? = null
     private var selected: String? = null
+    private var path: Path? = null
 
     init {
-        if (sampleText != null) load(sampleText, "refine-sample.json")
+        if (sampleText != null) {
+            load(sampleText, "refine-sample.json", null)
+        } else if (imported != null) {
+            // The file imported earlier (also the one the hub read again from the settings) is still the choice.
+            source = imported.source
+            selected = imported.profileName
+            path = imported.path
+        }
     }
 
     private val settingsDpi: Double? get() = ctx.trainerConfig()?.dpi
@@ -53,7 +65,8 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
     override fun build(): Actor {
         val choice = choice()
         val content = Table()
-        content.add(ui.label(t("refine.import.title"), Styles.HEADING)).left().colspan(2).padBottom(20f).row()
+        content.add(ui.label(t("refine.import.title"), Styles.HEADING)).left().colspan(2).padBottom(12f).row()
+        content.add(ctx.runsUseLine(ctx.runsUse(), LEFT_WIDTH + CARD_WIDTH, { ctx.showRefine() })).left().width(LEFT_WIDTH + CARD_WIDTH + 40f).colspan(2).padBottom(16f).row()
         val left = Table().top().left()
         left.add(ui.label(t("refine.import.intro"), Styles.BODY_MUTED, wrap = true)).left().width(LEFT_WIDTH).padBottom(16f).row()
         left.add(sourceBlock()).left().width(LEFT_WIDTH).padBottom(16f).row()
@@ -64,7 +77,7 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
         content.add(if (choice == null) hintCard() else profileCard(choice)).top().left().padLeft(40f)
 
         val footer = Table()
-        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showAccel() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
+        footer.add(ui.button(t("common.back"), Styles.TEXT) { ctx.showRawAccelHub() }).left().height(FOOTER_BUTTON_HEIGHT).padLeft(8f)
         footer.add().expandX()
         val start = ui.button(t("refine.import.start"), Styles.PRIMARY) { start(choice) }
         start.isDisabled = !canStart(choice)
@@ -72,11 +85,11 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
         return ui.frame(null, content, footer)
     }
 
-    override fun onEscape() = ctx.showAccel()
+    override fun onEscape() = ctx.showRawAccelHub()
 
     override fun onEnter() = start(choice())
 
-    private fun canStart(choice: RefineChoice?) = choice?.profile != null && ctx.rawAccelConfirmed && ctx.source.hasReportTimestamps
+    private fun canStart(choice: RefineChoice?) = choice?.profile?.refineStages()?.isNotEmpty() == true && ctx.rawAccelConfirmed && ctx.source.hasReportTimestamps
 
     private fun start(choice: RefineChoice?) {
         val profile = choice?.profile ?: return
@@ -86,6 +99,7 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
 
     private fun sourceBlock(): Table {
         val block = Table().left()
+        block.add(ui.button(t("refine.import.open"), Styles.PRIMARY) { openFile() }).left().height(FOOTER_BUTTON_HEIGHT).colspan(2 + MAX_FILE_BUTTONS).padBottom(12f).row()
         block.add(ui.button(t("refine.import.paste"), Styles.SECONDARY) { paste() }).left().height(FOOTER_BUTTON_HEIGHT).padRight(16f)
         val files = RefineImport.listFiles(ctx.importDir)
         files.take(MAX_FILE_BUTTONS).forEach { path ->
@@ -103,7 +117,7 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
         block.add(ui.caps(t("refine.import.profiles", s.label))).left().colspan(8).padBottom(8f).row()
         s.file.profileNames.forEach { name ->
             val style = if (name == selected) Styles.PRIMARY else Styles.SECONDARY
-            block.add(ui.button(name, style) { selected = name; rebuild() }).left().height(FOOTER_BUTTON_HEIGHT).padRight(12f)
+            block.add(ui.button(name, style) { selected = name; ctx.importProfile(ImportedProfile(s, name, path)); rebuild() }).left().height(FOOTER_BUTTON_HEIGHT).padRight(12f)
         }
         return block
     }
@@ -129,6 +143,7 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
             card.add(ui.label(t("refine.import.factor", "%.3f".format(java.util.Locale.ROOT, profile.outputDpi / profile.effectiveDeviceDpi)), Styles.CAPTION_MUTED, wrap = true))
                 .left().width(inner).padTop(8f).row()
             card.add(ChartActor(ui, profileChart(ui.tokens, profile))).left().width(inner).height(CHART_HEIGHT).padTop(12f).row()
+            if (profile.refineStages().isEmpty()) card.add(ui.label(t("refine.import.nothing"), Styles.CAUTION, wrap = true)).left().width(inner).padTop(12f).row()
         } else {
             card.add(ui.caps(t("refine.import.refused"))).left().row()
         }
@@ -154,6 +169,19 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
         return block
     }
 
+    /** Asks for a file with the native dialog; a cancelled dialog changes nothing. */
+    private fun openFile() {
+        val path = ctx.fileDialogs.openJson(t("file.dialog.open_title"), ctx.importDir) ?: return
+        when (val result = ImportFileReader.read(path)) {
+            is ImportFileResult.Ok -> load(result.text, path.fileName.toString(), path)
+            is ImportFileResult.Unreadable -> error = t("refine.import.file_unreadable", result.reason)
+            ImportFileResult.TooLarge -> error = t("refine.import.file_too_large")
+            ImportFileResult.NotJson -> error = t("refine.import.file_not_json")
+            is ImportFileResult.NotRawAccel -> error = t("refine.import.file_not_raw_accel", result.reason)
+        }
+        rebuild()
+    }
+
     private fun paste() {
         val text = try {
             Gdx.app.clipboard.contents
@@ -164,26 +192,29 @@ class RefineImportScreen(ctx: AppContext, sampleText: String? = null) : UiScreen
             error = t("refine.import.clipboard_empty")
             rebuild()
         } else {
-            load(text, t("refine.import.clipboard"))
+            load(text, t("refine.import.clipboard"), null)
             rebuild()
         }
     }
 
     private fun loadFile(path: Path) {
         try {
-            load(Files.readString(path), path.fileName.toString())
+            load(Files.readString(path), path.fileName.toString(), path)
         } catch (e: java.io.IOException) {
             error = e.message.orEmpty()
         }
         rebuild()
     }
 
-    private fun load(text: String, label: String) {
+    /** Reads [text]; a file that parses becomes the imported profile of the hub (its [file] is remembered in the settings), a clipboard text has none. */
+    private fun load(text: String, label: String, file: Path?) {
         RefineImport.parse(text, label).fold(
             {
                 source = it
+                path = file
                 error = null
                 selected = it.file.profileNames.firstOrNull()
+                selected?.let { name -> ctx.importProfile(ImportedProfile(it, name, file)) }
             },
             { error = it.message.orEmpty() },
         )

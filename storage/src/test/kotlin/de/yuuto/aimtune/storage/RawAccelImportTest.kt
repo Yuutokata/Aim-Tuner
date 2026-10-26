@@ -3,7 +3,9 @@ package de.yuuto.aimtune.storage
 import de.yuuto.aimtune.core.accel.LookupCurve
 import de.yuuto.aimtune.core.accel.RawAccelArgs
 import de.yuuto.aimtune.core.accel.RawAccelCapMode
+import de.yuuto.aimtune.core.accel.RawAccelDevice
 import de.yuuto.aimtune.core.accel.RawAccelMode
+import de.yuuto.aimtune.core.accel.RawAccelXY
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -39,8 +41,6 @@ class RawAccelImportTest {
             else -> JsonObject(LinkedHashMap(node.jsonObject).also { it[key] = set(node.jsonObject.getValue(key), path.drop(1), value) })
         }
     }
-
-    private fun refusals(file: RawAccelFile) = assertIs<RawAccelImportResult.Refused>(RawAccelImport.profile(file, "default")).reasons
 
     @Test
     fun `the user's file imports as the classic gain profile with its output dpi and device dpi`() {
@@ -80,51 +80,128 @@ class RawAccelImportTest {
         )
         val polled = RawAccelImport.profile(RawAccelImport.parse(Json.encodeToString(JsonElement.serializer(), withPolling)), "default")
         assertIs<RawAccelImportResult.Imported>(polled)
-        assertEquals(3, polled.warnings.size, "${polled.warnings}")
+        assertEquals(2, polled.warnings.size, "${polled.warnings}")
     }
 
+    private val speedBlock = "Input speed calculation parameters"
+    private val wholeKey = "Whole/combined accel (set false for 'by component' mode)"
+    private val inputHalf = "Time in ms after which an input is weighted at half its original value."
+    private val scaleHalf = "Time in ms after which scale is weighted at half its original value."
+    private val outputHalf = "Time in ms after which an output is weighted at half its original value."
+
+    /** The profile of [file] after an import that must not be refused. */
+    private fun imported(file: RawAccelFile) = assertIs<RawAccelImportResult.Imported>(RawAccelImport.profile(file, "default", 800.0))
+
     @Test
-    fun `everything the trainer cannot reproduce is a refusal with its reason`() {
-        val whole = "Input speed calculation parameters"
-        val cases = listOf(
-            listOf(whole, "Whole/combined accel (set false for 'by component' mode)") to (JsonPrimitive(false) to "by-component"),
-            listOf(whole, "lpNorm") to (JsonPrimitive(3.0) to "Lp norm"),
-            listOf(whole, "Time in ms after which an input is weighted at half its original value.") to (JsonPrimitive(2.0) to "input smoothing"),
-            listOf(whole, "Time in ms after which scale is weighted at half its original value.") to (JsonPrimitive(2.0) to "scale smoothing"),
-            listOf(whole, "Time in ms after which an output is weighted at half its original value.") to (JsonPrimitive(2.0) to "output smoothing"),
-            listOf("Input Speed Cap") to (JsonPrimitive(120.0) to "Input Speed Cap"),
-            listOf("Stretches domain for horizontal vs vertical inputs", "x") to (JsonPrimitive(1.5) to "Stretches domain"),
-            listOf("Stretches accel range for horizontal vs vertical inputs", "y") to (JsonPrimitive(0.5) to "Stretches accel range"),
-            listOf("Degrees of rotation") to (JsonPrimitive(5.0) to "rotation"),
-            listOf("Degrees of angle snapping") to (JsonPrimitive(3.0) to "snapping"),
-            listOf("Y/X output DPI ratio (vertical sens multiplier)") to (JsonPrimitive(1.2) to "Y/X"),
-            listOf("L/R output DPI ratio (left sens multiplier)") to (JsonPrimitive(0.9) to "L/R"),
-            listOf("U/D output DPI ratio (up sens multiplier)") to (JsonPrimitive(0.9) to "U/D"),
-            listOf("Vertical accel parameters", "acceleration") to (JsonPrimitive(0.01) to "vertical"),
+    fun `by-component mode imports with its own vertical curve`() {
+        val both = edited(speedBlock, wholeKey, value = JsonPrimitive(false))
+        val file = RawAccelImport.parse(
+            Json.encodeToString(JsonElement.serializer(), set(both.root, listOf("profiles", "0", "Vertical accel parameters", "acceleration"), JsonPrimitive(0.01))),
         )
-        for ((path, change) in cases) {
-            val (value, expected) = change
-            val reasons = refusals(edited(*path.toTypedArray(), value = value))
-            assertEquals(1, reasons.size, "$path: $reasons")
-            assertTrue(expected in reasons.single(), "$path: ${reasons.single()}")
-        }
-        for (mode in listOf("jump", "synchronous", "power")) {
-            val file = edited("Whole or horizontal accel parameters", "mode", value = JsonPrimitive(mode))
-            assertTrue(refusals(file).any { "'$mode'" in it })
-        }
+        val profile = imported(file).profile
+        assertEquals(false, profile.speed.whole)
+        assertEquals(0.01, profile.accelY.acceleration)
+        assertEquals(0.005, profile.args.acceleration)
     }
 
     @Test
-    fun `several reasons are all reported`() {
-        val file = edited("Degrees of rotation", value = JsonPrimitive(5.0)).let {
-            RawAccelImport.parse(
-                Json.encodeToString(
-                    JsonElement.serializer(),
-                    set(it.root, listOf("profiles", "0", "Input Speed Cap"), JsonPrimitive(100.0)),
-                ),
-            )
+    fun `each smoothing half-life imports with its value and output smoothing warns about lag`() {
+        assertEquals(2.5, imported(edited(speedBlock, inputHalf, value = JsonPrimitive(2.5))).profile.speed.inputHalfLife)
+        assertEquals(3.0, imported(edited(speedBlock, scaleHalf, value = JsonPrimitive(3.0))).profile.speed.scaleHalfLife)
+        val output = imported(edited(speedBlock, outputHalf, value = JsonPrimitive(4.0)))
+        assertEquals(4.0, output.profile.speed.outputHalfLife)
+        assertTrue(output.warnings.single().contains("lag"), "${output.warnings}")
+    }
+
+    @Test
+    fun `speed cap, domain and range stretch, rotation and snap import with their values`() {
+        assertEquals(120.0, imported(edited("Input Speed Cap", value = JsonPrimitive(120.0))).profile.speedCap)
+        assertEquals(RawAccelXY(1.5, 1.0), imported(edited("Stretches domain for horizontal vs vertical inputs", "x", value = JsonPrimitive(1.5))).profile.domain)
+        assertEquals(RawAccelXY(1.0, 0.5), imported(edited("Stretches accel range for horizontal vs vertical inputs", "y", value = JsonPrimitive(0.5))).profile.range)
+        assertEquals(5.0, imported(edited("Degrees of rotation", value = JsonPrimitive(5.0))).profile.rotationDegrees)
+        assertEquals(3.0, imported(edited("Degrees of angle snapping", value = JsonPrimitive(3.0))).profile.snapDegrees)
+    }
+
+    @Test
+    fun `the Y over X, left right and up down ratios import with their values`() {
+        assertEquals(1.2, imported(edited("Y/X output DPI ratio (vertical sens multiplier)", value = JsonPrimitive(1.2))).profile.yxRatio)
+        assertEquals(0.9, imported(edited("L/R output DPI ratio (left sens multiplier)", value = JsonPrimitive(0.9))).profile.lrRatio)
+        assertEquals(0.8, imported(edited("U/D output DPI ratio (up sens multiplier)", value = JsonPrimitive(0.8))).profile.udRatio)
+    }
+
+    @Test
+    fun `the Lp norm imports with its value`() {
+        assertEquals(3.0, imported(edited(speedBlock, "lpNorm", value = JsonPrimitive(3.0))).profile.speed.lpNorm)
+    }
+
+    @Test
+    fun `power, jump and synchronous profiles import with their parameters`() {
+        fun both(mode: String, vararg changes: Pair<String, JsonElement>): RawAccelFile {
+            var root: JsonElement = set(userRoot, listOf("profiles", "0", "Whole or horizontal accel parameters", "mode"), JsonPrimitive(mode))
+            for (block in listOf("Whole or horizontal accel parameters", "Vertical accel parameters")) {
+                for ((key, value) in changes) root = set(root, listOf("profiles", "0", block, key), value)
+            }
+            return RawAccelImport.parse(Json.encodeToString(JsonElement.serializer(), root))
         }
-        assertEquals(2, refusals(file).size)
+        val power = imported(both("power", "scale" to JsonPrimitive(0.3), "exponentPower" to JsonPrimitive(0.4), "outputOffset" to JsonPrimitive(0.2))).profile.args
+        assertEquals(RawAccelMode.POWER, power.mode)
+        assertEquals(Triple(0.3, 0.4, 0.2), Triple(power.scale, power.exponentPower, power.outputOffset))
+        val jump = imported(both("jump", "smooth" to JsonPrimitive(0.25))).profile.args
+        assertEquals(RawAccelMode.JUMP, jump.mode)
+        assertEquals(Triple(62.5, 1.6, 0.25), Triple(jump.capX, jump.capY, jump.smooth))
+        val sync = imported(both("synchronous", "gamma" to JsonPrimitive(1.4), "motivity" to JsonPrimitive(2.0), "syncSpeed" to JsonPrimitive(20.0))).profile.args
+        assertEquals(RawAccelMode.SYNCHRONOUS, sync.mode)
+        assertEquals(Triple(1.4, 2.0, 20.0), Triple(sync.gamma, sync.motivity, sync.syncSpeed))
+    }
+
+    @Test
+    fun `device timing imports, optional time limits included`() {
+        val device = userRoot.getValue("defaultDeviceConfig").jsonObject
+        val changed = JsonObject(
+            LinkedHashMap(userRoot).also {
+                it["defaultDeviceConfig"] = JsonObject(
+                    LinkedHashMap(device).also { d ->
+                        d["Polling rate Hz (keep at 0 for automatic adjustment)"] = JsonPrimitive(1000)
+                        d["Use constant time interval based on polling rate"] = JsonPrimitive(true)
+                        d["minimumTime"] = JsonPrimitive(0.2)
+                        d["maximumTime"] = JsonPrimitive(50.0)
+                    },
+                )
+            },
+        )
+        val result = imported(RawAccelImport.parse(Json.encodeToString(JsonElement.serializer(), changed)))
+        assertEquals(RawAccelDevice(pollingRate = 1000, pollTimeLock = true, timeMin = 0.2, timeMax = 50.0), result.profile.device)
+        assertEquals(2, result.warnings.size, "${result.warnings}")
+        assertEquals(RawAccelDevice(), imported(RawAccelImport.parse(userText)).profile.device, "absent limits are Raw Accel's defaults")
+    }
+
+    @Test
+    fun `a disabled device, setExtraInfo and a mapping to another profile are warnings`() {
+        val device = userRoot.getValue("defaultDeviceConfig").jsonObject
+        val changed = JsonObject(
+            LinkedHashMap(userRoot).also {
+                it["defaultDeviceConfig"] = JsonObject(LinkedHashMap(device).also { d -> d["disable"] = JsonPrimitive(true); d["setExtraInfo"] = JsonPrimitive(true) })
+                it["devices"] = JsonArray(
+                    listOf(
+                        JsonObject(mapOf("name" to JsonPrimitive("Mouse"), "profile" to JsonPrimitive("other"))),
+                        JsonObject(mapOf("name" to JsonPrimitive("Pad"), "profile" to JsonPrimitive("default"))),
+                    ),
+                )
+            },
+        )
+        val warnings = imported(RawAccelImport.parse(Json.encodeToString(JsonElement.serializer(), changed))).warnings
+        assertEquals(3, warnings.size, "$warnings")
+        assertTrue(warnings.any { "disabled" in it } && warnings.any { "setExtraInfo" in it } && warnings.any { "Mouse" in it && "'other'" in it })
+    }
+
+    @Test
+    fun `only what Raw Accel itself would refuse is refused`() {
+        val negative = RawAccelImport.profile(edited("Input Speed Cap", value = JsonPrimitive(-1.0)), "default")
+        assertTrue("speed cap" in assertIs<RawAccelImportResult.Refused>(negative).reasons.single())
+        val snap = RawAccelImport.profile(edited("Degrees of angle snapping", value = JsonPrimitive(60.0)), "default")
+        assertTrue("snap" in assertIs<RawAccelImportResult.Refused>(snap).reasons.single())
+        val acceleration = RawAccelImport.profile(editedBoth("acceleration", JsonPrimitive(0.0)), "default")
+        assertTrue("acceleration" in assertIs<RawAccelImportResult.Refused>(acceleration).reasons.single())
     }
 
     @Test
@@ -138,9 +215,6 @@ class RawAccelImportTest {
         assertFailsWith<RawAccelImportException> {
             RawAccelImport.profile(editedBoth("Cap mode", JsonPrimitive("sideways")), "default")
         }
-        // values Raw Accel's own validation rejects
-        val both = editedBoth("acceleration", JsonPrimitive(0.0))
-        assertFailsWith<RawAccelImportException> { RawAccelImport.profile(both, "default") }.also { assertTrue("acceleration" in it.message!!) }
     }
 
     @Test

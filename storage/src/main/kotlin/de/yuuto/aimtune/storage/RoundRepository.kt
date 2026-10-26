@@ -107,7 +107,7 @@ class RoundRepository(private val database: Database) {
                     endNanos = start + rs.getLong(6),
                     mouseEvents = MouseEventCodec.decode(rs.getBytes(8), rs.getInt(7), start),
                     targetEvents = loadTargetEvents(c, roundId, start),
-                    accel = rs.getString(9)?.let(AccelSpec::decode),
+                    accel = rs.getString(9)?.let(AccelSpec::decodeModel),
                 )
             }
         }
@@ -229,7 +229,7 @@ class RoundRepository(private val database: Database) {
             it.setInt(10, r.mouseEvents.size)
             it.setBytes(11, MouseEventCodec.encode(r.mouseEvents, r.startNanos))
             it.setInt(12, METRICS_VERSION)
-            it.setString(13, r.accel?.let(AccelSpec::encode))
+            it.setString(13, r.accel?.let(AccelSpec::encodeModel))
             it.executeUpdate()
             it.generatedKeys.use { keys -> keys.next(); keys.getLong(1) }
         }

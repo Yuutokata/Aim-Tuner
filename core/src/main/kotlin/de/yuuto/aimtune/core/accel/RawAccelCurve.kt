@@ -4,76 +4,10 @@ import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.pow
 
-/** `accel_mode` of Raw Accel 1.7.1 (`common/rawaccel-base.hpp:246`); [json] is the name in `settings.json` (`wrapper/wrapper.cpp:37`). Only the modes AimTune reproduces. */
-enum class RawAccelMode(val json: String) {
-    CLASSIC("classic"),
-    NATURAL("natural"),
-    LUT("lut"),
-    NOACCEL("noaccel"),
-}
-
-/** `cap_mode` of Raw Accel 1.7.1 (`common/rawaccel-base.hpp:256`); [json] is the name in `settings.json` (`wrapper/wrapper.cpp:43`). */
-enum class RawAccelCapMode(val json: String) {
-    IN_OUT("in_out"),
-    INPUT("input"),
-    OUTPUT("output"),
-}
-
-/**
- * The parameters of one Raw Accel 1.7.1 `accel_args` (`common/rawaccel-base.hpp:260`) that classic, natural, lut and noaccel read,
- * under the names and defaults of the C++ struct. [gain] is the "Gain / Velocity" switch: false is Velocity (`LEGACY`, the curve is
- * the multiplier), true is Gain (the curve is defined through its derivative). For [RawAccelMode.LUT] the flag decides what the
- * table's y values are: output speeds when true, multipliers when false (`accel-lookup.hpp:111`, `:136`). [lut] is the flat
- * `data` array x1, y1, x2, y2, ... as the floats Raw Accel stores.
- *
- * The init block applies the checks of `common/rawaccel-validate.hpp:38-131` to the fields kept here, so a value that Raw Accel
- * would refuse to load cannot be built.
- */
-data class RawAccelArgs(
-    val mode: RawAccelMode,
-    val gain: Boolean = true,
-    val acceleration: Double = 0.005,
-    val exponentClassic: Double = 2.0,
-    val inputOffset: Double = 0.0,
-    val decayRate: Double = 0.1,
-    val limit: Double = 1.5,
-    val capX: Double = 15.0,
-    val capY: Double = 1.5,
-    val capMode: RawAccelCapMode = RawAccelCapMode.OUTPUT,
-    val lut: List<Float> = emptyList(),
-) {
-    init {
-        if (mode == RawAccelMode.LUT) {
-            require(lut.size >= 4) { "lookup mode requires at least 2 points" }
-            require(lut.size <= RAW_DATA_CAPACITY) { "too many data points (max=$MAX_LUT_POINTS)" }
-        }
-        require(lut.size <= RAW_DATA_CAPACITY) { "data size > max" }
-        require(lut.size % 2 == 0) { "lut data must hold x, y pairs" }
-        require(inputOffset >= 0) { "offset can not be negative" }
-        require(capX >= 0) { "cap (input) can not be negative" }
-        require(capY >= 0) { "cap (output) can not be negative" }
-        if (mode == RawAccelMode.CLASSIC && capMode == RawAccelCapMode.IN_OUT) {
-            require(capX != 0.0) { "cap (input) can not be 0" }
-            require(capY != 0.0) { "cap (output) can not be 0" }
-        }
-        require(!(mode == RawAccelMode.CLASSIC && capX > 0 && capX < inputOffset && capMode != RawAccelCapMode.OUTPUT)) { "cap < offset" }
-        require(acceleration > 0) { "acceleration must be positive" }
-        require(decayRate > 0) { "decay rate must be positive" }
-        require(exponentClassic > 1) { "exponent must be greater than 1" }
-        require(limit > 0) { "limit must be positive" }
-    }
-
-    companion object {
-        /** `LUT_RAW_DATA_CAPACITY` (`rawaccel-base.hpp:235`). */
-        const val RAW_DATA_CAPACITY = 514
-        const val MAX_LUT_POINTS = RAW_DATA_CAPACITY / 2
-    }
-}
-
 /**
  * The multiplier of a Raw Accel 1.7.1 acceleration mode at a speed in inches per second, computed with the code of the driver:
  * classic Velocity/Gain `common/accel-classic.hpp:27-77` / `:79-170`, natural `accel-natural.hpp:25-37` / `:40-57`, lut
- * `accel-lookup.hpp:103-156`, noaccel returns 1. The callback that wraps all of them multiplies `(f(x) - 1)` by the range weight
+ * `accel-lookup.hpp:55-97`, noaccel returns 1. The callback that wraps all of them multiplies `(f(x) - 1)` by the range weight
  * (`rawaccel.hpp:451`), which is 1 for the profiles AimTune accepts. The derived parameters (the classic `a` of a cap mode that
  * fixes the curve by a point, the Gain cap and its integration constant) are computed once in the constructor, in the order of
  * the C++ constructors.
@@ -90,6 +24,9 @@ data class RawAccelCurve(val args: RawAccelArgs) : AccelCurve {
         RawAccelMode.NATURAL -> if (args.gain) naturalGain(args) else naturalVelocity(args)
         RawAccelMode.LUT -> lookup(args)
         RawAccelMode.NOACCEL -> { _ -> 1.0 }
+        RawAccelMode.JUMP -> if (args.gain) RawJump.gain(args) else RawJump.legacy(args)
+        RawAccelMode.POWER -> if (args.gain) RawPower.gain(args) else RawPower.legacy(args)
+        RawAccelMode.SYNCHRONOUS -> if (args.gain) RawSynchronous.gain(args) else RawSynchronous.legacy(args)
     }
 
     /**
@@ -122,9 +59,6 @@ data class RawAccelCurve(val args: RawAccelArgs) : AccelCurve {
         fun classicGainValue(x: Double, accel: Double, power: Double, offset: Double) = power * (accel * (x - offset)).pow(power - 1)
         fun classicGainInverse(y: Double, accel: Double, power: Double, offset: Double) = (accel * offset + (y / power).pow(1 / (power - 1))) / accel
         fun classicGainAccel(x: Double, y: Double, power: Double, offset: Double) = -(y / power).pow(1 / (power - 1)) / (offset - x)
-
-        /** `utility.hpp` `minsd`: the second argument unless the first is smaller. */
-        fun minsd(a: Double, b: Double) = if (a < b) a else b
 
         // accel-classic.hpp:27-77
         fun classicVelocity(args: RawAccelArgs): (Double) -> Double {
@@ -246,13 +180,7 @@ data class RawAccelCurve(val args: RawAccelArgs) : AccelCurve {
             }
         }
 
-        // accel-lookup.hpp:93-101, with maxsd/minsd of utility.hpp
-        fun lerp(a: Double, b: Double, t: Double): Double {
-            val x = a + t * (b - a)
-            return if ((t > 1) == (a < b)) (if (b < x) x else b) else minsd(x, b)
-        }
-
-        // accel-lookup.hpp:103-156; `velocity` there is args.gain
+        // accel-lookup.hpp:55-97; `velocity` there is args.gain
         fun lookup(args: RawAccelArgs): (Double) -> Double {
             val data = args.lut
             val size = data.size / 2
@@ -274,7 +202,7 @@ data class RawAccelCurve(val args: RawAccelArgs) : AccelCurve {
                     }
                 }
                 if (lo > 0) {
-                    val y = lerp(py(lo - 1), py(lo), (x - px(lo - 1)) / (px(lo) - px(lo - 1)))
+                    val y = rawLerp(py(lo - 1), py(lo), (x - px(lo - 1)) / (px(lo) - px(lo - 1)))
                     return if (outputSpeed) y / x else y
                 }
                 return if (outputSpeed) py(0) / px(0) else py(0)
@@ -283,29 +211,3 @@ data class RawAccelCurve(val args: RawAccelArgs) : AccelCurve {
     }
 }
 
-/**
- * A Raw Accel profile as far as the trainer needs it: the acceleration of the whole (combined) input plus the two DPI values.
- * Raw Accel computes the speed of a report as counts per ms times 1000 / [deviceDpi] (the device's DPI setting, `driver.cpp:376`;
- * a device DPI of 0 means no normalization and is the same as 1000), so the speed axis of [curve] belongs to the DPI in the
- * file, and the trainer must run with that DPI to see the user's curve at the user's speeds. The counts are then multiplied by
- * the curve and by `outputDpi / deviceDpi` (`rawaccel.hpp:412`, `:429`).
- */
-data class RawAccelProfile(
-    val name: String,
-    val args: RawAccelArgs,
-    val outputDpi: Double,
-    val deviceDpi: Double,
-) {
-    init {
-        require(outputDpi > 0 && outputDpi.isFinite()) { "output DPI must be positive" }
-        require(deviceDpi >= 0 && deviceDpi.isFinite()) { "device DPI must not be negative" }
-    }
-
-    val curve: RawAccelCurve = RawAccelCurve(args)
-
-    /** The DPI the driver normalizes with: the device's, or 1000 when the file has none. */
-    val effectiveDeviceDpi: Double get() = if (deviceDpi > 0) deviceDpi else AccelProcessor.NORMALIZED_DPI
-
-    /** The factor the counts get at [speed] inches per second: the curve times `outputDpi / deviceDpi`. */
-    fun totalMultiplier(speed: Double): Double = curve.multiplier(speed) * outputDpi / effectiveDeviceDpi
-}

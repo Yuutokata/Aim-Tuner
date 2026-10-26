@@ -86,9 +86,19 @@ data class SimulatedPlayer(
      * instance is mutable and carries the learning from round to round, so give every simulated person its own one.
      */
     val adaptation: HandAdaptation? = null,
+    /** Deviations of the hand's counts that a Raw Accel rotation, Y/X, L/R, U/D ratio or angle snapping corrects; neutral by default. */
+    val hand: HandGeometry = HandGeometry.NEUTRAL,
+    /**
+     * Scale of the endpoint noise of a reach along its direction (the extent) and across it (the direction); 1 (the default)
+     * is the isotropic noise of the base model. Real first movements have a larger extent than direction spread; the passive
+     * setting gate scales them to the spread of stored rounds.
+     */
+    val extentNoiseScale: Double = 1.0,
+    val directionNoiseScale: Double = 1.0,
 ) {
     init {
         require(noiseLevel >= 0.0 && fatiguePerMinute >= 0.0 && optimumScale > 0.0) { "invalid player parameters" }
+        require(extentNoiseScale > 0.0 && directionNoiseScale > 0.0) { "noise scales must be positive" }
         require(rangeBias >= 0.0 && rangeReferenceDegrees > 0.0) { "invalid range bias" }
         require(undershootBias in 0.0..<1.0) { "undershoot bias must be in [0, 1)" }
         require(pressureUndershoot >= 0.0) { "pressure undershoot must not be negative" }
